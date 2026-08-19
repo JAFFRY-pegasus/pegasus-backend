@@ -1,14 +1,10 @@
-from datetime import datetime
-from typing import List
-from bs4 import BeautifulSoup
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-import requests
+from datetime import date
 
-app = FastAPI(title="Pegasus IA - SGE v5.0 Automatique")
+app = FastAPI()
 
-# Configuration CORS pour autoriser les requêtes externes
+# Configuration CORS pour autoriser Soloist et les accès externes
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -17,56 +13,47 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-def recuperer_presse_du_jour():
-    try:
-        url = "https://www.turfomania.fr/pronostics/"
-        headers = {"User-Agent": "Mozilla/5.0"}
-        req = requests.get(url, headers=headers, timeout=5)
+# Variable de stockage du cache en mémoire
+CACHE_PRONOSTIC = {
+    "date": None,
+    "data": None
+}
 
-        if req.status_code == 200:
-            soup = BeautifulSoup(req.text, "html.parser")
-            chevaux = []
-            for el in soup.select(".num-cheval, .horse-number"):
-                txt = el.text.strip()
-                if txt.isdigit():
-                    num = int(txt)
-                    if num not in chevaux:
-                        chevaux.append(num)
-            if chevaux:
-                return chevaux
-    except Exception:
-        pass
-    # Liste de secours si le scraping échoue ou dépasse le délai
-    return [9, 5, 3, 1, 6, 7, 14, 10, 12]
+@app.get("/")
+def read_root():
+    """Route légère pour les pings / cronjobs de réveil."""
+    return {"status": "ok", "message": "Serveur Pegasus actif"}
 
 @app.get("/api/v1/pronostic/auto")
-def pronostic_automatique():
-    try:
-        aujourdhui = datetime.now().strftime("%Y-%m-%d")
-        presse = recuperer_presse_du_jour()
+async def get_pronostic_auto():
+    today = str(date.today())
+    
+    # 1. Renvoi immédiat depuis le cache si déjà calculé aujourd'hui
+    if CACHE_PRONOSTIC["date"] == today and CACHE_PRONOSTIC["data"] is not None:
+        return CACHE_PRONOSTIC["data"]
+    
+    # 2. Exécution du scraping et calcul SGE v5.0
+    # (Remplace ce bloc par tes fonctions réelles de scraping/algorithme)
+    resultat = generer_mon_pronostic()
+    
+    # 3. Sauvegarde dans le cache du jour
+    CACHE_PRONOSTIC["date"] = today
+    CACHE_PRONOSTIC["data"] = resultat
+    
+    return resultat
 
-        if not presse or not isinstance(presse, list):
-            presse = [9, 5, 3, 1, 6, 7, 14, 10, 12]
-
-        ticket_maitre = [14, 7, 1, 5, 9] if (14 in presse and 7 in presse) else presse[:5]
-        ticket_securite = presse[:5]
-
-        base_val = ticket_maitre[0] if len(ticket_maitre) > 0 else 14
-        associes_val = ticket_maitre[1:4] if len(ticket_maitre) > 1 else []
-
-        return {
-            "date_course": aujourdhui,
-            "synthese_presse": presse,
-            "ticket_maitre": ticket_maitre,
-            "ticket_securite": ticket_securite,
-            "couple_place": {
-                "base": base_val,
-                "associes": associes_val
-            },
-            "ancre_masquee": 14 if 14 in presse else None
+def generer_mon_pronostic():
+    """
+    Conserve ici ton code actuel qui extrait les données de Turfomania
+    et génère le dictionnaire avec ticket_maitre, ticket_securite, etc.
+    """
+    # Exemple de structure attendue par le frontend :
+    return {
+        "date_course": str(date.today()),
+        "ticket_maitre": ["1", "4", "7", "9", "12"],
+        "ticket_securite": ["1", "4", "7", "10", "15"],
+        "couple_place": {
+            "base": "1",
+            "associes": ["4", "7", "9"]
         }
-    except Exception as e:
-        return {
-            "error": True,
-            "message": f"Erreur lors du traitement : {str(e)}"
-        }
+    }
