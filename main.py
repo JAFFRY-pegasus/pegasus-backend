@@ -1,78 +1,267 @@
-import os
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-
-app = FastAPI()
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-PRIORITES_GEOMETRIQUES = {
-    1: [9, 2, 10, 8, 16], 2: [10, 1, 8, 9, 10], 3: [11, 4, 2, 12, 10],
-    4: [12, 5, 8, 13, 11], 5: [13, 4, 6, 12, 14], 6: [14, 5, 7, 13, 14],
-    7: [15, 8, 6, 16, 14], 8: [16, 7, 1, 15, 9], 9: [1, 2, 8, 10, 16],
-    10: [2, 1, 8, 9, 11], 11: [8, 3, 2, 12, 10], 12: [4, 5, 3, 13, 11],
-    13: [5, 4, 6, 12, 14], 14: [6, 5, 7, 13, 15], 15: [7, 8, 6, 16, 14],
-    16: [8, 1, 7, 9, 15]
-}
-
-AXES_MIROIRS = {
-    1: 8, 8: 1, 2: 7, 7: 2, 3: 6, 6: 3, 4: 5, 5: 4,
-    9: 16, 16: 9, 10: 15, 15: 10, 11: 14, 14: 11, 12: 13, 13: 12
-}
-
-def calculer_resonances_pegasus(partants_actifs, favori_base, non_partants=[]):
-    scores = {num: 0.0 for num in partants_actifs if num not in non_partants}
-    
-    for np in non_partants:
-        if np in AXES_MIROIRS and AXES_MIROIRS[np] in scores:
-            scores[AXES_MIROIRS[np]] += 15.0
-
-    if favori_base in AXES_MIROIRS and AXES_MIROIRS[favori_base] in scores:
-        scores[AXES_MIROIRS[favori_base]] += 20.0
-            
-    if favori_base in PRIORITES_GEOMETRIQUES:
-        poids = [12.0, 9.0, 6.0, 4.0, 2.0]
-        for idx, target in enumerate(PRIORITES_GEOMETRIQUES[favori_base]):
-            if target in non_partants and target in PRIORITES_GEOMETRIQUES:
-                devies = [n for n in PRIORITES_GEOMETRIQUES[target] if n not in non_partants and n in scores]
-                if devies:
-                    target = devies[0]
-            if target in scores:
-                scores[target] += poids[idx]
-
-    for num in list(scores.keys()):
-        miroir = AXES_MIROIRS.get(num)
-        if miroir and miroir in scores:
-            scores[num] += 5.0
-
-    return sorted(scores.items(), key=lambda x: x[1], reverse=True)
-
-@app.get("/")
-def home():
-    return {"status": "PEGASUS Backend en ligne", "version": "SGE v6.0"}
-
-@app.get("/predict")
-def predict(favori: int = 14, non_partants: str = ""):
-    # Traitement des non-partants transmis sous forme de texte ("12,3" ou "12")
-    np_list = []
-    if non_partants:
-        try:
-            np_list = [int(n.strip()) for n in non_partants.split(",") if n.strip().isdigit()]
-        except ValueError:
-            np_list = []
-
-    partants = list(range(1, 17))
-    resultats = calculer_resonances_pegasus(partants, favori, np_list)
-    
-    return {
-        "favori": favori,
-        "non_partants": np_list,
-        "quinte_sge": [num for num, score in resultats[:5]],
-        "scores": resultats
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PEGASUS IA - Pronostics SGE</title>
+  <style>
+    :root {
+      --bg-color: #0f172a;
+      --card-bg: #1e293b;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent-green: #10b981;
+      --accent-blue: #3b82f6;
+      --accent-blue-hover: #2563eb;
+      --border-color: #334155;
     }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+
+    .card {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 28px;
+      width: 100%;
+      max-width: 480px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+    }
+
+    .header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+
+    .title-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+    }
+
+    .badge {
+      background-color: var(--accent-blue);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 12px;
+      text-transform: uppercase;
+    }
+
+    /* Voyant vert clignotant */
+    .dot-green {
+      width: 12px;
+      height: 12px;
+      background-color: #2ecc71;
+      border-radius: 50%;
+      display: inline-block;
+      box-shadow: 0 0 10px #2ecc71;
+      animation: clignoter 1.5s infinite ease-in-out;
+    }
+
+    @keyframes clignoter {
+      0% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.25; transform: scale(0.85); }
+      100% { opacity: 1; transform: scale(1); }
+    }
+
+    .subtitle {
+      color: var(--text-muted);
+      font-size: 14px;
+      margin-top: 0;
+      margin-bottom: 24px;
+    }
+
+    .info-box {
+      background-color: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 14px 18px;
+      margin-bottom: 24px;
+    }
+
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 0;
+      font-size: 15px;
+    }
+
+    .info-row:not(:last-child) {
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .info-row span {
+      color: var(--text-muted);
+    }
+
+    .info-row strong {
+      color: var(--text-main);
+      font-weight: 700;
+    }
+
+    .selection-box {
+      background-color: #065f46;
+      border: 1px solid #047857;
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+      margin-bottom: 24px;
+    }
+
+    .selection-box h3 {
+      margin: 0 0 12px 0;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #a7f3d0;
+      font-weight: 700;
+    }
+
+    .numbers {
+      font-size: 26px;
+      font-weight: 900;
+      letter-spacing: 2px;
+      color: #ffffff;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+
+    button {
+      width: 100%;
+      background-color: var(--accent-blue);
+      color: #ffffff;
+      border: none;
+      border-radius: 10px;
+      padding: 14px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background-color 0.2s ease, transform 0.1s ease;
+    }
+
+    button:hover {
+      background-color: var(--accent-blue-hover);
+    }
+
+    button:active {
+      transform: scale(0.99);
+    }
+
+    .status-footer {
+      text-align: center;
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 16px;
+      margin-bottom: 0;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="card">
+    <!-- En-tête avec titre et signal clignotant -->
+    <div class="header-row">
+      <div class="title-group">
+        <h1>PEGASUS IA</h1>
+        <span class="badge">SGE v6.0</span>
+      </div>
+      <div class="status-indicator">
+        <span class="dot-green" title="Service actif"></span>
+      </div>
+    </div>
+
+    <p class="subtitle">Analyse géométrique & résonances matinales</p>
+
+    <!-- Bloc d'information -->
+    <div class="info-box">
+      <div class="info-row">
+        <span>Favori de la presse :</span>
+        <strong id="favori-val">Chargement...</strong>
+      </div>
+      <div class="info-row">
+        <span>Non partant(s) :</span>
+        <strong id="np-val">Chargement...</strong>
+      </div>
+    </div>
+
+    <!-- Pronostic -->
+    <div class="selection-box">
+      <h3>MON PRONOSTIC PEGASUS IA !</h3>
+      <div id="quinte-display" class="numbers">-- - -- - -- - -- - --</div>
+    </div>
+
+    <!-- Bouton d'action -->
+    <button id="btn-refresh" onclick="chargerPronostic()">Actualisation</button>
+
+    <p id="status-msg" class="status-footer">Dernière mise à jour effectuée avec succès.</p>
+  </div>
+
+  <script>
+    const API_URL = "https://pegasus-backend-c3a6.onrender.com/predict";
+
+    async function chargerPronostic() {
+      const btn = document.getElementById("btn-refresh");
+      const favoriEl = document.getElementById("favori-val");
+      const npEl = document.getElementById("np-val");
+      const quinteEl = document.getElementById("quinte-display");
+      const statusEl = document.getElementById("status-msg");
+
+      btn.disabled = true;
+      btn.innerText = "Calcul en cours...";
+      statusEl.innerText = "Connexion au serveur PEGASUS...";
+
+      try {
+        const response = await fetch(API_URL);
+        if (!response.ok) throw new Error("Erreur serveur");
+        
+        const data = await response.json();
+
+        // Mise à jour de l'affichage
+        favoriEl.innerText = "Cheval " + data.favori;
+        
+        if (data.non_partants && data.non_partants.length > 0) {
+          npEl.innerText = data.non_partants.join(", ");
+        } else {
+          npEl.innerText = "Aucun";
+        }
+
+        quinteEl.innerText = data.quinte_sge.join(" - ");
+        statusEl.innerText = "Dernière mise à jour effectuée avec succès.";
+
+      } catch (error) {
+        console.error("Erreur :", error);
+        statusEl.innerText = "Erreur de connexion avec le serveur.";
+      } finally {
+        btn.disabled = false;
+        btn.innerText = "Actualisation";
+      }
+    }
+
+    // Chargement automatique au lancement de la page
+    window.onload = chargerPronostic;
+  </script>
+
+</body>
+</html>
