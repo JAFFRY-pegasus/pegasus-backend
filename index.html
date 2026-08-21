@@ -1,175 +1,209 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pegasus IA — Pronostic Quinté+</title>
-  <style>
-    body {
-      background-color: #0f172a;
-      color: #fff;
-      font-family: 'Segoe UI', Roboto, sans-serif;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
-      margin: 0;
-      padding: 20px;
-      box-sizing: border-box;
-    }
-    #pegasus-card {
-      width: 100%;
-      max-width: 480px;
-      padding: 30px;
-      background: linear-gradient(145deg, #1e293b, #0f172a);
-      border-radius: 20px;
-      box-shadow: 0 20px 40px rgba(0,0,0,0.6);
-      border: 1px solid rgba(255,255,255,0.08);
-      text-align: center;
-    }
-    .badge-header {
-      background: rgba(0, 210, 255, 0.15);
-      color: #00d2ff;
-      padding: 4px 12px;
-      border-radius: 20px;
-      font-size: 12px;
-      font-weight: 600;
-      border: 1px solid rgba(0, 210, 255, 0.3);
-    }
-    .live-status {
-      font-size: 12px;
-      color: #4cd964;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-weight: 500;
-    }
-    .live-dot {
-      height: 8px;
-      width: 8px;
-      background-color: #4cd964;
-      border-radius: 50%;
-      display: inline-block;
-      box-shadow: 0 0 8px #4cd964;
-    }
-    #btn-prono {
-      width: 100%;
-      background: linear-gradient(90deg, #00d2ff, #0072ff);
-      color: #fff;
-      font-weight: bold;
-      padding: 16px 20px;
-      border: none;
-      border-radius: 12px;
-      cursor: pointer;
-      font-size: 16px;
-      transition: transform 0.2s, box-shadow 0.2s;
-      box-shadow: 0 4px 15px rgba(0, 210, 255, 0.3);
-      margin-top: 10px;
-    }
-    #btn-prono:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0, 210, 255, 0.4); }
-    #btn-prono:active { transform: translateY(0); }
-    .badge-container { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 8px; }
-    .num-ball {
-      width: 40px;
-      height: 40px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, #334155, #1e293b);
-      border: 1px solid rgba(255,255,255,0.15);
-      color: #fff;
-      font-weight: bold;
-      font-size: 16px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-shadow: 0 3px 6px rgba(0,0,0,0.3);
-    }
-    .num-ball.base-ball {
-      background: linear-gradient(135deg, #ff9500, #ff5e00);
-      border: none;
-      box-shadow: 0 3px 10px rgba(255, 149, 0, 0.4);
-    }
-    .section-block {
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid rgba(255, 255, 255, 0.05);
-      border-radius: 12px;
-      padding: 14px;
-      margin-top: 14px;
-      text-align: left;
-    }
-    .section-title { font-size: 12px; text-transform: uppercase; letter-spacing: 0.8px; color: #94a3b8; font-weight: 600; margin-bottom: 6px; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PEGASUS IA - Pronostics Quinté SGE</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --primary-color: #10b981;
+            --text-color: #f8fafc;
+            --text-secondary: #94a3b8;
+            --accent-color: #3b82f6;
+            --border-color: #334155;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 30px;
+            max-width: 550px;
+            width: 100%;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+        }
+
+        h1 {
+            color: var(--text-color);
+            font-size: 1.8rem;
+            margin-top: 0;
+            margin-bottom: 5px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .version-badge {
+            background-color: var(--accent-color);
+            color: white;
+            font-size: 0.75rem;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-weight: normal;
+        }
+
+        .subtitle {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            margin-bottom: 25px;
+        }
+
+        .data-card {
+            background-color: rgba(15, 23, 42, 0.6);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .data-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .data-row:last-child {
+            border-bottom: none;
+        }
+
+        .label {
+            color: var(--text-secondary);
+        }
+
+        .value {
+            font-weight: bold;
+        }
+
+        .result-box {
+            background: linear-gradient(135deg, #065f46 0%, #047857 100%);
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
+        }
+
+        .result-title {
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+            color: #a7f3d0;
+        }
+
+        .result-selection {
+            font-size: 2rem;
+            font-weight: 800;
+            letter-spacing: 2px;
+            color: #ffffff;
+        }
+
+        .btn-update {
+            width: 100%;
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+
+        .btn-update:hover {
+            background-color: #2563eb;
+        }
+
+        .status-msg {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            text-align: center;
+            margin-top: 15px;
+        }
+    </style>
 </head>
 <body>
 
-<div id="pegasus-card">
-  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-    <span class="badge-header">SGE v5.0</span>
-    <span class="live-status"><span class="live-dot"></span> En direct</span>
-  </div>
+<div class="container">
+    <h1>PEGASUS IA <span class="version-badge">SGE v6.0</span></h1>
+    <div class="subtitle">Analyse géométrique & résonances matinales</div>
 
-  <h1 style="margin: 0 0 5px 0; font-size: 24px; font-weight: 700;">Mon pronostic IA PEGASUS</h1>
-  <p style="margin: 0 0 20px 0; font-size: 14px; color: #94a3b8;">Analyse algorithmique de la presse</p>
+    <div class="data-card">
+        <div class="data-row">
+            <span class="label">Favori retenu :</span>
+            <span class="value" id="sge-favori">-</span>
+        </div>
+        <div class="data-row">
+            <span class="label">Non-partants détectés :</span>
+            <span class="value" id="sge-np">Aucun</span>
+        </div>
+    </div>
 
-  <button id="btn-prono" onclick="chargerPronostic()">Obtenir la sélection du jour</button>
+    <div class="result-box">
+        <div class="result-title">Sélection Quinté Recommandée</div>
+        <div class="result-selection" id="sge-quinte">-- -- -- -- --</div>
+    </div>
 
-  <div id="zone-resultat"></div>
+    <button class="btn-update" onclick="chargerPronosticSGE()">Actualiser les résonances</button>
+    <div class="status-msg" id="status-text">Initialisation des systèmes...</div>
 </div>
 
 <script>
-async function chargerPronostic() {
-  const btn = document.getElementById("btn-prono");
-  const resultat = document.getElementById("zone-resultat");
-  
-  btn.innerText = "Calcul en cours...";
-  btn.disabled = true;
-  btn.style.opacity = "0.7";
+    const API_URL = 'https://pegasus-backend-c3a6.onrender.com/predict';
 
-  try {
-    const response = await fetch("https://pegasus-backend-c3a6.onrender.com/api/v1/pronostic/auto");
-    if (!response.ok) throw new Error("Erreur serveur : " + response.status);
-    
-    const data = await response.json();
+    async function chargerPronosticSGE() {
+        const quinteEl = document.getElementById('sge-quinte');
+        const favoriEl = document.getElementById('sge-favori');
+        const npEl = document.getElementById('sge-np');
+        const statusEl = document.getElementById('status-text');
 
-    if (data.error) {
-      resultat.innerHTML = `<p style="color: #ff3b30; font-size: 14px; margin-top: 20px;">⚠️ ${data.message}</p>`;
-    } else {
-      const makeBalls = (arr) => arr.map(n => `<div class="num-ball">${n}</div>`).join('');
+        quinteEl.innerText = "-- -- -- -- --";
+        statusEl.innerText = "Analyse en cours... (Serveur en démarrage : 10 à 30 sec)";
 
-      resultat.innerHTML = `
-        <div style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px; margin-top: 20px;">
-          <p style="font-size: 13px; color: #00d2ff; margin-bottom: 15px; font-weight: 600;">
-            📅 Course du ${data.date_course}
-          </p>
+        try {
+            const response = await fetch(API_URL);
+            if (!response.ok) throw new Error("Erreur réseau HTTP " + response.status);
 
-          <div class="section-block">
-            <div class="section-title">⭐ Ticket Maître (Sélection principale)</div>
-            <div class="badge-container">${makeBalls(data.ticket_maitre)}</div>
-          </div>
+            const data = await response.json();
 
-          <div class="section-block">
-            <div class="section-title">🛡️ Ticket Sécurité (Couverture)</div>
-            <div class="badge-container">${makeBalls(data.ticket_securite)}</div>
-          </div>
+            favoriEl.innerText = data.favori ? "Cheval " + data.favori : "Non défini";
+            npEl.innerText = (data.non_partants && data.non_partants.length > 0) 
+                             ? data.non_partants.join(', ') 
+                             : 'Aucun';
+            
+            if (data.quinte_sge && data.quinte_sge.length > 0) {
+                quinteEl.innerText = data.quinte_sge.join(' - ');
+            } else {
+                quinteEl.innerText = "Données indisponibles";
+            }
 
-          <div class="section-block">
-            <div class="section-title">🎯 Base & Associés</div>
-            <div class="badge-container" style="justify-content: flex-start; align-items: center;">
-              <div class="num-ball base-ball" title="Base">${data.couple_place.base}</div>
-              <span style="color: #94a3b8; font-size: 18px; margin: 0 4px;">+</span>
-              ${makeBalls(data.couple_place.associes)}
-            </div>
-          </div>
-        </div>
-      `;
+            statusEl.innerText = "Dernière mise à jour effectuée avec succès.";
+
+        } catch (error) {
+            console.error("Erreur de connexion SGE :", error);
+            quinteEl.innerText = "ERREUR";
+            statusEl.innerText = "Impossible de joindre le serveur. Réessayez dans quelques instants.";
+        }
     }
-  } catch (err) {
-    resultat.innerHTML = `<p style="color: #ff3b30; font-size: 14px; margin-top: 20px;">⚠️ Connexion au serveur en cours... Réessaie dans quelques secondes.</p>`;
-  } finally {
-    btn.innerText = "Actualiser le pronostic";
-    btn.disabled = false;
-    btn.style.opacity = "1";
-  }
-}
+
+    // Chargement automatique dès l'ouverture de la page
+    document.addEventListener('DOMContentLoaded', chargerPronosticSGE);
 </script>
 
 </body>
