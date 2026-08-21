@@ -56,10 +56,10 @@ def calculer_resonances_pegasus(partants_actifs, favori_base, non_partants=[]):
     return sorted(scores.items(), key=lambda x: x[1], reverse=True)
 
 def obtenir_donnees_pmu_live():
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+    headers = {"User-Agent": "Mozilla/5.0"}
     try:
         url_prog = "https://online.pmu.fr/rest/client/7/programme/aujourdhui"
-        res = requests.get(url_prog, headers=headers, timeout=5)
+        res = requests.get(url_prog, headers=headers, timeout=4)
         if res.status_code != 200:
             return None
         
@@ -68,7 +68,7 @@ def obtenir_donnees_pmu_live():
         date_str = dt_obj.strftime("%d/%m/%Y")
         iso_date = dt_obj.strftime("%d%m%Y")
 
-        r_num, c_num, hippo, disc, dist = None, None, "Cabourg", "Attelé", "2750m"
+        r_num, c_num, hippo, disc, dist = None, None, "Hippodrome Quinté", "Attelé", "2750m"
 
         for r in prog.get('programme', {}).get('reunions', []):
             for c in r.get('courses', []):
@@ -87,7 +87,7 @@ def obtenir_donnees_pmu_live():
             return None
 
         url_partants = f"https://online.pmu.fr/rest/client/7/programme/{iso_date}/R{r_num}/C{c_num}/partants"
-        res_p = requests.get(url_partants, headers=headers, timeout=5)
+        res_p = requests.get(url_partants, headers=headers, timeout=4)
         if res_p.status_code != 200:
             return None
 
