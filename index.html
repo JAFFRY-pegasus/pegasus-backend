@@ -1,210 +1,78 @@
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PEGASUS IA - Pronostics Quinté SGE</title>
-    <style>
-        :root {
-            --bg-color: #0f172a;
-            --card-bg: #1e293b;
-            --primary-color: #10b981;
-            --text-color: #f8fafc;
-            --text-secondary: #94a3b8;
-            --accent-color: #3b82f6;
-            --border-color: #334155;
-        }
 
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            margin: 0;
-            padding: 20px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-        }
+import os
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
-        .container {
-            background-color: var(--card-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            padding: 30px;
-            max-width: 550px;
-            width: 100%;
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
-        }
+app = FastAPI()
 
-        h1 {
-            color: var(--text-color);
-            font-size: 1.8rem;
-            margin-top: 0;
-            margin-bottom: 5px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-        .version-badge {
-            background-color: var(--accent-color);
-            color: white;
-            font-size: 0.75rem;
-            padding: 3px 8px;
-            border-radius: 12px;
-            font-weight: normal;
-        }
+PRIORITES_GEOMETRIQUES = {
+    1: [9, 2, 10, 8, 16], 2: [10, 1, 8, 9, 10], 3: [11, 4, 2, 12, 10],
+    4: [12, 5, 8, 13, 11], 5: [13, 4, 6, 12, 14], 6: [14, 5, 7, 13, 14],
+    7: [15, 8, 6, 16, 14], 8: [16, 7, 1, 15, 9], 9: [1, 2, 8, 10, 16],
+    10: [2, 1, 8, 9, 11], 11: [8, 3, 2, 12, 10], 12: [4, 5, 3, 13, 11],
+    13: [5, 4, 6, 12, 14], 14: [6, 5, 7, 13, 15], 15: [7, 8, 6, 16, 14],
+    16: [8, 1, 7, 9, 15]
+}
 
-        .subtitle {
-            color: var(--text-secondary);
-            font-size: 0.9rem;
-            margin-bottom: 25px;
-        }
+AXES_MIROIRS = {
+    1: 8, 8: 1, 2: 7, 7: 2, 3: 6, 6: 3, 4: 5, 5: 4,
+    9: 16, 16: 9, 10: 15, 15: 10, 11: 14, 14: 11, 12: 13, 13: 12
+}
 
-        .data-card {
-            background-color: rgba(15, 23, 42, 0.6);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 15px;
-            margin-bottom: 20px;
-        }
+def calculer_resonances_pegasus(partants_actifs, favori_base, non_partants=[]):
+    scores = {num: 0.0 for num in partants_actifs if num not in non_partants}
+    
+    for np in non_partants:
+        if np in AXES_MIROIRS and AXES_MIROIRS[np] in scores:
+            scores[AXES_MIROIRS[np]] += 15.0
 
-        .data-row {
-            display: flex;
-            justify-content: space-between;
-            padding: 8px 0;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-        }
-
-        .data-row:last-child {
-            border-bottom: none;
-        }
-
-        .label {
-            color: var(--text-secondary);
-        }
-
-        .value {
-            font-weight: bold;
-        }
-
-        .result-box {
-            background: linear-gradient(135deg, #065f46 0%, #047857 100%);
-            border-radius: 8px;
-            padding: 20px;
-            text-align: center;
-            margin-bottom: 20px;
-            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
-        }
-
-        .result-title {
-            font-size: 0.9rem;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 10px;
-            color: #a7f3d0;
-        }
-
-        .result-selection {
-            font-size: 2rem;
-            font-weight: 800;
-            letter-spacing: 2px;
-            color: #ffffff;
-        }
-
-        .btn-update {
-            width: 100%;
-            background-color: var(--accent-color);
-            color: white;
-            border: none;
-            padding: 12px;
-            font-size: 1rem;
-            font-weight: 600;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: background-color 0.2s ease;
-        }
-
-        .btn-update:hover {
-            background-color: #2563eb;
-        }
-
-        .status-msg {
-            font-size: 0.85rem;
-            color: var(--text-secondary);
-            text-align: center;
-            margin-top: 15px;
-        }
-    </style>
-</head>
-<body>
-
-<div class="container">
-    <h1>PEGASUS IA <span class="version-badge">SGE v6.0</span></h1>
-    <div class="subtitle">Analyse géométrique & résonances matinales</div>
-
-    <div class="data-card">
-        <div class="data-row">
-            <span class="label">Favori retenu :</span>
-            <span class="value" id="sge-favori">-</span>
-        </div>
-        <div class="data-row">
-            <span class="label">Non-partants détectés :</span>
-            <span class="value" id="sge-np">Aucun</span>
-        </div>
-    </div>
-
-    <div class="result-box">
-        <div class="result-title">Sélection Quinté Recommandée</div>
-        <div class="result-selection" id="sge-quinte">-- -- -- -- --</div>
-    </div>
-
-    <button class="btn-update" onclick="chargerPronosticSGE()">Actualiser les résonances</button>
-    <div class="status-msg" id="status-text">Initialisation des systèmes...</div>
-</div>
-
-<script>
-    const API_URL = 'https://pegasus-backend-c3a6.onrender.com/predict';
-
-    async function chargerPronosticSGE() {
-        const quinteEl = document.getElementById('sge-quinte');
-        const favoriEl = document.getElementById('sge-favori');
-        const npEl = document.getElementById('sge-np');
-        const statusEl = document.getElementById('status-text');
-
-        quinteEl.innerText = "-- -- -- -- --";
-        statusEl.innerText = "Analyse en cours... (Serveur en démarrage : 10 à 30 sec)";
-
-        try {
-            const response = await fetch(API_URL);
-            if (!response.ok) throw new Error("Erreur réseau HTTP " + response.status);
-
-            const data = await response.json();
-
-            favoriEl.innerText = data.favori ? "Cheval " + data.favori : "Non défini";
-            npEl.innerText = (data.non_partants && data.non_partants.length > 0) 
-                             ? data.non_partants.join(', ') 
-                             : 'Aucun';
+    if favori_base in AXES_MIROIRS and AXES_MIROIRS[favori_base] in scores:
+        scores[AXES_MIROIRS[favori_base]] += 20.0
             
-            if (data.quinte_sge && data.quinte_sge.length > 0) {
-                quinteEl.innerText = data.quinte_sge.join(' - ');
-            } else {
-                quinteEl.innerText = "Données indisponibles";
-            }
+    if favori_base in PRIORITES_GEOMETRIQUES:
+        poids = [12.0, 9.0, 6.0, 4.0, 2.0]
+        for idx, target in enumerate(PRIORITES_GEOMETRIQUES[favori_base]):
+            if target in non_partants and target in PRIORITES_GEOMETRIQUES:
+                devies = [n for n in PRIORITES_GEOMETRIQUES[target] if n not in non_partants and n in scores]
+                if devies:
+                    target = devies[0]
+            if target in scores:
+                scores[target] += poids[idx]
 
-            statusEl.innerText = "Dernière mise à jour effectuée avec succès.";
+    for num in list(scores.keys()):
+        miroir = AXES_MIROIRS.get(num)
+        if miroir and miroir in scores:
+            scores[num] += 5.0
 
-        } catch (error) {
-            console.error("Erreur de connexion SGE :", error);
-            quinteEl.innerText = "ERREUR";
-            statusEl.innerText = "Impossible de joindre le serveur. Réessayez dans quelques instants.";
-        }
+    return sorted(scores.items(), key=lambda x: x[1], reverse=True)
+
+@app.get("/")
+def home():
+    return {"status": "PEGASUS Backend en ligne", "version": "SGE v6.0"}
+
+@app.get("/predict")
+def predict(favori: int = 14, non_partants: str = ""):
+    np_list = []
+    if non_partants:
+        try:
+            np_list = [int(n.strip()) for n in non_partants.split(",") if n.strip().isdigit()]
+        except ValueError:
+            np_list = []
+
+    partants = list(range(1, 17))
+    resultats = calculer_resonances_pegasus(partants, favori, np_list)
+    
+    return {
+        "favori": favori,
+        "non_partants": np_list,
+        "quinte_sge": [num for num, score in resultats[:5]],
+        "scores": resultats
     }
-
-    // Chargement automatique dès l'ouverture de la page
-    document.addEventListener('DOMContentLoaded', chargerPronosticSGE);
-</script>
-
-</body>
-</html>
