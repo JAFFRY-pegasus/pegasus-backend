@@ -1,5 +1,4 @@
 import os
-import requests
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -26,57 +25,6 @@ AXES_MIROIRS = {
     1: 8, 8: 1, 2: 7, 7: 2, 3: 6, 6: 3, 4: 5, 5: 4,
     9: 16, 16: 9, 10: 15, 15: 10, 11: 14, 14: 11, 12: 13, 13: 12
 }
-
-def recuperer_donnees_pmu():
-    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
-    donnees = {"partants": list(range(1, 17)), "favori_presse": 8, "non_partants": []}
-    
-    try:
-        url = "https://online.pmu.fr/rest/client/7/programme/aujourdhui"
-        resp = requests.get(url, headers=headers, timeout=5)
-        
-        if resp.status_code == 200:
-            prog = resp.json()
-            date_str = prog.get("programme", {}).get("date")
-            
-            r_num, c_num = None, None
-            for r in prog.get("programme", {}).get("reunions", []):
-                for c in r.get("courses", []):
-                    if c.get("eQuintePlus") or c.get("quintePlus"):
-                        r_num = r.get("numOfficiel")
-                        c_num = c.get("numOrdre")
-                        break
-                if r_num:
-                    break
-            
-            if r_num and c_num and date_str:
-                url_p = f"https://online.pmu.fr/rest/client/7/programme/{date_str}/R{r_num}/C{c_num}/partants"
-                resp_p = requests.get(url_p, headers=headers, timeout=5)
-                
-                if resp_p.status_code == 200:
-                    data_p = resp_p.json()
-                    cotes = {}
-                    non_partants = []
-                    partants = []
-                    
-                    for p in data_p.get("partants", []):
-                        num = p.get("numProno")
-                        if p.get("nonPartant"):
-                            non_partants.append(num)
-                        else:
-                            partants.append(num)
-                            rapport = p.get("rapportProbable", {})
-                            if rapport and "rapport" in rapport:
-                                cotes[num] = float(rapport["rapport"])
-                    
-                    if cotes:
-                        donnees["favori_presse"] = min(cotes, key=cotes.get)
-                    donnees["non_partants"] = non_partants
-                    donnees["partants"] = partants + non_partants
-    except Exception as e:
-        print(f"Erreur API PMU : {e}")
-
-    return donnees
 
 def calculer_resonances_pegasus(partants_actifs, favori_base, non_partants=[]):
     scores = {num: 0.0 for num in partants_actifs if num not in non_partants}
@@ -110,16 +58,21 @@ def home():
     return {"status": "PEGASUS Backend en ligne", "version": "SGE v6.0"}
 
 @app.get("/predict")
-def predict():
-    donnees = recuperer_donnees_pmu()
-    resultats = calculer_resonances_pegasus(
-        donnees["partants"], 
-        donnees["favori_presse"], 
-        donnees["non_partants"]
-    )
+def predict(favori: int = 14, non_partants: str = ""):
+    # Traitement des non-partants transmis sous forme de texte ("12,3" ou "12")
+    np_list = []
+    if non_partants:
+        try:
+            np_list = [int(n.strip()) for n in non_partants.split(",") if n.strip().isdigit()]
+        except ValueError:
+            np_list = []
+
+    partants = list(range(1, 17))
+    resultats = calculer_resonances_pegasus(partants, favori, np_list)
+    
     return {
-        "favori": donnees["favori_presse"],
-        "non_partants": donnees["non_partants"],
+        "favori": favori,
+        "non_partants": np_list,
         "quinte_sge": [num for num, score in resultats[:5]],
         "scores": resultats
     }
