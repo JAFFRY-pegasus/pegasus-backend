@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 
-# Configuration du CORS pour autoriser l'interface GitHub Pages / local
+# Configuration CORS pour autoriser GitHub Pages / front-end
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -33,31 +33,103 @@ AXES_MIROIRS = {
 }
 
 # ==============================================================================
-# 2. LOGIQUE METIER (TURFOMANIA + SGE)
+# 2. FONCTION DE RÉCUPÉRATION DYNAMIQUE (API PMU)
 # ==============================================================================
 
-def recuperer_donnees_turfomania():
+def recuperer_donnees_pmu():
+    """
+    Interroge l'API officielle PMU pour récupérer le Quinté+ du jour,
+    identifier le grand favori (cote la plus basse) et la liste des non-partants.
+    """
     headers = {'User-Agent': 'Mozilla/5.0'}
-    url = "https://www.turfomania.fr/courses/quinte.php"
-    donnees = {"partants": list(range(1, 17)), "favori_presse": 8, "non_partants": []}
+    
+    # Valeurs par défaut en cas d'erreur
+    donnees = {
+        "partants": list(range(1, 17)),
+        "favori_presse": 8,
+        "non_partants": []
+    }
+    
     try:
-        resp = requests.get(url, headers=headers, timeout=5)
-        if resp.status_code == 200:
-            pass
+        # 1. On récupère le programme du jour sur le PMU
+        url_programme = "https://aip-pmu-api.pmu.fr/rest/client/7/programme/aujourdhui"
+        resp = requests.get(url_programme, headers=headers, timeout=5)
+        if resp.status_code != 200:
+            return donnees
+
+        programme = resp.json()
+        date_str = programme.get("programme", {}).get("date")
+        
+        # 2. On recherche la course du Quinté+
+        reunion_quinte = None
+        course_quinte = None
+        
+        for reunion in programme.get("programme", {}).get("reunions", []):
+            for course in reunion.get("courses", []):
+                if course.get("eQuintePlus") or course.get("quintePlus"):
+                    reunion_quinte = reunion.get("numOfficiel")
+                    course_quinte = course.get("numOrdre")
+                    break
+            if reunion_quinte:
+                break
+                
+        if not reunion_quinte or not course_quinte:
+            return donnees
+
+        # 3. On récupère les partants et cotes de la course Quinté
+        url_partants = f"https://aip-pmu-api.pmu.fr/rest/client/7/programme/{date_str}/R{reunion_quinte}/C{course_quinte}/partants"
+        resp_partants = requests.get(url_partants, headers=headers, timeout=5)
+        
+        if resp_partants.status_code == 200:
+            data_partants = resp_partants.json()
+            partants = []
+            non_partants = []
+            cotes = {}
+            
+            for p in data_partants.get("partants", []):
+                num = p.get("numProno")
+                if p.get("nonPartant"):
+                    non_partants.append(num)
+                else:
+                    partants.append(num)
+                    # On cherche la cote probable pour repérer le favori
+                    rapport = p.get("rapportProbable", {})
+                    cote = rapport.get("rapport") if rapport else None
+                    if cote:
+                        cotes[num] = float(cote)
+
+            # Le favori est le numéro ayant la cote la plus faible
+            if cotes:
+                favori = min(cotes, key=cotes.get)
+            else:
+                favori = partants[0] if partants else 8
+
+            donnees["partants"] = partants + non_partants
+            donnees["favori_presse"] = favori
+            donnees["non_partants"] = non_partants
+
     except Exception as e:
-        print(f"Erreur scraping : {e}")
+        print(f"Erreur lors de la récupération PMU : {e}")
+
     return donnees
+
+# ==============================================================================
+# 3. LOGIQUE SGE v6.0
+# ==============================================================================
 
 def calculer_resonances_pegasus(partants_actifs, favori_base, non_partants=[]):
     scores = {num: 0.0 for num in partants_actifs if num not in non_partants}
     
+    # Impact des non-partants sur leur miroir (+15 pts)
     for np in non_partants:
         if np in AXES_MIROIRS and AXES_MIROIRS[np] in scores:
             scores[AXES_MIROIRS[np]] += 15.0
 
+    # Impact du favori sur son miroir (+20 pts)
     if favori_base in AXES_MIROIRS and AXES_MIROIRS[favori_base] in scores:
         scores[AXES_MIROIRS[favori_base]] += 20.0
             
+    # Injection des priorités géométriques du favori
     if favori_base in PRIORITES_GEOMETRIQUES:
         poids = [12.0, 9.0, 6.0, 4.0, 2.0]
         for idx, target in enumerate(PRIORITES_GEOMETRIQUES[favori_base]):
@@ -68,6 +140,7 @@ def calculer_resonances_pegasus(partants_actifs, favori_base, non_partants=[]):
             if target in scores:
                 scores[target] += poids[idx]
 
+    # Traitement miroir secondaire
     for num in list(scores.keys()):
         miroir = AXES_MIROIRS.get(num)
         if miroir and miroir in scores:
@@ -76,7 +149,7 @@ def calculer_resonances_pegasus(partants_actifs, favori_base, non_partants=[]):
     return sorted(scores.items(), key=lambda x: x[1], reverse=True)
 
 # ==============================================================================
-# 3. ROUTES API FASTAPI
+# 4. ROUTES FASTAPI
 # ==============================================================================
 
 @app.get("/")
@@ -85,7 +158,7 @@ def home():
 
 @app.get("/predict")
 def predict():
-    donnees = recuperer_donnees_turfomania()
+    donnees = recuperer_donnees_pmu()
     resultats = calculer_resonances_pegasus(
         donnees["partants"], 
         donnees["favori_presse"], 
