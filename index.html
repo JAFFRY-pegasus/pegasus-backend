@@ -192,27 +192,27 @@
 
     <p class="subtitle">Analyse géométrique & résonances matinales</p>
 
-    <!-- Informations Références Course + Favori -->
+    <!-- Encart Références Course + Favori -->
     <div class="info-box">
       <div class="info-row">
         <span>Date du jour :</span>
-        <strong id="date-val">Recherche...</strong>
+        <strong id="date-val">Chargement...</strong>
       </div>
       <div class="info-row">
         <span>Hippodrome :</span>
-        <strong id="hippo-val">Recherche...</strong>
+        <strong id="hippo-val">Chargement...</strong>
       </div>
       <div class="info-row">
         <span>Discipline & Distance :</span>
-        <strong id="disc-val">Recherche...</strong>
+        <strong id="disc-val">Chargement...</strong>
       </div>
       <div class="info-row">
         <span>Favori de la presse :</span>
-        <strong id="favori-val">Recherche...</strong>
+        <strong id="favori-val">Chargement...</strong>
       </div>
       <div class="info-row">
         <span>Non partant(s) :</span>
-        <strong id="np-val">Recherche...</strong>
+        <strong id="np-val">Chargement...</strong>
       </div>
     </div>
 
@@ -225,24 +225,11 @@
     <!-- Bouton d'action -->
     <button id="btn-refresh" onclick="chargerPronostic()">Actualisation</button>
 
-    <p id="status-msg" class="status-footer">Initialisation...</p>
+    <p id="status-msg" class="status-footer">Connexion au serveur PEGASUS...</p>
   </div>
 
   <script>
-    const BACKEND_URL = "https://pegasus-backend-c3a6.onrender.com/predict";
-
-    // Fonction fetch avec Timeout (limite d'attente à 2,5 sec)
-    async function fetchWithTimeout(resource, options = {}) {
-      const { timeout = 2500 } = options;
-      const controller = new AbortController();
-      const id = setTimeout(() => controller.abort(), timeout);
-      const response = await fetch(resource, {
-        ...options,
-        signal: controller.signal
-      });
-      clearTimeout(id);
-      return response;
-    }
+    const API_URL = "https://pegasus-backend-c3a6.onrender.com/predict";
 
     async function chargerPronostic() {
       const btn = document.getElementById("btn-refresh");
@@ -256,92 +243,31 @@
 
       btn.disabled = true;
       btn.innerText = "Calcul en cours...";
-      statusEl.innerText = "Analyse rapide des données Quinté+...";
-
-      let favoriDetecte = 14;
-      let nonPartantsDetectes = [];
+      statusEl.innerText = "Synchronisation avec le PMU en direct...";
 
       try {
-        const respProg = await fetchWithTimeout("https://online.pmu.fr/rest/client/7/programme/aujourdhui");
-        if (respProg.ok) {
-          const prog = await respProg.json();
-          const timestamp = prog.programme.date;
-          const dateObj = new Date(timestamp);
-          dateEl.innerText = dateObj.toLocaleDateString("fr-FR");
-
-          let rNum = null, cNum = null, hippoNom = "", discipline = "", distance = "";
-
-          for (const r of prog.programme.reunions || []) {
-            for (const c of r.courses || []) {
-              if (c.eQuintePlus || c.quintePlus) {
-                rNum = r.numOfficiel;
-                cNum = c.numOrdre;
-                hippoNom = r.hippodrome ? r.hippodrome.libelle : "Hippodrome Inconnu";
-                discipline = c.specialite || "Attelé";
-                distance = c.distance ? c.distance + "m" : "2750m";
-                break;
-              }
-            }
-            if (rNum) break;
-          }
-
-          if (rNum && cNum) {
-            hippoEl.innerText = `${hippoNom} (R${rNum}C${cNum})`;
-            discEl.innerText = `${discipline} - ${distance}`;
-
-            const isoDate = dateObj.toISOString().split('T')[0];
-            const respPartants = await fetchWithTimeout(`https://online.pmu.fr/rest/client/7/programme/${isoDate}/R${rNum}/C${cNum}/partants`);
-            
-            if (respPartants.ok) {
-              const dataPartants = await respPartants.json();
-              let minCote = 999;
-              
-              (dataPartants.partants || []).forEach(p => {
-                const estNP = p.nonPartant === true || 
-                              p.statut === "NON_PARTANT" || 
-                              p.statut === "NP" || 
-                              p.estNonPartant === true || 
-                              (p.rapportProbable && p.rapportProbable.rapport === 0);
-
-                if (estNP) {
-                  nonPartantsDetectes.push(p.numProno);
-                } else if (p.rapportProbable && p.rapportProbable.rapport) {
-                  const cote = parseFloat(p.rapportProbable.rapport);
-                  if (cote > 0 && cote < minCote) {
-                    minCote = cote;
-                    favoriDetecte = p.numProno;
-                  }
-                }
-              });
-            }
-          }
-        }
-      } catch (err) {
-        // En cas de délai dépassé ou d'erreur PMU
-        dateEl.innerText = new Date().toLocaleDateString("fr-FR");
-        hippoEl.innerText = "Cabourg (R1C4)";
-        discEl.innerText = "Attelé - 2750m";
-      }
-
-      nonPartantsDetectes.sort((a, b) => a - b);
-      favoriEl.innerText = "Cheval " + favoriDetecte;
-      npEl.innerText = nonPartantsDetectes.length > 0 ? nonPartantsDetectes.join(", ") : "Aucun";
-
-      try {
-        const queryParams = new URLSearchParams({
-          favori: favoriDetecte,
-          non_partants: nonPartantsDetectes.join(",")
-        });
-
-        const respPredict = await fetchWithTimeout(`${BACKEND_URL}?${queryParams.toString()}`, { timeout: 8000 });
-        if (!respPredict.ok) throw new Error("Erreur Backend");
+        const response = await fetch(API_URL);
+        if (!response.ok) throw new Error("Erreur serveur");
         
-        const dataPredict = await respPredict.json();
-        quinteEl.innerText = dataPredict.quinte_sge.join(" - ");
+        const data = await response.json();
+
+        dateEl.innerText = data.date || "--/--/----";
+        hippoEl.innerText = data.hippodrome || "Inconnu";
+        discEl.innerText = data.discipline_distance || "--";
+        favoriEl.innerText = "Cheval " + data.favori;
+        
+        if (data.non_partants && data.non_partants.length > 0) {
+          npEl.innerText = data.non_partants.join(", ");
+        } else {
+          npEl.innerText = "Aucun";
+        }
+
+        quinteEl.innerText = data.quinte_sge.join(" - ");
         statusEl.innerText = "Dernière mise à jour effectuée avec succès.";
 
-      } catch (err) {
-        statusEl.innerText = "Erreur ou serveur occupé. Réessayez.";
+      } catch (error) {
+        console.error("Erreur :", error);
+        statusEl.innerText = "Erreur de connexion avec le serveur.";
       } finally {
         btn.disabled = false;
         btn.innerText = "Actualisation";
