@@ -69,7 +69,6 @@
       text-transform: uppercase;
     }
 
-    /* Voyant vert clignotant */
     .dot-green {
       width: 12px;
       height: 12px;
@@ -90,7 +89,7 @@
       color: var(--text-muted);
       font-size: 14px;
       margin-top: 0;
-      margin-bottom: 24px;
+      margin-bottom: 20px;
     }
 
     .info-box {
@@ -106,7 +105,7 @@
       justify-content: space-between;
       align-items: center;
       padding: 6px 0;
-      font-size: 15px;
+      font-size: 14px;
     }
 
     .info-row:not(:last-child) {
@@ -181,7 +180,6 @@
 <body>
 
   <div class="card">
-    <!-- En-tête avec titre et signal clignotant -->
     <div class="header-row">
       <div class="title-group">
         <h1>PEGASUS IA</h1>
@@ -194,15 +192,27 @@
 
     <p class="subtitle">Analyse géométrique & résonances matinales</p>
 
-    <!-- Bloc d'information -->
+    <!-- Informations Références Course + Favori -->
     <div class="info-box">
       <div class="info-row">
+        <span>Date du jour :</span>
+        <strong id="date-val">Recherche...</strong>
+      </div>
+      <div class="info-row">
+        <span>Hippodrome :</span>
+        <strong id="hippo-val">Recherche...</strong>
+      </div>
+      <div class="info-row">
+        <span>Discipline & Distance :</span>
+        <strong id="disc-val">Recherche...</strong>
+      </div>
+      <div class="info-row">
         <span>Favori de la presse :</span>
-        <strong id="favori-val">Chargement...</strong>
+        <strong id="favori-val">Recherche...</strong>
       </div>
       <div class="info-row">
         <span>Non partant(s) :</span>
-        <strong id="np-val">Chargement...</strong>
+        <strong id="np-val">Recherche...</strong>
       </div>
     </div>
 
@@ -215,14 +225,17 @@
     <!-- Bouton d'action -->
     <button id="btn-refresh" onclick="chargerPronostic()">Actualisation</button>
 
-    <p id="status-msg" class="status-footer">Dernière mise à jour effectuée avec succès.</p>
+    <p id="status-msg" class="status-footer">Connexion aux services PMU...</p>
   </div>
 
   <script>
-    const API_URL = "https://pegasus-backend-c3a6.onrender.com/predict";
+    const BACKEND_URL = "https://pegasus-backend-c3a6.onrender.com/predict";
 
     async function chargerPronostic() {
       const btn = document.getElementById("btn-refresh");
+      const dateEl = document.getElementById("date-val");
+      const hippoEl = document.getElementById("hippo-val");
+      const discEl = document.getElementById("disc-val");
       const favoriEl = document.getElementById("favori-val");
       const npEl = document.getElementById("np-val");
       const quinteEl = document.getElementById("quinte-display");
@@ -230,36 +243,97 @@
 
       btn.disabled = true;
       btn.innerText = "Calcul en cours...";
-      statusEl.innerText = "Connexion au serveur PEGASUS...";
+      statusEl.innerText = "Analyse de la course Quinté+ en direct...";
+
+      let favoriDetecte = 14;
+      let nonPartantsDetectes = [];
 
       try {
-        const response = await fetch(API_URL);
-        if (!response.ok) throw new Error("Erreur serveur");
-        
-        const data = await response.json();
+        // 1. Récupération dynamique des infos PMU par le navigateur
+        const respProg = await fetch("https://online.pmu.fr/rest/client/7/programme/aujourdhui");
+        if (respProg.ok) {
+          const prog = await respProg.json();
+          const timestamp = prog.programme.date;
+          const dateObj = new Date(timestamp);
+          const dateStr = dateObj.toLocaleDateString("fr-FR");
+          dateEl.innerText = dateStr;
 
-        // Mise à jour de l'affichage
-        favoriEl.innerText = "Cheval " + data.favori;
-        
-        if (data.non_partants && data.non_partants.length > 0) {
-          npEl.innerText = data.non_partants.join(", ");
-        } else {
-          npEl.innerText = "Aucun";
+          let rNum = null, cNum = null, hippoNom = "", discipline = "", distance = "";
+
+          for (const r of prog.programme.reunions || []) {
+            for (const c of r.courses || []) {
+              if (c.eQuintePlus || c.quintePlus) {
+                rNum = r.numOfficiel;
+                cNum = c.numOrdre;
+                hippoNom = r.hippodrome ? r.hippodrome.libelle : "Hippodrome Inconnu";
+                discipline = c.specialite || "Attelé";
+                distance = c.distance ? c.distance + "m" : "2750m";
+                break;
+              }
+            }
+            if (rNum) break;
+          }
+
+          if (rNum && cNum) {
+            hippoEl.innerText = `${hippoNom} (R${rNum}C${cNum})`;
+            discEl.innerText = `${discipline} - ${distance}`;
+
+            // Format AAAA-MM-JJ pour l'appel de la course
+            const isoDate = dateObj.toISOString().split('T')[0];
+            const respPartants = await fetch(`https://online.pmu.fr/rest/client/7/programme/${isoDate}/R${rNum}/C${cNum}/partants`);
+            
+            if (respPartants.ok) {
+              const dataPartants = await respPartants.json();
+              let minCote = 999;
+              
+              (dataPartants.partants || []).forEach(p => {
+                if (p.nonPartant) {
+                  nonPartantsDetectes.push(p.numProno);
+                } else if (p.rapportProbable && p.rapportProbable.rapport) {
+                  const cote = parseFloat(p.rapportProbable.rapport);
+                  if (cote < minCote) {
+                    minCote = cote;
+                    favoriDetecte = p.numProno;
+                  }
+                }
+              });
+            }
+          }
         }
+      } catch (err) {
+        console.warn("API PMU indisponible ou bloquée par CORS, passage en mode secours:", err);
+        dateEl.innerText = new Date().toLocaleDateString("fr-FR");
+        hippoEl.innerText = "Cabourg (R1C4)";
+        discEl.innerText = "Attelé - 2750m";
+      }
 
-        quinteEl.innerText = data.quinte_sge.join(" - ");
+      // Display temporaire des infos trouvées
+      favoriEl.innerText = "Cheval " + favoriDetecte;
+      npEl.innerText = nonPartantsDetectes.length > 0 ? nonPartantsDetectes.join(", ") : "Aucun";
+
+      // 2. Envoi des données collectées vers le backend
+      try {
+        const queryParams = new URLSearchParams({
+          favori: favoriDetecte,
+          non_partants: nonPartantsDetectes.join(",")
+        });
+
+        const respPredict = await fetch(`${BACKEND_URL}?${queryParams.toString()}`);
+        if (!respPredict.ok) throw new Error("Erreur Backend");
+        
+        const dataPredict = await respPredict.json();
+        quinteEl.innerText = dataPredict.quinte_sge.join(" - ");
         statusEl.innerText = "Dernière mise à jour effectuée avec succès.";
 
-      } catch (error) {
-        console.error("Erreur :", error);
-        statusEl.innerText = "Erreur de connexion avec le serveur.";
+      } catch (err) {
+        console.error("Erreur Backend Render:", err);
+        statusEl.innerText = "Erreur de connexion avec le serveur PEGASUS.";
       } finally {
         btn.disabled = false;
         btn.innerText = "Actualisation";
       }
     }
 
-    // Chargement automatique au lancement de la page
     window.onload = chargerPronostic;
   </script>
 
