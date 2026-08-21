@@ -249,14 +249,12 @@
       let nonPartantsDetectes = [];
 
       try {
-        // 1. Récupération dynamique des infos PMU par le navigateur
         const respProg = await fetch("https://online.pmu.fr/rest/client/7/programme/aujourdhui");
         if (respProg.ok) {
           const prog = await respProg.json();
           const timestamp = prog.programme.date;
           const dateObj = new Date(timestamp);
-          const dateStr = dateObj.toLocaleDateString("fr-FR");
-          dateEl.innerText = dateStr;
+          dateEl.innerText = dateObj.toLocaleDateString("fr-FR");
 
           let rNum = null, cNum = null, hippoNom = "", discipline = "", distance = "";
 
@@ -278,7 +276,6 @@
             hippoEl.innerText = `${hippoNom} (R${rNum}C${cNum})`;
             discEl.innerText = `${discipline} - ${distance}`;
 
-            // Format AAAA-MM-JJ pour l'appel de la course
             const isoDate = dateObj.toISOString().split('T')[0];
             const respPartants = await fetch(`https://online.pmu.fr/rest/client/7/programme/${isoDate}/R${rNum}/C${cNum}/partants`);
             
@@ -287,11 +284,17 @@
               let minCote = 999;
               
               (dataPartants.partants || []).forEach(p => {
-                if (p.nonPartant) {
+                const estNP = p.nonPartant === true || 
+                              p.statut === "NON_PARTANT" || 
+                              p.statut === "NP" || 
+                              p.estNonPartant === true || 
+                              (p.rapportProbable && p.rapportProbable.rapport === 0);
+
+                if (estNP) {
                   nonPartantsDetectes.push(p.numProno);
                 } else if (p.rapportProbable && p.rapportProbable.rapport) {
                   const cote = parseFloat(p.rapportProbable.rapport);
-                  if (cote < minCote) {
+                  if (cote > 0 && cote < minCote) {
                     minCote = cote;
                     favoriDetecte = p.numProno;
                   }
@@ -301,17 +304,18 @@
           }
         }
       } catch (err) {
-        console.warn("API PMU indisponible ou bloquée par CORS, passage en mode secours:", err);
+        console.warn("API PMU indisponible ou bloquée par CORS :", err);
         dateEl.innerText = new Date().toLocaleDateString("fr-FR");
         hippoEl.innerText = "Cabourg (R1C4)";
         discEl.innerText = "Attelé - 2750m";
       }
 
-      // Display temporaire des infos trouvées
+      // Tri des non-partants par ordre numérique
+      nonPartantsDetectes.sort((a, b) => a - b);
+
       favoriEl.innerText = "Cheval " + favoriDetecte;
       npEl.innerText = nonPartantsDetectes.length > 0 ? nonPartantsDetectes.join(", ") : "Aucun";
 
-      // 2. Envoi des données collectées vers le backend
       try {
         const queryParams = new URLSearchParams({
           favori: favoriDetecte,
@@ -326,7 +330,7 @@
         statusEl.innerText = "Dernière mise à jour effectuée avec succès.";
 
       } catch (err) {
-        console.error("Erreur Backend Render:", err);
+        console.error("Erreur Backend Render :", err);
         statusEl.innerText = "Erreur de connexion avec le serveur PEGASUS.";
       } finally {
         btn.disabled = false;
