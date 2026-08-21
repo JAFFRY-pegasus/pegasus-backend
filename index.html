@@ -225,11 +225,24 @@
     <!-- Bouton d'action -->
     <button id="btn-refresh" onclick="chargerPronostic()">Actualisation</button>
 
-    <p id="status-msg" class="status-footer">Connexion aux services PMU...</p>
+    <p id="status-msg" class="status-footer">Initialisation...</p>
   </div>
 
   <script>
     const BACKEND_URL = "https://pegasus-backend-c3a6.onrender.com/predict";
+
+    // Fonction fetch avec Timeout (limite d'attente à 2,5 sec)
+    async function fetchWithTimeout(resource, options = {}) {
+      const { timeout = 2500 } = options;
+      const controller = new AbortController();
+      const id = setTimeout(() => controller.abort(), timeout);
+      const response = await fetch(resource, {
+        ...options,
+        signal: controller.signal
+      });
+      clearTimeout(id);
+      return response;
+    }
 
     async function chargerPronostic() {
       const btn = document.getElementById("btn-refresh");
@@ -243,13 +256,13 @@
 
       btn.disabled = true;
       btn.innerText = "Calcul en cours...";
-      statusEl.innerText = "Analyse de la course Quinté+ en direct...";
+      statusEl.innerText = "Analyse rapide des données Quinté+...";
 
       let favoriDetecte = 14;
       let nonPartantsDetectes = [];
 
       try {
-        const respProg = await fetch("https://online.pmu.fr/rest/client/7/programme/aujourdhui");
+        const respProg = await fetchWithTimeout("https://online.pmu.fr/rest/client/7/programme/aujourdhui");
         if (respProg.ok) {
           const prog = await respProg.json();
           const timestamp = prog.programme.date;
@@ -277,7 +290,7 @@
             discEl.innerText = `${discipline} - ${distance}`;
 
             const isoDate = dateObj.toISOString().split('T')[0];
-            const respPartants = await fetch(`https://online.pmu.fr/rest/client/7/programme/${isoDate}/R${rNum}/C${cNum}/partants`);
+            const respPartants = await fetchWithTimeout(`https://online.pmu.fr/rest/client/7/programme/${isoDate}/R${rNum}/C${cNum}/partants`);
             
             if (respPartants.ok) {
               const dataPartants = await respPartants.json();
@@ -304,15 +317,13 @@
           }
         }
       } catch (err) {
-        console.warn("API PMU indisponible ou bloquée par CORS :", err);
+        // En cas de délai dépassé ou d'erreur PMU
         dateEl.innerText = new Date().toLocaleDateString("fr-FR");
         hippoEl.innerText = "Cabourg (R1C4)";
         discEl.innerText = "Attelé - 2750m";
       }
 
-      // Tri des non-partants par ordre numérique
       nonPartantsDetectes.sort((a, b) => a - b);
-
       favoriEl.innerText = "Cheval " + favoriDetecte;
       npEl.innerText = nonPartantsDetectes.length > 0 ? nonPartantsDetectes.join(", ") : "Aucun";
 
@@ -322,7 +333,7 @@
           non_partants: nonPartantsDetectes.join(",")
         });
 
-        const respPredict = await fetch(`${BACKEND_URL}?${queryParams.toString()}`);
+        const respPredict = await fetchWithTimeout(`${BACKEND_URL}?${queryParams.toString()}`, { timeout: 8000 });
         if (!respPredict.ok) throw new Error("Erreur Backend");
         
         const dataPredict = await respPredict.json();
@@ -330,8 +341,7 @@
         statusEl.innerText = "Dernière mise à jour effectuée avec succès.";
 
       } catch (err) {
-        console.error("Erreur Backend Render :", err);
-        statusEl.innerText = "Erreur de connexion avec le serveur PEGASUS.";
+        statusEl.innerText = "Erreur ou serveur occupé. Réessayez.";
       } finally {
         btn.disabled = false;
         btn.innerText = "Actualisation";
