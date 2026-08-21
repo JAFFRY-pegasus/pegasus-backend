@@ -1,4 +1,5 @@
 import os
+import requests
 from datetime import datetime
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -54,23 +55,108 @@ def calculer_resonances_pegasus(partants_actifs, favori_base, non_partants=[]):
 
     return sorted(scores.items(), key=lambda x: x[1], reverse=True)
 
+def obtenir_donnees_pmu_live():
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+    try:
+        url_prog = "https://online.pmu.fr/rest/client/7/programme/aujourdhui"
+        res = requests.get(url_prog, headers=headers, timeout=5)
+        if res.status_code != 200:
+            return None
+        
+        prog = res.json()
+        dt_obj = datetime.fromtimestamp(prog['programme']['date'] / 1000.0)
+        date_str = dt_obj.strftime("%d/%m/%Y")
+        iso_date = dt_obj.strftime("%d%m%Y")
+
+        r_num, c_num, hippo, disc, dist = None, None, "Cabourg", "Attelé", "2750m"
+
+        for r in prog.get('programme', {}).get('reunions', []):
+            for c in r.get('courses', []):
+                if c.get('eQuintePlus') or c.get('quintePlus'):
+                    r_num = r.get('numOfficiel')
+                    c_num = c.get('numOrdre')
+                    hippo = r.get('hippodrome', {}).get('libelle', hippo)
+                    disc = c.get('specialite', disc)
+                    if c.get('distance'):
+                        dist = f"{c.get('distance')}m"
+                    break
+            if r_num:
+                break
+
+        if not r_num or not c_num:
+            return None
+
+        url_partants = f"https://online.pmu.fr/rest/client/7/programme/{iso_date}/R{r_num}/C{c_num}/partants"
+        res_p = requests.get(url_partants, headers=headers, timeout=5)
+        if res_p.status_code != 200:
+            return None
+
+        data_p = res_p.json()
+        non_partants = []
+        favori = 14
+        min_cote = 999.0
+
+        for p in data_p.get('partants', []):
+            num = p.get('numProno')
+            est_np = (
+                p.get('nonPartant') is True or
+                p.get('statut') in ['NON_PARTANT', 'NP'] or
+                p.get('estNonPartant') is True
+            )
+            
+            if est_np:
+                non_partants.append(num)
+            else:
+                rapport = p.get('rapportProbable', {}).get('rapport')
+                if rapport is not None:
+                    try:
+                        cote = float(rapport)
+                        if 0 < cote < min_cote:
+                            min_cote = cote
+                            favori = num
+                    except ValueError:
+                        pass
+
+        non_partants.sort()
+        return {
+            "date": date_str,
+            "hippodrome": f"{hippo} (R{r_num}C{c_num})",
+            "discipline_distance": f"{disc} - {dist}",
+            "favori": favori,
+            "non_partants": non_partants
+        }
+
+    except Exception:
+        return None
+
 @app.get("/")
 def home():
     return {"status": "PEGASUS Backend en ligne", "version": "SGE v6.0"}
 
 @app.get("/predict")
-def predict(favori: int = 14, non_partants: str = ""):
-    np_list = []
-    if non_partants:
-        try:
-            np_list = [int(n.strip()) for n in non_partants.split(",") if n.strip().isdigit()]
-        except ValueError:
-            np_list = []
+def predict():
+    data_live = obtenir_donnees_pmu_live()
+    
+    if data_live:
+        favori = data_live["favori"]
+        np_list = data_live["non_partants"]
+        date_str = data_live["date"]
+        hippo_str = data_live["hippodrome"]
+        disc_str = data_live["discipline_distance"]
+    else:
+        favori = 14
+        np_list = []
+        date_str = datetime.now().strftime("%d/%m/%Y")
+        hippo_str = "Cabourg (R1C4)"
+        disc_str = "Attelé - 2750m"
 
     partants = list(range(1, 17))
     resultats = calculer_resonances_pegasus(partants, favori, np_list)
     
     return {
+        "date": date_str,
+        "hippodrome": hippo_str,
+        "discipline_distance": disc_str,
         "favori": favori,
         "non_partants": np_list,
         "quinte_sge": [num for num, score in resultats[:5]],
