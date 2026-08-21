@@ -1,6 +1,4 @@
 fastapi
 uvicorn
 pydantic
-beautifulsoup4
-playwright
 requests
