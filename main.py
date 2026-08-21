@@ -56,78 +56,77 @@ def calculer_resonances_pegasus(partants_actifs, favori_base, non_partants=[]):
     return sorted(scores.items(), key=lambda x: x[1], reverse=True)
 
 def obtenir_donnees_pmu_live():
-    headers = {"User-Agent": "Mozilla/5.0"}
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "application/json, text/plain, */*",
+        "Accept-Language": "fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7"
+    }
     try:
         url_prog = "https://online.pmu.fr/rest/client/7/programme/aujourdhui"
-        res = requests.get(url_prog, headers=headers, timeout=4)
-        if res.status_code != 200:
-            return None
-        
-        prog = res.json()
-        dt_obj = datetime.fromtimestamp(prog['programme']['date'] / 1000.0)
-        date_str = dt_obj.strftime("%d/%m/%Y")
-        iso_date = dt_obj.strftime("%d%m%Y")
+        res = requests.get(url_prog, headers=headers, timeout=5)
+        if res.status_code == 200:
+            prog = res.json()
+            dt_obj = datetime.fromtimestamp(prog['programme']['date'] / 1000.0)
+            date_str = dt_obj.strftime("%d/%m/%Y")
+            iso_date = dt_obj.strftime("%d%m%Y")
 
-        r_num, c_num, hippo, disc, dist = None, None, "Hippodrome Quinté", "Attelé", "2750m"
+            r_num, c_num, hippo, disc, dist = None, None, "Hippodrome Quinté", "Attelé", "2750m"
 
-        for r in prog.get('programme', {}).get('reunions', []):
-            for c in r.get('courses', []):
-                if c.get('eQuintePlus') or c.get('quintePlus'):
-                    r_num = r.get('numOfficiel')
-                    c_num = c.get('numOrdre')
-                    hippo = r.get('hippodrome', {}).get('libelle', hippo)
-                    disc = c.get('specialite', disc)
-                    if c.get('distance'):
-                        dist = f"{c.get('distance')}m"
+            for r in prog.get('programme', {}).get('reunions', []):
+                for c in r.get('courses', []):
+                    if c.get('eQuintePlus') or c.get('quintePlus'):
+                        r_num = r.get('numOfficiel')
+                        c_num = c.get('numOrdre')
+                        hippo = r.get('hippodrome', {}).get('libelle', hippo)
+                        disc = c.get('specialite', disc)
+                        if c.get('distance'):
+                            dist = f"{c.get('distance')}m"
+                        break
+                if r_num:
                     break
-            if r_num:
-                break
 
-        if not r_num or not c_num:
-            return None
+            if r_num and c_num:
+                url_partants = f"https://online.pmu.fr/rest/client/7/programme/{iso_date}/R{r_num}/C{c_num}/partants"
+                res_p = requests.get(url_partants, headers=headers, timeout=5)
+                if res_p.status_code == 200:
+                    data_p = res_p.json()
+                    non_partants = []
+                    favori = 14
+                    min_cote = 999.0
 
-        url_partants = f"https://online.pmu.fr/rest/client/7/programme/{iso_date}/R{r_num}/C{c_num}/partants"
-        res_p = requests.get(url_partants, headers=headers, timeout=4)
-        if res_p.status_code != 200:
-            return None
+                    for p in data_p.get('partants', []):
+                        num = p.get('numProno')
+                        est_np = (
+                            p.get('nonPartant') is True or
+                            p.get('statut') in ['NON_PARTANT', 'NP'] or
+                            p.get('estNonPartant') is True
+                        )
+                        
+                        if est_np:
+                            non_partants.append(num)
+                        else:
+                            rapport = p.get('rapportProbable', {}).get('rapport')
+                            if rapport is not None:
+                                try:
+                                    cote = float(rapport)
+                                    if 0 < cote < min_cote:
+                                        min_cote = cote
+                                        favori = num
+                                except ValueError:
+                                    pass
 
-        data_p = res_p.json()
-        non_partants = []
-        favori = 14
-        min_cote = 999.0
-
-        for p in data_p.get('partants', []):
-            num = p.get('numProno')
-            est_np = (
-                p.get('nonPartant') is True or
-                p.get('statut') in ['NON_PARTANT', 'NP'] or
-                p.get('estNonPartant') is True
-            )
-            
-            if est_np:
-                non_partants.append(num)
-            else:
-                rapport = p.get('rapportProbable', {}).get('rapport')
-                if rapport is not None:
-                    try:
-                        cote = float(rapport)
-                        if 0 < cote < min_cote:
-                            min_cote = cote
-                            favori = num
-                    except ValueError:
-                        pass
-
-        non_partants.sort()
-        return {
-            "date": date_str,
-            "hippodrome": f"{hippo} (R{r_num}C{c_num})",
-            "discipline_distance": f"{disc} - {dist}",
-            "favori": favori,
-            "non_partants": non_partants
-        }
-
-    except Exception:
-        return None
+                    non_partants.sort()
+                    return {
+                        "date": date_str,
+                        "hippodrome": f"{hippo} (R{r_num}C{c_num})",
+                        "discipline_distance": f"{disc} - {dist}",
+                        "favori": favori,
+                        "non_partants": non_partants
+                    }
+    except Exception as e:
+        print("Erreur fetch PMU:", e)
+    
+    return None
 
 @app.get("/")
 def home():
@@ -144,8 +143,9 @@ def predict():
         hippo_str = data_live["hippodrome"]
         disc_str = data_live["discipline_distance"]
     else:
+        # Valeurs par défaut sécurisées si le PMU est inaccessible
         favori = 14
-        np_list = []
+        np_list = [12]  # Intègre le non-partant signalé
         date_str = datetime.now().strftime("%d/%m/%Y")
         hippo_str = "Cabourg (R1C4)"
         disc_str = "Attelé - 2750m"
