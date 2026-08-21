@@ -196,23 +196,23 @@
     <div class="info-box">
       <div class="info-row">
         <span>Date du jour :</span>
-        <strong id="date-val">--/--/----</strong>
+        <strong id="date-val">Chargement...</strong>
       </div>
       <div class="info-row">
         <span>Hippodrome :</span>
-        <strong id="hippo-val">--</strong>
+        <strong id="hippo-val">Chargement...</strong>
       </div>
       <div class="info-row">
         <span>Discipline & Distance :</span>
-        <strong id="disc-val">--</strong>
+        <strong id="disc-val">Chargement...</strong>
       </div>
       <div class="info-row">
         <span>Favori de la presse :</span>
-        <strong id="favori-val">--</strong>
+        <strong id="favori-val">Chargement...</strong>
       </div>
       <div class="info-row">
         <span>Non partant(s) :</span>
-        <strong id="np-val">--</strong>
+        <strong id="np-val">Chargement...</strong>
       </div>
     </div>
 
@@ -225,7 +225,7 @@
     <!-- Bouton d'action -->
     <button id="btn-refresh" onclick="chargerPronostic()">Actualisation</button>
 
-    <p id="status-msg" class="status-footer">Initialisation...</p>
+    <p id="status-msg" class="status-footer">Connexion en cours...</p>
   </div>
 
   <script>
@@ -243,7 +243,7 @@
 
       btn.disabled = true;
       btn.innerText = "Calcul en cours...";
-      statusEl.innerText = "Chargement des données en cours...";
+      statusEl.innerText = "Analyse et calcul de la matrice SGE...";
 
       try {
         const response = await fetch(API_URL);
@@ -262,12 +262,15 @@
           npEl.innerText = "Aucun";
         }
 
-        quinteEl.innerText = data.quinte_sge.join(" - ");
+        if (data.quinte_sge && data.quinte_sge.length > 0) {
+          quinteEl.innerText = data.quinte_sge.join(" - ");
+        }
+
         statusEl.innerText = "Dernière mise à jour effectuée avec succès.";
 
       } catch (error) {
-        console.error("Erreur de chargement :", error);
-        statusEl.innerText = "Erreur de connexion au serveur Render.";
+        console.error("Erreur de connexion :", error);
+        statusEl.innerText = "Serveur en cours de démarrage, réessayez dans 10 secondes.";
       } finally {
         btn.disabled = false;
         btn.innerText = "Actualisation";
