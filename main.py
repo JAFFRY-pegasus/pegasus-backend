@@ -1,4 +1,3 @@
-
 import os
 import requests
 from datetime import datetime, timedelta
@@ -121,15 +120,30 @@ def obtenir_donnees_pmu_live():
                         if est_np:
                             non_partants.append(num)
                         else:
-                            rapport = p.get('rapportProbable', {}).get('rapport')
-                            if rapport is not None:
+                            # Extraction multi-niveau de la cote PMU
+                            cote_val = None
+                            
+                            # 1. Tentative sur rapportProbable / rapport
+                            if 'rapportProbable' in p and isinstance(p['rapportProbable'], dict):
+                                cote_val = p['rapportProbable'].get('rapport') or p['rapportProbable'].get('cote')
+                            
+                            # 2. Tentative sur dernierRapportDirect
+                            if cote_val is None and 'dernierRapportDirect' in p and isinstance(p['dernierRapportDirect'], dict):
+                                cote_val = p['dernierRapportDirect'].get('rapport')
+                            
+                            # 3. Tentative sur coteDirecte
+                            if cote_val is None:
+                                cote_val = p.get('cote') or p.get('coteProbable')
+
+                            if cote_val is not None:
                                 try:
-                                    cote = float(rapport)
-                                    cotes[num] = cote
+                                    cote = float(cote_val)
+                                    cotes[str(num)] = round(cote, 1)
+                                    cotes[num] = round(cote, 1)
                                     if 0 < cote < min_cote:
                                         min_cote = cote
                                         favori = num
-                                except ValueError:
+                                except (ValueError, TypeError):
                                     pass
 
                     non_partants.sort()
@@ -192,7 +206,7 @@ def calculer_resonances_pegasus(partants_actifs, favori_base, non_partants=[], a
 
 @app.get("/")
 def home():
-    return {"status": "PEGASUS Backend en ligne", "version": "SGE v6.5 (Cotes au survol)"}
+    return {"status": "PEGASUS Backend en ligne", "version": "SGE v6.6 (Fix Cotes PMU)"}
 
 @app.get("/predict")
 def predict():
