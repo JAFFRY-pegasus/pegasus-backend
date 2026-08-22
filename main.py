@@ -34,12 +34,12 @@ BONUS_HISTORIQUE_BASE = {
     9: 2.5, 10: 3.1, 11: 3.8, 12: 4.0, 13: 4.6, 14: 4.8, 15: 2.9, 16: 2.1
 }
 
+# Variable mémoire pour geler le dernier pronostic valide avant clôture
+DERNIER_PRONO_VALIDE = None
+
 def extraire_arrivee_depuis_json(data):
-    """ Cherche l'ordre d'arrivée dans différentes structures possibles de l'API PMU """
     if not isinstance(data, dict):
         return []
-    
-    # 1. Directement dans ordreArrivee (liste d'int)
     arr = data.get('ordreArrivee', [])
     if isinstance(arr, list) and len(arr) >= 5:
         res = []
@@ -51,7 +51,6 @@ def extraire_arrivee_depuis_json(data):
         if len(res) >= 5:
             return res[:5]
 
-    # 2. Dans la liste des participants / arrivants
     arrivants = data.get('arrivants', []) or data.get('combinaisonArrivee', [])
     if isinstance(arrivants, list) and len(arrivants) >= 5:
         res = []
@@ -156,7 +155,7 @@ def obtenir_donnees_pmu_live():
 
                 # Cotes
                 cotes = {}
-                favori = 3
+                favori = None
                 min_cote = 999.0
                 url_cotes = f"https://online.pmu.fr/rest/client/7/programme/{iso_date}/R{r_num}/C{c_num}/rapports-probables?specialite=E_SIMPLE_GAGNANT"
                 res_c = requests.get(url_cotes, headers=headers, timeout=6)
@@ -183,7 +182,7 @@ def obtenir_donnees_pmu_live():
                     data_d = res_d.json()
                     arrivee_officielle = extraire_arrivee_depuis_json(data_d)
 
-                # Statut de clôture
+                # Clôture
                 course_terminee = False
                 statuts_fin = ['ARRIVEE', 'FIN_COURSE', 'PAYE', 'ARRIVEE_PROVISOIRE', 'ARRIVEE_DEFINITIVE']
                 if any(s in statut_course for s in statuts_fin) or len(arrivee_officielle) >= 5:
@@ -210,6 +209,9 @@ def obtenir_donnees_pmu_live():
     return None
 
 def calculer_resonances_pegasus(partants_actifs, favori_base, non_partants=[], arrivee_veille=[]):
+    if not favori_base:
+        favori_base = 3
+        
     scores = {num: 0.0 for num in partants_actifs if num not in non_partants}
     
     for np in non_partants:
@@ -246,23 +248,51 @@ def calculer_resonances_pegasus(partants_actifs, favori_base, non_partants=[], a
 
 @app.get("/")
 def home():
-    return {"status": "PEGASUS Backend en ligne", "version": "SGE v7.1"}
+    return {"status": "PEGASUS Backend en ligne", "version": "SGE v7.2 (Gelo-Prono)"}
 
 @app.get("/predict")
 def predict():
+    global DERNIER_PRONO_VALIDE
+    
     data_live = obtenir_donnees_pmu_live()
     arrivee_veille = obtenir_arrivee_veille()
     
     if data_live:
+        course_terminee = data_live["course_terminee"]
         favori = data_live["favori"]
         np_list = data_live["non_partants"]
         date_str = data_live["date"]
         hippo_str = data_live["hippodrome"]
         nom_course = data_live["nom_course"]
         disc_str = data_live["discipline_distance"]
-        course_terminee = data_live["course_terminee"]
         arrivee_officielle = data_live.get("arrivee_officielle", [])
         cotes = data_live.get("cotes", {})
+
+        # Si la course est EN COURS et qu'on a un favori, on calcule et sauvegarde la version active
+        if not course_terminee and favori is not None:
+            partants = list(range(1, 17))
+            resultats = calculer_resonances_pegasus(partants, favori, np_list, arrivee_veille)
+            quinte_sge = [num for num, score in resultats[:5]]
+
+            DERNIER_PRONO_VALIDE = {
+                "quinte_sge": quinte_sge,
+                "scores": resultats,
+                "favori": favori,
+                "cotes": cotes
+            }
+        # Si la course est TERMINÉE, on verrouille le pronostic calculé juste avant la course
+        elif course_terminee and DERNIER_PRONO_VALIDE is not None:
+            quinte_sge = DERNIER_PRONO_VALIDE["quinte_sge"]
+            resultats = DERNIER_PRONO_VALIDE["scores"]
+            favori = DERNIER_PRONO_VALIDE["favori"]
+            if not cotes:
+                cotes = DERNIER_PRONO_VALIDE["cotes"]
+        else:
+            # Fallback direct si le serveur redémarre après la course
+            favori = favori or 3
+            partants = list(range(1, 17))
+            resultats = calculer_resonances_pegasus(partants, favori, np_list, arrivee_veille)
+            quinte_sge = [num for num, score in resultats[:5]]
     else:
         favori = 3
         np_list = []
@@ -274,10 +304,10 @@ def predict():
         course_terminee = True
         arrivee_officielle = [14, 9, 5, 12, 10]
         cotes = {}
+        partants = list(range(1, 17))
+        resultats = calculer_resonances_pegasus(partants, favori, np_list, arrivee_veille)
+        quinte_sge = [num for num, score in resultats[:5]]
 
-    partants = list(range(1, 17))
-    resultats = calculer_resonances_pegasus(partants, favori, np_list, arrivee_veille)
-    
     return {
         "date": date_str,
         "hippodrome": hippo_str,
@@ -289,6 +319,6 @@ def predict():
         "course_terminee": course_terminee,
         "arrivee_officielle": arrivee_officielle,
         "arrivee_veille_injectee": arrivee_veille,
-        "quinte_sge": [num for num, score in resultats[:5]],
+        "quinte_sge": quinte_sge,
         "scores": resultats
     }
