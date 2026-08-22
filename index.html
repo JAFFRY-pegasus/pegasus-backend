@@ -12,6 +12,7 @@
       --text-muted: #94a3b8;
       --accent-gold: #ffd700;
       --accent-blue: #38bdf8;
+      --accent-red: #ef4444;
       --border-color: #334155;
     }
 
@@ -101,8 +102,8 @@
     }
 
     .dot.red {
-      background-color: #ef4444;
-      box-shadow: 0 0 8px #ef4444;
+      background-color: var(--accent-red);
+      box-shadow: 0 0 8px var(--accent-red);
     }
 
     .section-title {
@@ -136,9 +137,30 @@
       transition: transform 0.2s ease, box-shadow 0.2s ease;
     }
 
+    .number-ball.officiel {
+      background: linear-gradient(135deg, #ef4444, #991b1b);
+      box-shadow: 0 4px 10px rgba(239, 68, 68, 0.4);
+    }
+
     .number-ball:hover {
       transform: scale(1.1);
-      box-shadow: 0 6px 14px rgba(255, 215, 0, 0.6);
+    }
+
+    .arrivee-box {
+      background-color: rgba(239, 68, 68, 0.1);
+      border: 1px dashed var(--accent-red);
+      border-radius: 12px;
+      padding: 15px;
+      margin-bottom: 20px;
+    }
+
+    .arrivee-title {
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--accent-red);
+      font-weight: bold;
+      margin-bottom: 10px;
     }
 
     .details-box {
@@ -189,19 +211,19 @@
       <span id="status-text">Analyse en cours...</span>
     </div>
 
-    <!-- Titre Pronostic -->
+    <!-- Titre Pronostic SGE -->
     <div class="section-title">Pronostic de Résonance SGE</div>
 
     <!-- Loader -->
     <div id="loader" class="loader"></div>
 
-    <!-- Balles des numéros -->
-    <div class="prono-container" id="prono-container" style="display: none;">
-      <div class="number-ball">-</div>
-      <div class="number-ball">-</div>
-      <div class="number-ball">-</div>
-      <div class="number-ball">-</div>
-      <div class="number-ball">-</div>
+    <!-- Balles des numéros SGE -->
+    <div class="prono-container" id="prono-container" style="display: none;"></div>
+
+    <!-- Bloc d'affichage de l'Arrivée Officielle (S'affiche une fois la course terminée) -->
+    <div class="arrivee-box" id="arrivee-box" style="display: none;">
+      <div class="arrivee-title">Arrivée Officielle PMU</div>
+      <div class="prono-container" id="officiel-container" style="margin-bottom: 0;"></div>
     </div>
 
     <!-- Informations complémentaires -->
@@ -226,11 +248,9 @@
         document.getElementById('nom-course').innerText = data.nom_course || "";
         document.getElementById('discipline-course').innerText = data.discipline_distance || "";
 
-        // 2. Gestion prioritaire de la diode de statut
+        // 2. Gestion de la diode d'état
         const dot = document.getElementById('status-dot');
         const statusText = document.getElementById('status-text');
-        
-        // Détection de l'absence de cotes (course fermée/terminée)
         const cotesInexistantes = !data.cotes || Object.keys(data.cotes).length === 0;
 
         if (data.course_terminee || cotesInexistantes) {
@@ -241,7 +261,7 @@
           statusText.innerText = "Analyse Live Active";
         }
 
-        // 3. Affichage des 5 numéros SGE avec la cote PMU au survol
+        // 3. Affichage du Pronostic SGE
         const pronoContainer = document.getElementById('prono-container');
         pronoContainer.innerHTML = ''; 
 
@@ -250,15 +270,30 @@
             const ball = document.createElement('div');
             ball.className = 'number-ball';
             ball.innerText = num;
-            
             const coteVal = (data.cotes && data.cotes[num]) ? data.cotes[num] : 'NC';
             ball.title = `Cote PMU : ${coteVal}`;
-
             pronoContainer.appendChild(ball);
           });
         }
 
-        // 4. Informations complémentaires
+        // 4. Affichage de l'Arrivée Officielle si disponible
+        const arriveeBox = document.getElementById('arrivee-box');
+        const officielContainer = document.getElementById('officiel-container');
+        officielContainer.innerHTML = '';
+
+        if (data.arrivee_officielle && data.arrivee_officielle.length >= 5) {
+          data.arrivee_officielle.forEach(num => {
+            const ball = document.createElement('div');
+            ball.className = 'number-ball officiel';
+            ball.innerText = num;
+            officielContainer.appendChild(ball);
+          });
+          arriveeBox.style.display = 'block';
+        } else {
+          arriveeBox.style.display = 'none';
+        }
+
+        // 5. Informations complémentaires
         document.getElementById('favori-val').innerText = data.favori ? `N° ${data.favori}` : "Non disponible";
         document.getElementById('np-val').innerText = (data.non_partants && data.non_partants.length > 0) 
           ? data.non_partants.map(n => `N°${n}`).join(', ') 
