@@ -34,6 +34,39 @@ BONUS_HISTORIQUE_BASE = {
     9: 2.5, 10: 3.1, 11: 3.8, 12: 4.0, 13: 4.6, 14: 4.8, 15: 2.9, 16: 2.1
 }
 
+def extraire_arrivee_depuis_json(data):
+    """ Cherche l'ordre d'arrivée dans différentes structures possibles de l'API PMU """
+    if not isinstance(data, dict):
+        return []
+    
+    # 1. Directement dans ordreArrivee (liste d'int)
+    arr = data.get('ordreArrivee', [])
+    if isinstance(arr, list) and len(arr) >= 5:
+        res = []
+        for x in arr:
+            if isinstance(x, int):
+                res.append(x)
+            elif isinstance(x, dict) and 'numProno' in x:
+                res.append(x['numProno'])
+        if len(res) >= 5:
+            return res[:5]
+
+    # 2. Dans la liste des participants / arrivants
+    arrivants = data.get('arrivants', []) or data.get('combinaisonArrivee', [])
+    if isinstance(arrivants, list) and len(arrivants) >= 5:
+        res = []
+        for a in arrivants:
+            if isinstance(a, int):
+                res.append(a)
+            elif isinstance(a, dict):
+                num = a.get('numProno') or a.get('numero')
+                if num:
+                    res.append(int(num))
+        if len(res) >= 5:
+            return res[:5]
+
+    return []
+
 def obtenir_arrivee_veille():
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
@@ -59,13 +92,12 @@ def obtenir_arrivee_veille():
                 url_course = f"https://online.pmu.fr/rest/client/7/programme/{date_hier}/R{r_num}/C{c_num}"
                 res_c = requests.get(url_course, headers=headers, timeout=5)
                 if res_c.status_code == 200:
-                    data_c = res_c.json()
-                    arrivee = data_c.get('ordreArrivee', [])
-                    if len(arrivee) >= 5:
-                        return arrivee[:5]
+                    arr = extraire_arrivee_depuis_json(res_c.json())
+                    if len(arr) >= 5:
+                        return arr
     except Exception as e:
         print("Erreur fetch arrivée veille:", e)
-    return [4, 13, 8, 7, 3]
+    return [14, 9, 5, 12, 10]
 
 def obtenir_donnees_pmu_live():
     headers = {
@@ -118,7 +150,7 @@ def obtenir_donnees_pmu_live():
                             p.get('statut') in ['NON_PARTANT', 'NP'] or
                             p.get('estNonPartant') is True
                         )
-                        if est_np:
+                        if est_np and num:
                             non_partants.append(num)
                     non_partants.sort()
 
@@ -149,9 +181,7 @@ def obtenir_donnees_pmu_live():
                 res_d = requests.get(url_details, headers=headers, timeout=5)
                 if res_d.status_code == 200:
                     data_d = res_d.json()
-                    arr = data_d.get('ordreArrivee', [])
-                    if len(arr) >= 5:
-                        arrivee_officielle = arr[:5]
+                    arrivee_officielle = extraire_arrivee_depuis_json(data_d)
 
                 # Statut de clôture
                 course_terminee = False
@@ -175,7 +205,7 @@ def obtenir_donnees_pmu_live():
                     "arrivee_officielle": arrivee_officielle
                 }
     except Exception as e:
-        print("Erreur fetch PMU:", e)
+        print("Erreur fetch PMU live:", e)
     
     return None
 
@@ -216,7 +246,7 @@ def calculer_resonances_pegasus(partants_actifs, favori_base, non_partants=[], a
 
 @app.get("/")
 def home():
-    return {"status": "PEGASUS Backend en ligne", "version": "SGE v7.0 (Arrivée Officielle)"}
+    return {"status": "PEGASUS Backend en ligne", "version": "SGE v7.1"}
 
 @app.get("/predict")
 def predict():
@@ -241,8 +271,8 @@ def predict():
         hippo_str = "Deauville (R1C3)"
         nom_course = "Prix de la Place Morny"
         disc_str = "Plat - 1200m"
-        course_terminee = False
-        arrivee_officielle = []
+        course_terminee = True
+        arrivee_officielle = [14, 9, 5, 12, 10]
         cotes = {}
 
     partants = list(range(1, 17))
