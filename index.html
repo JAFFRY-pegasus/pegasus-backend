@@ -3,322 +3,272 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PEGASUS IA - Pronostics SGE</title>
+  <title>SGE - Système de Résonance Géométrique</title>
   <style>
     :root {
       --bg-color: #0f172a;
       --card-bg: #1e293b;
       --text-main: #f8fafc;
       --text-muted: #94a3b8;
-      --accent-green: #10b981;
-      --accent-red: #ef4444;
-      --accent-blue: #3b82f6;
-      --accent-blue-hover: #2563eb;
+      --accent-gold: #ffd700;
+      --accent-blue: #38bdf8;
       --border-color: #334155;
     }
 
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       background-color: var(--bg-color);
       color: var(--text-main);
       display: flex;
       justify-content: center;
       align-items: center;
       min-height: 100vh;
-      margin: 0;
       padding: 20px;
-      box-sizing: border-box;
     }
 
-    .card {
+    .container {
       background-color: var(--card-bg);
       border: 1px solid var(--border-color);
       border-radius: 16px;
-      padding: 28px;
+      padding: 30px;
+      max-width: 500px;
       width: 100%;
-      max-width: 480px;
-      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+      text-align: center;
     }
 
-    .header-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 6px;
+    .header-info {
+      margin-bottom: 24px;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 16px;
     }
 
-    .title-group {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    h1 {
-      margin: 0;
-      font-size: 24px;
-      font-weight: 800;
-      letter-spacing: -0.5px;
-    }
-
-    .badge {
-      background-color: var(--accent-blue);
-      color: #fff;
-      font-size: 11px;
-      font-weight: 700;
-      padding: 3px 8px;
-      border-radius: 12px;
+    .header-info p#date-course {
+      font-size: 0.9rem;
+      color: var(--text-muted);
       text-transform: uppercase;
+      letter-spacing: 1px;
     }
 
-    .status-indicator {
-      display: flex;
+    .header-info h2#hippodrome-course {
+      font-size: 1.4rem;
+      color: var(--text-main);
+      margin-top: 4px;
+    }
+
+    .header-info h3#nom-course {
+      font-size: 1.1rem;
+      color: var(--accent-gold);
+      margin-top: 6px;
+      font-style: italic;
+      font-weight: 600;
+    }
+
+    .header-info p#discipline-course {
+      font-size: 0.95rem;
+      color: var(--accent-blue);
+      margin-top: 4px;
+    }
+
+    .status-badge {
+      display: inline-flex;
       align-items: center;
       gap: 8px;
-    }
-
-    .status-text {
-      font-size: 12px;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 0.85rem;
       font-weight: 600;
-      transition: color 0.3s ease;
+      margin-bottom: 20px;
+      background-color: rgba(255, 255, 255, 0.05);
     }
-
-    .status-text.green { color: var(--accent-green); }
-    .status-text.red { color: var(--accent-red); }
 
     .dot {
-      width: 12px;
-      height: 12px;
+      width: 10px;
+      height: 10px;
       border-radius: 50%;
       display: inline-block;
-      transition: background-color 0.3s ease, box-shadow 0.3s ease;
     }
 
     .dot.green {
-      background-color: var(--accent-green);
-      box-shadow: 0 0 10px var(--accent-green);
-      animation: clignoter 1.5s infinite ease-in-out;
+      background-color: #22c55e;
+      box-shadow: 0 0 8px #22c55e;
     }
 
     .dot.red {
-      background-color: var(--accent-red);
-      box-shadow: 0 0 10px var(--accent-red);
-      animation: none;
+      background-color: #ef4444;
+      box-shadow: 0 0 8px #ef4444;
     }
 
-    @keyframes clignoter {
-      0% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.25; transform: scale(0.85); }
-      100% { opacity: 1; transform: scale(1); }
-    }
-
-    .subtitle {
-      color: var(--text-muted);
-      font-size: 14px;
-      margin-top: 0;
-      margin-bottom: 20px;
-    }
-
-    .info-box {
-      background-color: rgba(15, 23, 42, 0.6);
-      border: 1px solid var(--border-color);
-      border-radius: 10px;
-      padding: 14px 18px;
-      margin-bottom: 24px;
-    }
-
-    .info-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 6px 0;
-      font-size: 14px;
-    }
-
-    .info-row:not(:last-child) {
-      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-    }
-
-    .info-row span {
-      color: var(--text-muted);
-    }
-
-    .info-row strong {
-      color: var(--text-main);
-      font-weight: 700;
-    }
-
-    .selection-box {
-      background-color: #065f46;
-      border: 1px solid #047857;
-      border-radius: 12px;
-      padding: 20px;
-      text-align: center;
-      margin-bottom: 24px;
-    }
-
-    .selection-box h3 {
-      margin: 0 0 12px 0;
-      font-size: 13px;
+    .section-title {
+      font-size: 0.85rem;
       text-transform: uppercase;
-      letter-spacing: 1px;
-      color: #a7f3d0;
-      font-weight: 700;
-    }
-
-    .numbers {
-      font-size: 26px;
-      font-weight: 900;
-      letter-spacing: 2px;
-      color: #ffffff;
-      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-    }
-
-    button {
-      width: 100%;
-      background-color: var(--accent-blue);
-      color: #ffffff;
-      border: none;
-      border-radius: 10px;
-      padding: 14px;
-      font-size: 16px;
-      font-weight: 700;
-      cursor: pointer;
-      transition: background-color 0.2s ease, transform 0.1s ease;
-    }
-
-    button:hover {
-      background-color: var(--accent-blue-hover);
-    }
-
-    button:active {
-      transform: scale(0.99);
-    }
-
-    .status-footer {
-      text-align: center;
-      font-size: 12px;
+      letter-spacing: 1.5px;
       color: var(--text-muted);
-      margin-top: 16px;
-      margin-bottom: 0;
+      margin-bottom: 12px;
+    }
+
+    .prono-container {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 25px;
+    }
+
+    .number-ball {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+      color: #ffffff;
+      font-weight: bold;
+      font-size: 1.3rem;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      box-shadow: 0 4px 10px rgba(217, 119, 6, 0.4);
+    }
+
+    .details-box {
+      background-color: rgba(0, 0, 0, 0.2);
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      text-align: left;
+      line-height: 1.6;
+    }
+
+    .details-box span {
+      color: var(--text-main);
+      font-weight: 600;
+    }
+
+    .loader {
+      border: 3px solid var(--border-color);
+      border-top: 3px solid var(--accent-blue);
+      border-radius: 50%;
+      width: 24px;
+      height: 24px;
+      animation: spin 1s linear infinite;
+      margin: 20px auto;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
     }
   </style>
 </head>
 <body>
 
-  <div class="card">
-    <div class="header-row">
-      <div class="title-group">
-        <h1>PEGASUS IA</h1>
-        <span class="badge">SGE v6.2</span>
-      </div>
-      <div class="status-indicator">
-        <span id="course-status-label" class="status-text green">course non partie</span>
-        <span id="course-status-dot" class="dot green"></span>
-      </div>
+  <div class="container">
+    <!-- En-tête de la course -->
+    <div class="header-info">
+      <p id="date-course">Chargement...</p>
+      <h2 id="hippodrome-course">--</h2>
+      <h3 id="nom-course">--</h3>
+      <p id="discipline-course">--</p>
     </div>
 
-    <p class="subtitle">Analyse géométrique & résonances matinales</p>
-
-    <!-- Encart Références Course + Favori -->
-    <div class="info-box">
-      <div class="info-row">
-        <span>Date du jour :</span>
-        <strong id="date-val">Chargement...</strong>
-      </div>
-      <div class="info-row">
-        <span>Hippodrome :</span>
-        <strong id="hippo-val">Chargement...</strong>
-      </div>
-      <div class="info-row">
-        <span>Discipline & Distance :</span>
-        <strong id="disc-val">Chargement...</strong>
-      </div>
-      <div class="info-row">
-        <span>Favori de la presse :</span>
-        <strong id="favori-val">Chargement...</strong>
-      </div>
-      <div class="info-row">
-        <span>Non partant(s) :</span>
-        <strong id="np-val">Chargement...</strong>
-      </div>
+    <!-- Statut de la course (Diode) -->
+    <div class="status-badge" id="status-badge">
+      <span class="dot" id="status-dot"></span>
+      <span id="status-text">Analyse en cours...</span>
     </div>
 
-    <!-- Pronostic -->
-    <div class="selection-box">
-      <h3>MON PRONOSTIC PEGASUS IA !</h3>
-      <div id="quinte-display" class="numbers">-- - -- - -- - -- - --</div>
+    <!-- Titre Pronostic -->
+    <div class="section-title">Pronostic de Résonance SGE</div>
+
+    <!-- Loader -->
+    <div id="loader" class="loader"></div>
+
+    <!-- Balles des numéros -->
+    <div class="prono-container" id="prono-container" style="display: none;">
+      <div class="number-ball">-</div>
+      <div class="number-ball">-</div>
+      <div class="number-ball">-</div>
+      <div class="number-ball">-</div>
+      <div class="number-ball">-</div>
     </div>
 
-    <!-- Bouton d'action -->
-    <button id="btn-refresh" onclick="chargerPronostic()">Actualisation</button>
-
-    <p id="status-msg" class="status-footer">Connexion en cours...</p>
+    <!-- Informations complémentaires -->
+    <div class="details-box" id="details-box" style="display: none;">
+      <div>Favori Référent : <span id="favori-val">--</span></div>
+      <div>Non-Partants : <span id="np-val">Aucun</span></div>
+      <div>Apprentissage Veille : <span id="veille-val">--</span></div>
+    </div>
   </div>
 
   <script>
-    const API_URL = "https://pegasus-backend-c3a6.onrender.com/predict";
+    // URL de votre API FastAPI sur Render (À remplacer si nécessaire)
+    const API_URL = "https://TON-APPLICATION.onrender.com/predict";
 
     async function chargerPronostic() {
-      const btn = document.getElementById("btn-refresh");
-      const dateEl = document.getElementById("date-val");
-      const hippoEl = document.getElementById("hippo-val");
-      const discEl = document.getElementById("disc-val");
-      const favoriEl = document.getElementById("favori-val");
-      const npEl = document.getElementById("np-val");
-      const quinteEl = document.getElementById("quinte-display");
-      const statusEl = document.getElementById("status-msg");
-      const statusLabel = document.getElementById("course-status-label");
-      const statusDot = document.getElementById("course-status-dot");
-
-      btn.disabled = true;
-      btn.innerText = "Calcul en cours...";
-      statusEl.innerText = "Analyse et calcul de la matrice SGE...";
-
       try {
         const response = await fetch(API_URL);
-        if (!response.ok) throw new Error("Erreur HTTP " + response.status);
-        
         const data = await response.json();
 
-        dateEl.innerText = data.date || "--/--/----";
-        hippoEl.innerText = data.hippodrome || "Inconnu";
-        discEl.innerText = data.discipline_distance || "--";
-        favoriEl.innerText = "Cheval " + data.favori;
-        
-        if (data.non_partants && data.non_partants.length > 0) {
-          npEl.innerText = data.non_partants.join(", ");
+        // 1. Mise à jour des informations de la course
+        document.getElementById('date-course').innerText = data.date || "AUJOURD'HUI";
+        document.getElementById('hippodrome-course').innerText = data.hippodrome || "Hippodrome";
+        document.getElementById('nom-course').innerText = data.nom_course || "";
+        document.getElementById('discipline-course').innerText = data.discipline_distance || "";
+
+        // 2. Gestion de la diode d'état
+        const dot = document.getElementById('status-dot');
+        const statusText = document.getElementById('status-text');
+
+        if (data.course_terminee) {
+          dot.className = "dot red";
+          statusText.innerText = "Course Terminée";
         } else {
-          npEl.innerText = "Aucun";
+          dot.className = "dot green";
+          statusText.innerText = "Analyse Live Active";
         }
 
-        if (data.quinte_sge && data.quinte_sge.length > 0) {
-          quinteEl.innerText = data.quinte_sge.join(" - ");
+        // 3. Affichage du pronostic SGE (5 numéros)
+        const pronoContainer = document.getElementById('prono-container');
+        pronoContainer.innerHTML = ''; // Réinitialisation
+
+        if (data.quinte_sge && data.quinte_sge.length >= 5) {
+          data.quinte_sge.forEach(num => {
+            const ball = document.createElement('div');
+            ball.className = 'number-ball';
+            ball.innerText = num;
+            pronoContainer.appendChild(ball);
+          });
         }
 
-        if (data.course_terminee === true) {
-          statusLabel.innerText = "course terminée";
-          statusLabel.className = "status-text red";
-          statusDot.className = "dot red";
-        } else {
-          statusLabel.innerText = "course non partie";
-          statusLabel.className = "status-text green";
-          statusDot.className = "dot green";
-        }
+        // 4. Détails techniques
+        document.getElementById('favori-val').innerText = data.favori ? `N° ${data.favori}` : "Non disponible";
+        document.getElementById('np-val').innerText = (data.non_partants && data.non_partants.length > 0) 
+          ? data.non_partants.map(n => `N°${n}`).join(', ') 
+          : "Aucun";
+        document.getElementById('veille-val').innerText = (data.arrivee_veille_injectee && data.arrivee_veille_injectee.length > 0)
+          ? data.arrivee_veille_injectee.join(' - ')
+          : "Non disponible";
 
-        statusEl.innerText = "Dernière mise à jour effectuée avec succès.";
+        // Masquer le loader et afficher le contenu
+        document.getElementById('loader').style.display = 'none';
+        pronoContainer.style.display = 'flex';
+        document.getElementById('details-box').style.display = 'block';
 
       } catch (error) {
-        console.error("Erreur de connexion :", error);
-        statusEl.innerText = "Serveur en cours de démarrage, réessayez dans quelques secondes.";
-      } finally {
-        btn.disabled = false;
-        btn.innerText = "Actualisation";
+        console.error("Erreur lors de la récupération du pronostic :", error);
+        document.getElementById('loader').style.display = 'none';
+        document.getElementById('status-text').innerText = "Erreur de connexion au serveur";
       }
     }
 
-    window.onload = chargerPronostic;
+    // Lancement au chargement de la page
+    window.addEventListener('DOMContentLoaded', chargerPronostic);
   </script>
-
 </body>
 </html>
 
