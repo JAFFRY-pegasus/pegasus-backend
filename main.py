@@ -100,70 +100,59 @@ def obtenir_donnees_pmu_live():
                     break
 
             if r_num and c_num:
+                # 1. Récupération des partants et non-partants
                 url_partants = f"https://online.pmu.fr/rest/client/7/programme/{iso_date}/R{r_num}/C{c_num}/partants"
                 res_p = requests.get(url_partants, headers=headers, timeout=6)
+                non_partants = []
                 if res_p.status_code == 200:
-                    data_p = res_p.json()
-                    non_partants = []
-                    cotes = {}
-                    favori = 3
-                    min_cote = 999.0
-
-                    for p in data_p.get('partants', []):
+                    for p in res_p.json().get('partants', []):
                         num = p.get('numProno')
                         est_np = (
                             p.get('nonPartant') is True or
                             p.get('statut') in ['NON_PARTANT', 'NP'] or
                             p.get('estNonPartant') is True
                         )
-                        
                         if est_np:
                             non_partants.append(num)
-                        else:
-                            # Extraction multi-niveau de la cote PMU
-                            cote_val = None
-                            
-                            # 1. Tentative sur rapportProbable / rapport
-                            if 'rapportProbable' in p and isinstance(p['rapportProbable'], dict):
-                                cote_val = p['rapportProbable'].get('rapport') or p['rapportProbable'].get('cote')
-                            
-                            # 2. Tentative sur dernierRapportDirect
-                            if cote_val is None and 'dernierRapportDirect' in p and isinstance(p['dernierRapportDirect'], dict):
-                                cote_val = p['dernierRapportDirect'].get('rapport')
-                            
-                            # 3. Tentative sur coteDirecte
-                            if cote_val is None:
-                                cote_val = p.get('cote') or p.get('coteProbable')
-
-                            if cote_val is not None:
-                                try:
-                                    cote = float(cote_val)
-                                    cotes[str(num)] = round(cote, 1)
-                                    cotes[num] = round(cote, 1)
-                                    if 0 < cote < min_cote:
-                                        min_cote = cote
-                                        favori = num
-                                except (ValueError, TypeError):
-                                    pass
-
                     non_partants.sort()
 
-                    course_terminee = False
-                    if heure_depart_ms:
-                        maintenant_ms = datetime.now().timestamp() * 1000
-                        if maintenant_ms > heure_depart_ms:
-                            course_terminee = True
+                # 2. Récupération dédiée des cotes en direct via l'API des rapports probables PMU
+                cotes = {}
+                favori = 3
+                min_cote = 999.0
+                url_cotes = f"https://online.pmu.fr/rest/client/7/programme/{iso_date}/R{r_num}/C{c_num}/rapports-probables?specialite=E_SIMPLE_GAGNANT"
+                res_c = requests.get(url_cotes, headers=headers, timeout=6)
+                if res_c.status_code == 200:
+                    for item in res_c.json().get('rapportsProbables', []):
+                        num = item.get('numProno')
+                        rapport = item.get('rapport')
+                        if num and rapport is not None:
+                            try:
+                                cote = float(rapport)
+                                cotes[str(num)] = round(cote, 1)
+                                cotes[num] = round(cote, 1)
+                                if 0 < cote < min_cote:
+                                    min_cote = cote
+                                    favori = num
+                            except (ValueError, TypeError):
+                                pass
 
-                    return {
-                        "date": date_str,
-                        "hippodrome": f"{hippo} (R{r_num}C{c_num})",
-                        "nom_course": nom_course,
-                        "discipline_distance": f"{disc} - {dist}",
-                        "favori": favori,
-                        "cotes": cotes,
-                        "non_partants": non_partants,
-                        "course_terminee": course_terminee
-                    }
+                course_terminee = False
+                if heure_depart_ms:
+                    maintenant_ms = datetime.now().timestamp() * 1000
+                    if maintenant_ms > heure_depart_ms:
+                        course_terminee = True
+
+                return {
+                    "date": date_str,
+                    "hippodrome": f"{hippo} (R{r_num}C{c_num})",
+                    "nom_course": nom_course,
+                    "discipline_distance": f"{disc} - {dist}",
+                    "favori": favori,
+                    "cotes": cotes,
+                    "non_partants": non_partants,
+                    "course_terminee": course_terminee
+                }
     except Exception as e:
         print("Erreur fetch PMU:", e)
     
@@ -206,7 +195,7 @@ def calculer_resonances_pegasus(partants_actifs, favori_base, non_partants=[], a
 
 @app.get("/")
 def home():
-    return {"status": "PEGASUS Backend en ligne", "version": "SGE v6.6 (Fix Cotes PMU)"}
+    return {"status": "PEGASUS Backend en ligne", "version": "SGE v6.7 (Rapports probables OK)"}
 
 @app.get("/predict")
 def predict():
