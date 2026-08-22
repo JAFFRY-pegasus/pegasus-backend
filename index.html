@@ -11,6 +11,7 @@
       --text-main: #f8fafc;
       --text-muted: #94a3b8;
       --accent-green: #10b981;
+      --accent-red: #ef4444;
       --accent-blue: #3b82f6;
       --accent-blue-hover: #2563eb;
       --border-color: #334155;
@@ -69,14 +70,39 @@
       text-transform: uppercase;
     }
 
-    .dot-green {
+    .status-indicator {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .status-text {
+      font-size: 12px;
+      font-weight: 600;
+      transition: color 0.3s ease;
+    }
+
+    .status-text.green { color: var(--accent-green); }
+    .status-text.red { color: var(--accent-red); }
+
+    .dot {
       width: 12px;
       height: 12px;
-      background-color: #2ecc71;
       border-radius: 50%;
       display: inline-block;
-      box-shadow: 0 0 10px #2ecc71;
+      transition: background-color 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .dot.green {
+      background-color: var(--accent-green);
+      box-shadow: 0 0 10px var(--accent-green);
       animation: clignoter 1.5s infinite ease-in-out;
+    }
+
+    .dot.red {
+      background-color: var(--accent-red);
+      box-shadow: 0 0 10px var(--accent-red);
+      animation: none;
     }
 
     @keyframes clignoter {
@@ -183,10 +209,11 @@
     <div class="header-row">
       <div class="title-group">
         <h1>PEGASUS IA</h1>
-        <span class="badge">SGE v6.0</span>
+        <span class="badge">SGE v6.2</span>
       </div>
       <div class="status-indicator">
-        <span class="dot-green" title="Service actif"></span>
+        <span id="course-status-label" class="status-text green">course non partie</span>
+        <span id="course-status-dot" class="dot green"></span>
       </div>
     </div>
 
@@ -240,6 +267,8 @@
       const npEl = document.getElementById("np-val");
       const quinteEl = document.getElementById("quinte-display");
       const statusEl = document.getElementById("status-msg");
+      const statusLabel = document.getElementById("course-status-label");
+      const statusDot = document.getElementById("course-status-dot");
 
       btn.disabled = true;
       btn.innerText = "Calcul en cours...";
@@ -266,11 +295,21 @@
           quinteEl.innerText = data.quinte_sge.join(" - ");
         }
 
+        if (data.course_terminee === true) {
+          statusLabel.innerText = "course terminée";
+          statusLabel.className = "status-text red";
+          statusDot.className = "dot red";
+        } else {
+          statusLabel.innerText = "course non partie";
+          statusLabel.className = "status-text green";
+          statusDot.className = "dot green";
+        }
+
         statusEl.innerText = "Dernière mise à jour effectuée avec succès.";
 
       } catch (error) {
         console.error("Erreur de connexion :", error);
-        statusEl.innerText = "Serveur en cours de démarrage, réessayez dans 10 secondes.";
+        statusEl.innerText = "Serveur en cours de démarrage, réessayez dans quelques secondes.";
       } finally {
         btn.disabled = false;
         btn.innerText = "Actualisation";
@@ -282,3 +321,5 @@
 
 </body>
 </html>
+
+
