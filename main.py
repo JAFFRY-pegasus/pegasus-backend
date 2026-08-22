@@ -34,7 +34,6 @@ BONUS_HISTORIQUE_BASE = {
     9: 2.5, 10: 3.1, 11: 3.8, 12: 4.0, 13: 4.6, 14: 4.8, 15: 2.9, 16: 2.1
 }
 
-# Variable mémoire pour geler le dernier pronostic valide avant clôture
 DERNIER_PRONO_VALIDE = None
 
 def extraire_arrivee_depuis_json(data):
@@ -137,7 +136,6 @@ def obtenir_donnees_pmu_live():
                     break
 
             if r_num and c_num:
-                # Partants & Non-Partants
                 url_partants = f"https://online.pmu.fr/rest/client/7/programme/{iso_date}/R{r_num}/C{c_num}/partants"
                 res_p = requests.get(url_partants, headers=headers, timeout=6)
                 non_partants = []
@@ -153,7 +151,6 @@ def obtenir_donnees_pmu_live():
                             non_partants.append(num)
                     non_partants.sort()
 
-                # Cotes
                 cotes = {}
                 favori = None
                 min_cote = 999.0
@@ -174,7 +171,6 @@ def obtenir_donnees_pmu_live():
                             except (ValueError, TypeError):
                                 pass
 
-                # Récupération de l'Arrivée Officielle
                 arrivee_officielle = []
                 url_details = f"https://online.pmu.fr/rest/client/7/programme/{iso_date}/R{r_num}/C{c_num}"
                 res_d = requests.get(url_details, headers=headers, timeout=5)
@@ -182,7 +178,6 @@ def obtenir_donnees_pmu_live():
                     data_d = res_d.json()
                     arrivee_officielle = extraire_arrivee_depuis_json(data_d)
 
-                # Clôture
                 course_terminee = False
                 statuts_fin = ['ARRIVEE', 'FIN_COURSE', 'PAYE', 'ARRIVEE_PROVISOIRE', 'ARRIVEE_DEFINITIVE']
                 if any(s in statut_course for s in statuts_fin) or len(arrivee_officielle) >= 5:
@@ -248,7 +243,7 @@ def calculer_resonances_pegasus(partants_actifs, favori_base, non_partants=[], a
 
 @app.get("/")
 def home():
-    return {"status": "PEGASUS Backend en ligne", "version": "SGE v7.2 (Gelo-Prono)"}
+    return {"status": "PEGASUS Backend en ligne", "version": "SGE v7.2"}
 
 @app.get("/predict")
 def predict():
@@ -268,7 +263,6 @@ def predict():
         arrivee_officielle = data_live.get("arrivee_officielle", [])
         cotes = data_live.get("cotes", {})
 
-        # Si la course est EN COURS et qu'on a un favori, on calcule et sauvegarde la version active
         if not course_terminee and favori is not None:
             partants = list(range(1, 17))
             resultats = calculer_resonances_pegasus(partants, favori, np_list, arrivee_veille)
@@ -280,7 +274,6 @@ def predict():
                 "favori": favori,
                 "cotes": cotes
             }
-        # Si la course est TERMINÉE, on verrouille le pronostic calculé juste avant la course
         elif course_terminee and DERNIER_PRONO_VALIDE is not None:
             quinte_sge = DERNIER_PRONO_VALIDE["quinte_sge"]
             resultats = DERNIER_PRONO_VALIDE["scores"]
@@ -288,7 +281,6 @@ def predict():
             if not cotes:
                 cotes = DERNIER_PRONO_VALIDE["cotes"]
         else:
-            # Fallback direct si le serveur redémarre après la course
             favori = favori or 3
             partants = list(range(1, 17))
             resultats = calculer_resonances_pegasus(partants, favori, np_list, arrivee_veille)
