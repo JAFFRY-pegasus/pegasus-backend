@@ -106,6 +106,7 @@ def obtenir_donnees_pmu_live():
                     break
 
             if r_num and c_num:
+                # Partants & Non-Partants
                 url_partants = f"https://online.pmu.fr/rest/client/7/programme/{iso_date}/R{r_num}/C{c_num}/partants"
                 res_p = requests.get(url_partants, headers=headers, timeout=6)
                 non_partants = []
@@ -121,6 +122,7 @@ def obtenir_donnees_pmu_live():
                             non_partants.append(num)
                     non_partants.sort()
 
+                # Cotes
                 cotes = {}
                 favori = 3
                 min_cote = 999.0
@@ -141,16 +143,22 @@ def obtenir_donnees_pmu_live():
                             except (ValueError, TypeError):
                                 pass
 
-                # Vérification de l'état de la course
+                # Récupération de l'Arrivée Officielle
+                arrivee_officielle = []
+                url_details = f"https://online.pmu.fr/rest/client/7/programme/{iso_date}/R{r_num}/C{c_num}"
+                res_d = requests.get(url_details, headers=headers, timeout=5)
+                if res_d.status_code == 200:
+                    data_d = res_d.json()
+                    arr = data_d.get('ordreArrivee', [])
+                    if len(arr) >= 5:
+                        arrivee_officielle = arr[:5]
+
+                # Statut de clôture
                 course_terminee = False
-                
-                # 1. Vérification par le statut envoyé par le PMU
                 statuts_fin = ['ARRIVEE', 'FIN_COURSE', 'PAYE', 'ARRIVEE_PROVISOIRE', 'ARRIVEE_DEFINITIVE']
-                if any(s in statut_course for s in statuts_fin):
+                if any(s in statut_course for s in statuts_fin) or len(arrivee_officielle) >= 5:
                     course_terminee = True
-                
-                # 2. Vérification par comparaison d'heure exacte (Paris)
-                if heure_depart_ms:
+                elif heure_depart_ms:
                     maintenant_ms = datetime.now(tz_france).timestamp() * 1000
                     if maintenant_ms >= heure_depart_ms:
                         course_terminee = True
@@ -163,7 +171,8 @@ def obtenir_donnees_pmu_live():
                     "favori": favori,
                     "cotes": cotes,
                     "non_partants": non_partants,
-                    "course_terminee": course_terminee
+                    "course_terminee": course_terminee,
+                    "arrivee_officielle": arrivee_officielle
                 }
     except Exception as e:
         print("Erreur fetch PMU:", e)
@@ -207,7 +216,7 @@ def calculer_resonances_pegasus(partants_actifs, favori_base, non_partants=[], a
 
 @app.get("/")
 def home():
-    return {"status": "PEGASUS Backend en ligne", "version": "SGE v6.9"}
+    return {"status": "PEGASUS Backend en ligne", "version": "SGE v7.0 (Arrivée Officielle)"}
 
 @app.get("/predict")
 def predict():
@@ -222,6 +231,7 @@ def predict():
         nom_course = data_live["nom_course"]
         disc_str = data_live["discipline_distance"]
         course_terminee = data_live["course_terminee"]
+        arrivee_officielle = data_live.get("arrivee_officielle", [])
         cotes = data_live.get("cotes", {})
     else:
         favori = 3
@@ -232,6 +242,7 @@ def predict():
         nom_course = "Prix de la Place Morny"
         disc_str = "Plat - 1200m"
         course_terminee = False
+        arrivee_officielle = []
         cotes = {}
 
     partants = list(range(1, 17))
@@ -246,6 +257,7 @@ def predict():
         "cotes": cotes,
         "non_partants": np_list,
         "course_terminee": course_terminee,
+        "arrivee_officielle": arrivee_officielle,
         "arrivee_veille_injectee": arrivee_veille,
         "quinte_sge": [num for num, score in resultats[:5]],
         "scores": resultats
