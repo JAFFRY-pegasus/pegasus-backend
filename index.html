@@ -132,6 +132,13 @@
       justify-content: center;
       align-items: center;
       box-shadow: 0 4px 10px rgba(217, 119, 6, 0.4);
+      cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .number-ball:hover {
+      transform: scale(1.1);
+      box-shadow: 0 6px 14px rgba(255, 215, 0, 0.6);
     }
 
     .details-box {
@@ -206,7 +213,7 @@
   </div>
 
   <script>
-    // URL directe intégrée vers votre serveur Render
+    // URL directe de votre API hébergée sur Render
     const API_URL = "https://pegasus-backend-c3a6.onrender.com/predict";
 
     async function chargerPronostic() {
@@ -232,20 +239,25 @@
           statusText.innerText = "Analyse Live Active";
         }
 
-        // 3. Affichage du pronostic SGE (5 numéros)
+        // 3. Affichage des 5 numéros SGE avec la cote PMU au survol
         const pronoContainer = document.getElementById('prono-container');
-        pronoContainer.innerHTML = ''; // Réinitialisation
+        pronoContainer.innerHTML = ''; 
 
         if (data.quinte_sge && data.quinte_sge.length >= 5) {
           data.quinte_sge.forEach(num => {
             const ball = document.createElement('div');
             ball.className = 'number-ball';
             ball.innerText = num;
+            
+            // Récupération de la cote issue du backend
+            const coteVal = (data.cotes && data.cotes[num]) ? data.cotes[num] : 'N/C';
+            ball.title = `Cote PMU : ${coteVal}`;
+
             pronoContainer.appendChild(ball);
           });
         }
 
-        // 4. Détails techniques
+        // 4. Affichage des informations complémentaires
         document.getElementById('favori-val').innerText = data.favori ? `N° ${data.favori}` : "Non disponible";
         document.getElementById('np-val').innerText = (data.non_partants && data.non_partants.length > 0) 
           ? data.non_partants.map(n => `N°${n}`).join(', ') 
@@ -266,7 +278,7 @@
       }
     }
 
-    // Lancement au chargement de la page
+    // Lancement de la mise à jour dès le chargement du document
     window.addEventListener('DOMContentLoaded', chargerPronostic);
   </script>
 </body>
