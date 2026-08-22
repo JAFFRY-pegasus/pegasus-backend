@@ -39,7 +39,8 @@ def obtenir_arrivee_veille():
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
         "Accept": "application/json, text/plain, */*"
     }
-    date_hier = (datetime.now() - timedelta(days=1)).strftime("%d%m%Y")
+    tz_france = zoneinfo.ZoneInfo("Europe/Paris")
+    date_hier = (datetime.now(tz_france) - timedelta(days=1)).strftime("%d%m%Y")
     try:
         url_prog = f"https://online.pmu.fr/rest/client/7/programme/{date_hier}"
         res = requests.get(url_prog, headers=headers, timeout=5)
@@ -71,19 +72,21 @@ def obtenir_donnees_pmu_live():
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
         "Accept": "application/json, text/plain, */*"
     }
+    tz_france = zoneinfo.ZoneInfo("Europe/Paris")
+    
     try:
         url_prog = "https://online.pmu.fr/rest/client/7/programme/aujourdhui"
         res = requests.get(url_prog, headers=headers, timeout=6)
         if res.status_code == 200:
             prog = res.json()
-            dt_obj = datetime.fromtimestamp(prog['programme']['date'] / 1000.0)
+            dt_obj = datetime.fromtimestamp(prog['programme']['date'] / 1000.0, tz=tz_france)
             date_str = dt_obj.strftime("%d/%m/%Y")
             iso_date = dt_obj.strftime("%d%m%Y")
 
             r_num, c_num, hippo, disc, dist = None, None, None, "Plat", "1200m"
             nom_course = "Prix du Jour"
             heure_depart_ms = None
-            statut_course = None
+            statut_course = ""
 
             for r in prog.get('programme', {}).get('reunions', []):
                 for c in r.get('courses', []):
@@ -95,7 +98,7 @@ def obtenir_donnees_pmu_live():
                         disc = c.get('specialite', disc)
                         nom_course = c.get('libelle', nom_course)
                         heure_depart_ms = c.get('heureDepart')
-                        statut_course = c.get('statut')
+                        statut_course = str(c.get('statut', '')).upper()
                         if c.get('distance'):
                             dist = f"{c.get('distance')}m"
                         break
@@ -138,13 +141,18 @@ def obtenir_donnees_pmu_live():
                             except (ValueError, TypeError):
                                 pass
 
-                # Vérification du statut de la course (heure et statut PMU)
+                # Vérification de l'état de la course
                 course_terminee = False
-                if statut_course in ['ARRIVEE', 'FIN_COURSE', 'PAYE']:
+                
+                # 1. Vérification par le statut envoyé par le PMU
+                statuts_fin = ['ARRIVEE', 'FIN_COURSE', 'PAYE', 'ARRIVEE_PROVISOIRE', 'ARRIVEE_DEFINITIVE']
+                if any(s in statut_course for s in statuts_fin):
                     course_terminee = True
-                elif heure_depart_ms:
-                    maintenant_ms = datetime.now().timestamp() * 1000
-                    if maintenant_ms > heure_depart_ms:
+                
+                # 2. Vérification par comparaison d'heure exacte (Paris)
+                if heure_depart_ms:
+                    maintenant_ms = datetime.now(tz_france).timestamp() * 1000
+                    if maintenant_ms >= heure_depart_ms:
                         course_terminee = True
 
                 return {
@@ -199,7 +207,7 @@ def calculer_resonances_pegasus(partants_actifs, favori_base, non_partants=[], a
 
 @app.get("/")
 def home():
-    return {"status": "PEGASUS Backend en ligne", "version": "SGE v6.8 (Fix statut course)"}
+    return {"status": "PEGASUS Backend en ligne", "version": "SGE v6.9"}
 
 @app.get("/predict")
 def predict():
@@ -218,7 +226,8 @@ def predict():
     else:
         favori = 3
         np_list = []
-        date_str = datetime.now().strftime("%d/%m/%Y")
+        tz_france = zoneinfo.ZoneInfo("Europe/Paris")
+        date_str = datetime.now(tz_france).strftime("%d/%m/%Y")
         hippo_str = "Deauville (R1C3)"
         nom_course = "Prix de la Place Morny"
         disc_str = "Plat - 1200m"
