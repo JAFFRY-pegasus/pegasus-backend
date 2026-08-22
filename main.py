@@ -1,6 +1,7 @@
 import os
 import requests
 from datetime import datetime, timedelta
+import zoneinfo
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -82,6 +83,7 @@ def obtenir_donnees_pmu_live():
             r_num, c_num, hippo, disc, dist = None, None, None, "Plat", "1200m"
             nom_course = "Prix du Jour"
             heure_depart_ms = None
+            statut_course = None
 
             for r in prog.get('programme', {}).get('reunions', []):
                 for c in r.get('courses', []):
@@ -93,6 +95,7 @@ def obtenir_donnees_pmu_live():
                         disc = c.get('specialite', disc)
                         nom_course = c.get('libelle', nom_course)
                         heure_depart_ms = c.get('heureDepart')
+                        statut_course = c.get('statut')
                         if c.get('distance'):
                             dist = f"{c.get('distance')}m"
                         break
@@ -100,7 +103,6 @@ def obtenir_donnees_pmu_live():
                     break
 
             if r_num and c_num:
-                # 1. Récupération des partants et non-partants
                 url_partants = f"https://online.pmu.fr/rest/client/7/programme/{iso_date}/R{r_num}/C{c_num}/partants"
                 res_p = requests.get(url_partants, headers=headers, timeout=6)
                 non_partants = []
@@ -116,7 +118,6 @@ def obtenir_donnees_pmu_live():
                             non_partants.append(num)
                     non_partants.sort()
 
-                # 2. Récupération dédiée des cotes en direct via l'API des rapports probables PMU
                 cotes = {}
                 favori = 3
                 min_cote = 999.0
@@ -137,8 +138,11 @@ def obtenir_donnees_pmu_live():
                             except (ValueError, TypeError):
                                 pass
 
+                # Vérification du statut de la course (heure et statut PMU)
                 course_terminee = False
-                if heure_depart_ms:
+                if statut_course in ['ARRIVEE', 'FIN_COURSE', 'PAYE']:
+                    course_terminee = True
+                elif heure_depart_ms:
                     maintenant_ms = datetime.now().timestamp() * 1000
                     if maintenant_ms > heure_depart_ms:
                         course_terminee = True
@@ -195,7 +199,7 @@ def calculer_resonances_pegasus(partants_actifs, favori_base, non_partants=[], a
 
 @app.get("/")
 def home():
-    return {"status": "PEGASUS Backend en ligne", "version": "SGE v6.7 (Rapports probables OK)"}
+    return {"status": "PEGASUS Backend en ligne", "version": "SGE v6.8 (Fix statut course)"}
 
 @app.get("/predict")
 def predict():
