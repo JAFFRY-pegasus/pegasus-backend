@@ -213,7 +213,6 @@
   </div>
 
   <script>
-    // URL directe de votre API hébergée sur Render
     const API_URL = "https://pegasus-backend-c3a6.onrender.com/predict";
 
     async function chargerPronostic() {
@@ -221,17 +220,20 @@
         const response = await fetch(API_URL);
         const data = await response.json();
 
-        // 1. Mise à jour des informations de la course
+        // 1. Informations de la course
         document.getElementById('date-course').innerText = data.date || "AUJOURD'HUI";
         document.getElementById('hippodrome-course').innerText = data.hippodrome || "Hippodrome";
         document.getElementById('nom-course').innerText = data.nom_course || "";
         document.getElementById('discipline-course').innerText = data.discipline_distance || "";
 
-        // 2. Gestion de la diode d'état
+        // 2. Gestion prioritaire de la diode de statut
         const dot = document.getElementById('status-dot');
         const statusText = document.getElementById('status-text');
+        
+        // Détection de l'absence de cotes (course fermée/terminée)
+        const cotesInexistantes = !data.cotes || Object.keys(data.cotes).length === 0;
 
-        if (data.course_terminee) {
+        if (data.course_terminee || cotesInexistantes) {
           dot.className = "dot red";
           statusText.innerText = "Course Terminée";
         } else {
@@ -249,15 +251,14 @@
             ball.className = 'number-ball';
             ball.innerText = num;
             
-            // Récupération de la cote issue du backend
-            const coteVal = (data.cotes && data.cotes[num]) ? data.cotes[num] : 'N/C';
+            const coteVal = (data.cotes && data.cotes[num]) ? data.cotes[num] : 'NC';
             ball.title = `Cote PMU : ${coteVal}`;
 
             pronoContainer.appendChild(ball);
           });
         }
 
-        // 4. Affichage des informations complémentaires
+        // 4. Informations complémentaires
         document.getElementById('favori-val').innerText = data.favori ? `N° ${data.favori}` : "Non disponible";
         document.getElementById('np-val').innerText = (data.non_partants && data.non_partants.length > 0) 
           ? data.non_partants.map(n => `N°${n}`).join(', ') 
@@ -266,19 +267,18 @@
           ? data.arrivee_veille_injectee.join(' - ')
           : "Non disponible";
 
-        // Masquer le loader et afficher le contenu
+        // Affichage final
         document.getElementById('loader').style.display = 'none';
         pronoContainer.style.display = 'flex';
         document.getElementById('details-box').style.display = 'block';
 
       } catch (error) {
-        console.error("Erreur lors de la récupération du pronostic :", error);
+        console.error("Erreur de synchronisation :", error);
         document.getElementById('loader').style.display = 'none';
-        document.getElementById('status-text').innerText = "Erreur de connexion au serveur";
+        document.getElementById('status-text').innerText = "Erreur serveur";
       }
     }
 
-    // Lancement de la mise à jour dès le chargement du document
     window.addEventListener('DOMContentLoaded', chargerPronostic);
   </script>
 </body>
