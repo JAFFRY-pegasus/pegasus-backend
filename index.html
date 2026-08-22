@@ -12,7 +12,6 @@
       --text-muted: #94a3b8;
       --accent-gold: #ffd700;
       --accent-blue: #38bdf8;
-      --accent-red: #ef4444;
       --border-color: #334155;
     }
 
@@ -102,8 +101,8 @@
     }
 
     .dot.red {
-      background-color: var(--accent-red);
-      box-shadow: 0 0 8px var(--accent-red);
+      background-color: #ef4444;
+      box-shadow: 0 0 8px #ef4444;
     }
 
     .section-title {
@@ -118,9 +117,10 @@
       display: flex;
       justify-content: center;
       gap: 10px;
-      margin-bottom: 25px;
+      margin-bottom: 20px;
     }
 
+    /* Boules Jaunes (Pronostic SGE) */
     .number-ball {
       width: 50px;
       height: 50px;
@@ -137,8 +137,9 @@
       transition: transform 0.2s ease, box-shadow 0.2s ease;
     }
 
-    .number-ball.officiel {
-      background: linear-gradient(135deg, #ef4444, #991b1b);
+    /* Boules Rouges (Arrivée Officielle) */
+    .number-ball.red-ball {
+      background: linear-gradient(135deg, #ef4444, #dc2626);
       box-shadow: 0 4px 10px rgba(239, 68, 68, 0.4);
     }
 
@@ -146,21 +147,9 @@
       transform: scale(1.1);
     }
 
-    .arrivee-box {
-      background-color: rgba(239, 68, 68, 0.1);
-      border: 1px dashed var(--accent-red);
-      border-radius: 12px;
-      padding: 15px;
-      margin-bottom: 20px;
-    }
-
-    .arrivee-title {
-      font-size: 0.85rem;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      color: var(--accent-red);
-      font-weight: bold;
-      margin-bottom: 10px;
+    .officiel-section {
+      margin-top: 15px;
+      margin-bottom: 25px;
     }
 
     .details-box {
@@ -197,7 +186,7 @@
 <body>
 
   <div class="container">
-    <!-- En-tête de la course -->
+    <!-- En-tête -->
     <div class="header-info">
       <p id="date-course">Chargement...</p>
       <h2 id="hippodrome-course">--</h2>
@@ -211,18 +200,18 @@
       <span id="status-text">Analyse en cours...</span>
     </div>
 
-    <!-- Titre Pronostic SGE -->
-    <div class="section-title">Pronostic de Résonance SGE</div>
+    <!-- Titre Pronostic -->
+    <div class="section-title">PRONOSTIC DE RÉSONANCE SGE</div>
 
     <!-- Loader -->
     <div id="loader" class="loader"></div>
 
-    <!-- Balles des numéros SGE -->
+    <!-- Boules jaunes SGE -->
     <div class="prono-container" id="prono-container" style="display: none;"></div>
 
-    <!-- Bloc d'affichage de l'Arrivée Officielle (S'affiche une fois la course terminée) -->
-    <div class="arrivee-box" id="arrivee-box" style="display: none;">
-      <div class="arrivee-title">Arrivée Officielle PMU</div>
+    <!-- Section Arrivée Officielle (Boules rouges) -->
+    <div class="officiel-section" id="officiel-section" style="display: none;">
+      <div class="section-title" style="color: #ef4444; margin-top: 15px;">ARRIVÉE OFFICIELLE</div>
       <div class="prono-container" id="officiel-container" style="margin-bottom: 0;"></div>
     </div>
 
@@ -242,7 +231,7 @@
         const response = await fetch(API_URL);
         const data = await response.json();
 
-        // 1. Informations de la course
+        // 1. Informations course
         document.getElementById('date-course').innerText = data.date || "AUJOURD'HUI";
         document.getElementById('hippodrome-course').innerText = data.hippodrome || "Hippodrome";
         document.getElementById('nom-course').innerText = data.nom_course || "";
@@ -261,7 +250,7 @@
           statusText.innerText = "Analyse Live Active";
         }
 
-        // 3. Affichage du Pronostic SGE
+        // 3. Affichage Pronostic SGE (Boules Jaunes)
         const pronoContainer = document.getElementById('prono-container');
         pronoContainer.innerHTML = ''; 
 
@@ -276,24 +265,24 @@
           });
         }
 
-        // 4. Affichage de l'Arrivée Officielle si disponible
-        const arriveeBox = document.getElementById('arrivee-box');
+        // 4. Affichage Arrivée Officielle (Boules Rouges)
+        const officielSection = document.getElementById('officiel-section');
         const officielContainer = document.getElementById('officiel-container');
         officielContainer.innerHTML = '';
 
         if (data.arrivee_officielle && data.arrivee_officielle.length >= 5) {
           data.arrivee_officielle.forEach(num => {
             const ball = document.createElement('div');
-            ball.className = 'number-ball officiel';
+            ball.className = 'number-ball red-ball';
             ball.innerText = num;
             officielContainer.appendChild(ball);
           });
-          arriveeBox.style.display = 'block';
+          officielSection.style.display = 'block';
         } else {
-          arriveeBox.style.display = 'none';
+          officielSection.style.display = 'none';
         }
 
-        // 5. Informations complémentaires
+        // 5. Infos complémentaires
         document.getElementById('favori-val').innerText = data.favori ? `N° ${data.favori}` : "Non disponible";
         document.getElementById('np-val').innerText = (data.non_partants && data.non_partants.length > 0) 
           ? data.non_partants.map(n => `N°${n}`).join(', ') 
@@ -318,5 +307,4 @@
   </script>
 </body>
 </html>
-
 
