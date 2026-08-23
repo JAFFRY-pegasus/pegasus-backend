@@ -3,6 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Méta-tags pour désactiver la mise en cache navigateur -->
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>SGE - Système de Résonance Géométrique</title>
   <style>
     :root {
@@ -15,7 +19,11 @@
       --border-color: #334155;
     }
 
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
 
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -91,8 +99,15 @@
       display: inline-block;
     }
 
-    .dot.green { background-color: #22c55e; box-shadow: 0 0 8px #22c55e; }
-    .dot.red { background-color: #ef4444; box-shadow: 0 0 8px #ef4444; }
+    .dot.green {
+      background-color: #22c55e;
+      box-shadow: 0 0 8px #22c55e;
+    }
+
+    .dot.red {
+      background-color: #ef4444;
+      box-shadow: 0 0 8px #ef4444;
+    }
 
     .section-title {
       font-size: 0.85rem;
@@ -130,9 +145,14 @@
       box-shadow: 0 4px 10px rgba(239, 68, 68, 0.4);
     }
 
-    .number-ball:hover { transform: scale(1.1); }
+    .number-ball:hover {
+      transform: scale(1.1);
+    }
 
-    .officiel-section { margin-top: 15px; margin-bottom: 25px; }
+    .officiel-section {
+      margin-top: 15px;
+      margin-bottom: 25px;
+    }
 
     .details-box {
       background-color: rgba(0, 0, 0, 0.2);
@@ -144,7 +164,10 @@
       line-height: 1.6;
     }
 
-    .details-box span { color: var(--text-main); font-weight: 600; }
+    .details-box span {
+      color: var(--text-main);
+      font-weight: 600;
+    }
 
     .loader {
       border: 3px solid var(--border-color);
@@ -194,18 +217,31 @@
   </div>
 
   <script>
-    const API_URL = "https://pegasus-backend-c3a6.onrender.com/predict";
+    // URL Backend Render
+    const BASE_URL = "https://pegasus-backend-c3a6.onrender.com/predict";
 
     async function chargerPronostic() {
       try {
-        const response = await fetch(API_URL);
+        // Ajout d'un horodatage unique (t=timestamp) pour casser le cache navigateur & Vercel
+        const urlAntiCache = `${BASE_URL}?t=${new Date().getTime()}`;
+        
+        const response = await fetch(urlAntiCache, {
+          cache: 'no-store',
+          headers: {
+            'Pragma': 'no-cache',
+            'Cache-Control': 'no-cache'
+          }
+        });
+        
         const data = await response.json();
 
+        // 1. Infos course
         document.getElementById('date-course').innerText = data.date || "AUJOURD'HUI";
         document.getElementById('hippodrome-course').innerText = data.hippodrome || "Hippodrome";
         document.getElementById('nom-course').innerText = data.nom_course || "";
         document.getElementById('discipline-course').innerText = data.discipline_distance || "";
 
+        // 2. Diode d'état
         const dot = document.getElementById('status-dot');
         const statusText = document.getElementById('status-text');
 
@@ -217,8 +253,10 @@
           statusText.innerText = "Analyse Live Active";
         }
 
+        // 3. Affichage Pronostic SGE (Boules Jaunes)
         const pronoContainer = document.getElementById('prono-container');
         pronoContainer.innerHTML = ''; 
+
         if (data.quinte_sge && data.quinte_sge.length >= 5) {
           data.quinte_sge.forEach(num => {
             const ball = document.createElement('div');
@@ -230,6 +268,7 @@
           });
         }
 
+        // 4. Affichage Arrivée Officielle (Boules Rouges)
         const officielSection = document.getElementById('officiel-section');
         const officielContainer = document.getElementById('officiel-container');
         officielContainer.innerHTML = '';
@@ -246,6 +285,7 @@
           officielSection.style.display = 'none';
         }
 
+        // 5. Infos complémentaires
         document.getElementById('favori-val').innerText = data.favori ? `N° ${data.favori}` : "Non disponible";
         document.getElementById('np-val').innerText = (data.non_partants && data.non_partants.length > 0) 
           ? data.non_partants.map(n => `N°${n}`).join(', ') 
@@ -254,14 +294,15 @@
           ? data.arrivee_veille_injectee.join(' - ')
           : "Non disponible";
 
+        // Affichage final
         document.getElementById('loader').style.display = 'none';
         pronoContainer.style.display = 'flex';
         document.getElementById('details-box').style.display = 'block';
 
       } catch (error) {
-        console.error("Erreur :", error);
+        console.error("Erreur de synchronisation :", error);
         document.getElementById('loader').style.display = 'none';
-        document.getElementById('status-text').innerText = "Erreur serveur";
+        document.getElementById('status-text').innerText = "Connexion serveur...";
       }
     }
 
