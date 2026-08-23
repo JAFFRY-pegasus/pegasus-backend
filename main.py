@@ -3,8 +3,8 @@ import requests
 from datetime import datetime, timedelta
 import zoneinfo
 from fastapi import FastAPI, Response
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 
@@ -16,7 +16,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Table des résonances avec tes rectifications sur 2, 9 et 13
 PRIORITES_GEOMETRIQUES = {
     1: [9, 2, 10, 8, 16], 
     2: [10, 1, 8, 9, 11], 
@@ -49,31 +48,37 @@ BONUS_HISTORIQUE_BASE = {
 DERNIER_PRONO_VALIDE = None
 
 def extraire_arrivee_depuis_json(data):
+    """ Extrait les 5 premiers chevaux de l'arrivée officielle dans tous les formats PMU possibles """
     if not isinstance(data, dict):
         return []
-    arr = data.get('ordreArrivee', [])
-    if isinstance(arr, list) and len(arr) >= 5:
-        res = []
-        for x in arr:
-            if isinstance(x, int):
-                res.append(x)
-            elif isinstance(x, dict) and 'numProno' in x:
-                res.append(x['numProno'])
-        if len(res) >= 5:
-            return res[:5]
+    
+    # 1. Format sous forme de liste d'objets ou d'entiers
+    for cle in ['ordreArrivee', 'arrivants', 'combinaisonArrivee']:
+        arr = data.get(cle)
+        if isinstance(arr, list) and len(arr) >= 5:
+            res = []
+            for x in arr:
+                if isinstance(x, int):
+                    res.append(x)
+                elif isinstance(x, dict):
+                    num = x.get('numProno') or x.get('numero') or x.get('numCheval')
+                    if num: res.append(int(num))
+            if len(res) >= 5:
+                return res[:5]
 
-    arrivants = data.get('arrivants', []) or data.get('combinaisonArrivee', [])
-    if isinstance(arrivants, list) and len(arrivants) >= 5:
-        res = []
-        for a in arrivants:
-            if isinstance(a, int):
-                res.append(a)
-            elif isinstance(a, dict):
-                num = a.get('numProno') or a.get('numero')
-                if num:
-                    res.append(int(num))
-        if len(res) >= 5:
-            return res[:5]
+    # 2. Format sous forme de chaîne de caractères (ex: "14-9-5-12-10")
+    for cle in ['ordreArrivee', 'texteArrivee']:
+        arr_str = data.get(cle)
+        if isinstance(arr_str, str) and ('-' in arr_str or ' ' in arr_str):
+            separateur = '-' if '-' in arr_str else ' '
+            parties = arr_str.split(separateur)
+            res = []
+            for p in parties:
+                clean_p = ''.join(filter(str.isdigit, p))
+                if clean_p:
+                    res.append(int(clean_p))
+            if len(res) >= 5:
+                return res[:5]
 
     return []
 
@@ -96,15 +101,13 @@ def obtenir_arrivee_veille():
                         r_num = r.get('numOfficiel')
                         c_num = c.get('numOrdre')
                         break
-                if r_num:
-                    break
+                if r_num: break
             if r_num and c_num:
                 url_course = f"https://online.pmu.fr/rest/client/7/programme/{date_hier}/R{r_num}/C{c_num}"
                 res_c = requests.get(url_course, headers=headers, timeout=5)
                 if res_c.status_code == 200:
                     arr = extraire_arrivee_depuis_json(res_c.json())
-                    if len(arr) >= 5:
-                        return arr
+                    if len(arr) >= 5: return arr
     except Exception as e:
         print("Erreur fetch arrivée veille:", e)
     return [14, 9, 5, 12, 10]
@@ -131,19 +134,31 @@ def obtenir_donnees_pmu_live(arrivee_veille):
         date_aujourdhui = datetime.now(tz_france).strftime("%d%m%Y")
         date_str = datetime.now(tz_france).strftime("%d/%m/%Y")
 
-        url_course = f"https://online.pmu.fr/rest/client/7/programme/{date_aujourdhui}/R1/C3"
+        r_num, c_num = 1, 3
+        url_prog = f"https://online.pmu.fr/rest/client/7/programme/{date_aujourdhui}"
+        res_prog = requests.get(url_prog, headers=headers, timeout=5)
+        if res_prog.status_code == 200:
+            prog = res_prog.json()
+            for r in prog.get('programme', {}).get('reunions', []):
+                for c in r.get('courses', []):
+                    if c.get('eQuintePlus') or c.get('quintePlus'):
+                        r_num = r.get('numOfficiel', 1)
+                        c_num = c.get('numOrdre', 3)
+                        break
+
+        url_course = f"https://online.pmu.fr/rest/client/7/programme/{date_aujourdhui}/R{r_num}/C{c_num}"
         res_c = requests.get(url_course, headers=headers, timeout=6)
         
         if res_c.status_code == 200:
             c = res_c.json()
-            nom_course = c.get('libelle', 'Sumbe Grand Handicap')
-            hippo = "Deauville (R1C3)"
+            nom_course = c.get('libelle', 'Grand Handicap')
+            hippo = f"{c.get('hippodrome', {}).get('libelleLong', 'Hippodrome')} (R{r_num}C{c_num})"
             disc = c.get('specialite', 'PLAT')
             dist = f"{c.get('distance', 2000)}m"
             heure_depart_ms = c.get('heureDepart')
             statut_course = str(c.get('statut', '')).upper()
 
-            url_partants = f"https://online.pmu.fr/rest/client/7/programme/{date_aujourdhui}/R1/C3/partants"
+            url_partants = f"https://online.pmu.fr/rest/client/7/programme/{date_aujourdhui}/R{r_num}/C{c_num}/partants"
             res_p = requests.get(url_partants, headers=headers, timeout=6)
             non_partants = []
             if res_p.status_code == 200:
@@ -156,7 +171,7 @@ def obtenir_donnees_pmu_live(arrivee_veille):
             cotes = {}
             favori = None
             min_cote = 999.0
-            url_cotes = f"https://online.pmu.fr/rest/client/7/programme/{date_aujourdhui}/R1/C3/rapports-probables?specialite=E_SIMPLE_GAGNANT"
+            url_cotes = f"https://online.pmu.fr/rest/client/7/programme/{date_aujourdhui}/R{r_num}/C{c_num}/rapports-probables?specialite=E_SIMPLE_GAGNANT"
             res_cot = requests.get(url_cotes, headers=headers, timeout=6)
             if res_cot.status_code == 200:
                 for item in res_cot.json().get('rapportsProbables', []):
@@ -200,7 +215,7 @@ def obtenir_donnees_pmu_live(arrivee_veille):
                 "arrivee_officielle": arrivee_officielle
             }
     except Exception as e:
-        print("Erreur fetch PMU direct R1C3:", e)
+        print("Erreur fetch PMU direct:", e)
     
     return None
 
@@ -222,8 +237,7 @@ def calculer_resonances_pegasus(partants_actifs, favori_base, non_partants=[], a
         for idx, target in enumerate(PRIORITES_GEOMETRIQUES[favori_base]):
             if target in non_partants and target in PRIORITES_GEOMETRIQUES:
                 devies = [n for n in PRIORITES_GEOMETRIQUES[target] if n not in non_partants and n in scores]
-                if devies:
-                    target = devies[0]
+                if devies: target = devies[0]
             if target in scores:
                 scores[target] += poids[idx]
 
