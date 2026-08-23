@@ -1,72 +1,244 @@
-import datetime
-from typing import List, Dict, Optional
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SGE Resonance - Pegasus PMU</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --accent-blue: #3b82f6;
+            --accent-green: #10b981;
+            --text-main: #f8fafc;
+            --text-sub: #94a3b8;
+        }
 
-app = FastAPI(title="SGE Resonance API", version="7.4")
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
 
-# Activation du CORS pour autoriser GitHub Pages / Frontend local à requêter l'API
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+        .container {
+            max-width: 600px;
+            width: 100%;
+            background: var(--card-bg);
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        }
 
-@app.get("/predict")
-def get_prediction() -> Dict:
-    """
-    Endpoint principal fournissant les données de résonance SGE en temps réel.
-    """
-    
-    # 1. Définition de la date et de l'heure exacte du départ
-    # Exemple pour aujourd'hui avec départ prévu à 15h15
-    maintenant = datetime.datetime.now()
-    heure_depart = maintenant.replace(hour=15, minute=15, second=0, microsecond=0)
-    
-    # Conversion en Timestamp Unix en Millisecondes pour le compte à rebours JS
-    heure_depart_ms = int(heure_depart.timestamp() * 1000)
-    
-    # Détermination automatique du statut terminé (si l'heure actuelle dépasse l'heure de départ)
-    course_terminee = maintenant >= heure_depart
+        .header {
+            text-align: center;
+            border-bottom: 1px solid #334155;
+            padding-bottom: 16px;
+            margin-bottom: 20px;
+        }
 
-    # 2. Structure de réponse JSON synchronisée avec index.html
-    response_data = {
-        "date": "23/08/2026",
-        "hippodrome": "Deauville (R1C3)",
-        "nom_course": "Sumbe Grand Handicap",
-        "discipline_distance": "PLAT - 2000m",
-        
-        # Données de chronométrage & statut
-        "heure_depart_ms": heure_depart_ms,
-        "course_terminee": course_terminee,
-        
-        # Pronostic de résonance SGE
-        "quinte_sge": ["11", "5", "6", "7", "14"],
-        
-        # Cotes PMU facultatives (affichées au survol des boules)
-        "cotes": {
-            "11": "8.5",
-            "5": "12.0",
-            "6": "6.2",
-            "7": "14.1",
-            "14": "4.5"
-        },
-        
-        # Informations de synthèse
-        "favori": "14",
-        "non_partants": [],
-        "arrivee_veille_injectee": ["14", "9", "5", "12", "10"],
-        
-        # Arrivée officielle (vide tant que la course n'est pas courue)
-        # Compléter ex: ["11", "14", "5", "6", "7"] quand course_terminee est True
-        "arrivee_officielle": [] if not course_terminee else ["11", "14", "5", "6", "7"]
+        .header h1 {
+            margin: 0 0 8px 0;
+            font-size: 1.5rem;
+            color: var(--accent-blue);
+        }
+
+        .info-badge {
+            font-size: 0.9rem;
+            color: var(--text-sub);
+        }
+
+        .timer-box {
+            text-align: center;
+            background: #0f172a;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-weight: bold;
+            color: #f59e0b;
+        }
+
+        .balls-container {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+
+        .ball-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .ball {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            font-weight: bold;
+            box-shadow: 0 4px 10px rgba(59, 130, 246, 0.4);
+        }
+
+        .ball-cote {
+            font-size: 0.75rem;
+            color: var(--text-sub);
+            margin-top: 4px;
+        }
+
+        .btn-action {
+            display: block;
+            width: 100%;
+            padding: 14px;
+            background-color: var(--accent-blue);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            text-align: center;
+            text-decoration: none;
+            transition: background 0.2s;
+            box-sizing: border-box;
+        }
+
+        .btn-action:hover {
+            background-color: #2563eb;
+        }
+
+        .details-list {
+            margin-top: 20px;
+            font-size: 0.9rem;
+            color: var(--text-sub);
+            line-height: 1.6;
+        }
+
+        .status-finished {
+            color: var(--accent-green);
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h1 id="nom-course">Chargement de la course...</h1>
+        <div class="info-badge" id="details-course">-- / --</div>
+    </div>
+
+    <div class="timer-box" id="timer-box">
+        Compte à rebours : <span id="countdown">--:--:--</span>
+    </div>
+
+    <div style="text-align: center; font-size: 0.9rem; color: var(--text-sub);">
+        Pronostic de Résonance SGE
+    </div>
+
+    <div class="balls-container" id="quinte-balls">
+        <!-- Généré dynamiquement -->
+    </div>
+
+    <!-- BOUTON D'ACTION POINTANT VERS LA ROUTE PREDICT -->
+    <a href="https://pegasus-backend-zku1.vercel.app/predict" id="btn-refresh" class="btn-action">
+        Actualiser le Pronostic
+    </a>
+
+    <div class="details-list" id="extra-info">
+        <!-- Infos complémentaires -->
+    </div>
+</div>
+
+<script>
+    const API_URL = "https://pegasus-backend-zku1.vercel.app/predict";
+    let countdownInterval = null;
+
+    async function chargerDonnees() {
+        try {
+            const res = await fetch(API_URL);
+            const data = await res.json();
+
+            // Remplissage En-tête
+            document.getElementById('nom-course').innerText = data.nom_course || "Sumbe Grand Handicap";
+            document.getElementById('details-course').innerText = `${data.date} - ${data.hippodrome} (${data.discipline_distance})`;
+
+            // Affichage des boules Quinté SGE
+            const containerBalls = document.getElementById('quinte-balls');
+            containerBalls.innerHTML = '';
+            
+            if (data.quinte_sge && data.quinte_sge.length > 0) {
+                data.quinte_sge.forEach(num => {
+                    const strNum = String(num);
+                    const cote = (data.cotes && data.cotes[strNum]) ? `${data.cotes[strNum]}` : '-';
+                    
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'ball-wrapper';
+                    wrapper.innerHTML = `
+                        <div class="ball">${strNum}</div>
+                        <div class="ball-cote">${cote}</div>
+                    `;
+                    containerBalls.appendChild(wrapper);
+                });
+            }
+
+            // Gestion du Compte à rebours / Statut
+            if (data.course_terminee) {
+                document.getElementById('timer-box').innerHTML = '<span class="status-finished">Course terminée</span>';
+            } else if (data.heure_depart_ms) {
+                lancerCompteARebours(data.heure_depart_ms);
+            }
+
+            // Informations complémentaires
+            const arrivee = (data.arrivee_officielle && data.arrivee_officielle.length > 0) 
+                ? data.arrivee_officielle.join(' - ') 
+                : 'En attente';
+                
+            document.getElementById('extra-info').innerHTML = `
+                <strong>Favori Référent :</strong> N°${data.favori || '--'}<br>
+                <strong>Arrivée officielle :</strong> ${arrivee}<br>
+                <strong>Non-partants :</strong> ${data.non_partants.length > 0 ? data.non_partants.join(', ') : 'Aucun'}
+            `;
+
+        } catch (err) {
+            console.error("Erreur de chargement des données :", err);
+            document.getElementById('nom-course').innerText = "Erreur de connexion au serveur";
+        }
     }
 
-    return response_data
+    function lancerCompteARebours(heureDepartMs) {
+        if (countdownInterval) clearInterval(countdownInterval);
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+        countdownInterval = setInterval(() => {
+            const maintenant = new Date().getTime();
+            const diff = heureDepartMs - maintenant;
 
+            if (diff <= 0) {
+                clearInterval(countdownInterval);
+                document.getElementById('timer-box').innerHTML = '<span class="status-finished">Course en cours ou terminée</span>';
+                return;
+            }
+
+            const heures = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+            const secondes = Math.floor((diff % (1000 * 60)) / 1000);
+
+            document.getElementById('countdown').innerText = 
+                `${String(heures).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secondes).padStart(2, '0')}`;
+        }, 1000);
+    }
+
+    // Chargement automatique au démarrage
+    chargerDonnees();
+</script>
+
+</body>
+</html>
