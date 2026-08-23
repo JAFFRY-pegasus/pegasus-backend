@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 import zoneinfo
 from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse  # <-- MODIFICATION 1 : Import FileResponse
 
 app = FastAPI()
 
@@ -230,9 +231,10 @@ def calculer_resonances_pegasus(partants_actifs, favori_base, non_partants=[], a
 
     return sorted(scores.items(), key=lambda x: x[1], reverse=True)
 
-@app.get("/")
+# <-- MODIFICATION 2 : La route racine sert désormais index.html -->
+@app.get("/", response_class=FileResponse)
 def home():
-    return {"status": "PEGASUS Backend en ligne", "version": "SGE v7.4 (Direct R1C3 & Anti-Cache)"}
+    return "index.html"
 
 @app.get("/predict")
 def predict(response: Response):
