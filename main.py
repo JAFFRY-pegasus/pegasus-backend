@@ -34,7 +34,6 @@ BONUS_HISTORIQUE_BASE = {
     9: 2.5, 10: 3.1, 11: 3.8, 12: 4.0, 13: 4.6, 14: 4.8, 15: 2.9, 16: 2.1
 }
 
-# Variable mémoire pour geler le pronostic
 DERNIER_PRONO_VALIDE = None
 
 def extraire_arrivee_depuis_json(data):
@@ -117,110 +116,78 @@ def obtenir_donnees_pmu_live(arrivee_veille):
     tz_france = zoneinfo.ZoneInfo("Europe/Paris")
     
     try:
-        url_prog = "https://online.pmu.fr/rest/client/7/programme/aujourdhui"
-        res = requests.get(url_prog, headers=headers, timeout=6)
-        if res.status_code == 200:
-            prog = res.json()
-            dt_obj = datetime.fromtimestamp(prog['programme']['date'] / 1000.0, tz=tz_france)
-            date_str = dt_obj.strftime("%d/%m/%Y")
-            iso_date = dt_obj.strftime("%d%m%Y")
+        date_aujourdhui = datetime.now(tz_france).strftime("%d%m%Y")
+        date_str = datetime.now(tz_france).strftime("%d/%m/%Y")
 
-            r_num, c_num, hippo, disc, dist = None, None, None, "Plat", "1200m"
-            nom_course = "Prix du Jour"
-            heure_depart_ms = None
-            statut_course = ""
+        url_course = f"https://online.pmu.fr/rest/client/7/programme/{date_aujourdhui}/R1/C3"
+        res_c = requests.get(url_course, headers=headers, timeout=6)
+        
+        if res_c.status_code == 200:
+            c = res_c.json()
+            nom_course = c.get('libelle', 'Sumbe Grand Handicap')
+            hippo = "Deauville (R1C3)"
+            disc = c.get('specialite', 'PLAT')
+            dist = f"{c.get('distance', 2000)}m"
+            heure_depart_ms = c.get('heureDepart')
+            statut_course = str(c.get('statut', '')).upper()
 
-            for r in prog.get('programme', {}).get('reunions', []):
-                for c in r.get('courses', []):
-                    is_quinte = c.get('eQuintePlus') or c.get('quintePlus') or (r.get('numOfficiel') == 1 and c.get('numOrdre') == 3)
-                    if is_quinte:
-                        r_num = r.get('numOfficiel')
-                        c_num = c.get('numOrdre')
-                        hippo = r.get('hippodrome', {}).get('libelle', 'Hippodrome')
-                        disc = c.get('specialite', disc)
-                        nom_course = c.get('libelle', nom_course)
-                        heure_depart_ms = c.get('heureDepart')
-                        statut_course = str(c.get('statut', '')).upper()
-                        if c.get('distance'):
-                            dist = f"{c.get('distance')}m"
-                        break
-                if r_num:
-                    break
+            url_partants = f"https://online.pmu.fr/rest/client/7/programme/{date_aujourdhui}/R1/C3/partants"
+            res_p = requests.get(url_partants, headers=headers, timeout=6)
+            non_partants = []
+            if res_p.status_code == 200:
+                for p in res_p.json().get('partants', []):
+                    num = p.get('numProno')
+                    if p.get('nonPartant') is True or p.get('statut') in ['NON_PARTANT', 'NP']:
+                        if num: non_partants.append(num)
+                non_partants.sort()
 
-            if r_num and c_num:
-                # Partants & Non-Partants
-                url_partants = f"https://online.pmu.fr/rest/client/7/programme/{iso_date}/R{r_num}/C{c_num}/partants"
-                res_p = requests.get(url_partants, headers=headers, timeout=6)
-                non_partants = []
-                if res_p.status_code == 200:
-                    for p in res_p.json().get('partants', []):
-                        num = p.get('numProno')
-                        est_np = (
-                            p.get('nonPartant') is True or
-                            p.get('statut') in ['NON_PARTANT', 'NP'] or
-                            p.get('estNonPartant') is True
-                        )
-                        if est_np and num:
-                            non_partants.append(num)
-                    non_partants.sort()
+            cotes = {}
+            favori = None
+            min_cote = 999.0
+            url_cotes = f"https://online.pmu.fr/rest/client/7/programme/{date_aujourdhui}/R1/C3/rapports-probables?specialite=E_SIMPLE_GAGNANT"
+            res_cot = requests.get(url_cotes, headers=headers, timeout=6)
+            if res_cot.status_code == 200:
+                for item in res_cot.json().get('rapportsProbables', []):
+                    num = item.get('numProno')
+                    rapport = item.get('rapport')
+                    if num and rapport is not None:
+                        try:
+                            cote = float(rapport)
+                            cotes[str(num)] = round(cote, 1)
+                            if 0 < cote < min_cote:
+                                min_cote = cote
+                                favori = num
+                        except (ValueError, TypeError):
+                            pass
 
-                # Cotes PMU
-                cotes = {}
-                favori = None
-                min_cote = 999.0
-                url_cotes = f"https://online.pmu.fr/rest/client/7/programme/{iso_date}/R{r_num}/C{c_num}/rapports-probables?specialite=E_SIMPLE_GAGNANT"
-                res_c = requests.get(url_cotes, headers=headers, timeout=6)
-                if res_c.status_code == 200:
-                    for item in res_c.json().get('rapportsProbables', []):
-                        num = item.get('numProno')
-                        rapport = item.get('rapport')
-                        if num and rapport is not None:
-                            try:
-                                cote = float(rapport)
-                                cotes[str(num)] = round(cote, 1)
-                                cotes[num] = round(cote, 1)
-                                if 0 < cote < min_cote:
-                                    min_cote = cote
-                                    favori = num
-                            except (ValueError, TypeError):
-                                pass
+            if favori is None:
+                partants_actifs = [n for n in range(1, 16) if n not in non_partants]
+                favori = determiner_favori_sge_autonome(partants_actifs, arrivee_veille)
 
-                # Fallback : Si pas encore de favori aux cotes, on prend le favori SGE autonome
-                if favori is None:
-                    partants_actifs = [n for n in range(1, 17) if n not in non_partants]
-                    favori = determiner_favori_sge_autonome(partants_actifs, arrivee_veille)
+            arrivee_officielle = extraire_arrivee_depuis_json(c)
 
-                # Récupération Arrivée Officielle
-                arrivee_officielle = []
-                url_details = f"https://online.pmu.fr/rest/client/7/programme/{iso_date}/R{r_num}/C{c_num}"
-                res_d = requests.get(url_details, headers=headers, timeout=5)
-                if res_d.status_code == 200:
-                    data_d = res_d.json()
-                    arrivee_officielle = extraire_arrivee_depuis_json(data_d)
-
-                # Détection de fin de course
-                course_terminee = False
-                statuts_fin = ['ARRIVEE', 'FIN_COURSE', 'PAYE', 'ARRIVEE_PROVISOIRE', 'ARRIVEE_DEFINITIVE']
-                if any(s in statut_course for s in statuts_fin) or len(arrivee_officielle) >= 5:
+            course_terminee = False
+            statuts_fin = ['ARRIVEE', 'FIN_COURSE', 'PAYE', 'ARRIVEE_PROVISOIRE', 'ARRIVEE_DEFINITIVE']
+            if any(s in statut_course for s in statuts_fin) or len(arrivee_officielle) >= 5:
+                course_terminee = True
+            elif heure_depart_ms:
+                maintenant_ms = datetime.now(tz_france).timestamp() * 1000
+                if maintenant_ms >= heure_depart_ms:
                     course_terminee = True
-                elif heure_depart_ms:
-                    maintenant_ms = datetime.now(tz_france).timestamp() * 1000
-                    if maintenant_ms >= heure_depart_ms:
-                        course_terminee = True
 
-                return {
-                    "date": date_str,
-                    "hippodrome": f"{hippo} (R{r_num}C{c_num})",
-                    "nom_course": nom_course,
-                    "discipline_distance": f"{disc} - {dist}",
-                    "favori": favori,
-                    "cotes": cotes,
-                    "non_partants": non_partants,
-                    "course_terminee": course_terminee,
-                    "arrivee_officielle": arrivee_officielle
-                }
+            return {
+                "date": date_str,
+                "hippodrome": hippo,
+                "nom_course": nom_course,
+                "discipline_distance": f"{disc} - {dist}",
+                "favori": favori,
+                "cotes": cotes,
+                "non_partants": non_partants,
+                "course_terminee": course_terminee,
+                "arrivee_officielle": arrivee_officielle
+            }
     except Exception as e:
-        print("Erreur fetch PMU live:", e)
+        print("Erreur fetch PMU direct R1C3:", e)
     
     return None
 
@@ -264,13 +231,12 @@ def calculer_resonances_pegasus(partants_actifs, favori_base, non_partants=[], a
 
 @app.get("/")
 def home():
-    return {"status": "PEGASUS Backend en ligne", "version": "SGE v7.3 (Anti-Cache & Autonome)"}
+    return {"status": "PEGASUS Backend en ligne", "version": "SGE v7.4 (Direct R1C3 & Anti-Cache)"}
 
 @app.get("/predict")
 def predict(response: Response):
     global DERNIER_PRONO_VALIDE
     
-    # En-têtes HTTP Anti-Cache (Force le client et Vercel à ne pas mettre la réponse en mémoire)
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     response.headers["Pragma"] = "no-cache"
     response.headers["Expires"] = "0"
@@ -289,9 +255,8 @@ def predict(response: Response):
         arrivee_officielle = data_live.get("arrivee_officielle", [])
         cotes = data_live.get("cotes", {})
 
-        # Si la course est EN COURS : Calcul dynamique et mise en mémoire de sauvegarde
         if not course_terminee:
-            partants = list(range(1, 17))
+            partants = list(range(1, 16))
             resultats = calculer_resonances_pegasus(partants, favori, np_list, arrivee_veille)
             quinte_sge = [num for num, score in resultats[:5]]
 
@@ -301,7 +266,6 @@ def predict(response: Response):
                 "favori": favori,
                 "cotes": cotes
             }
-        # Si la course est TERMINÉE : Verrouillage strict du pronostic
         elif course_terminee and DERNIER_PRONO_VALIDE is not None:
             quinte_sge = DERNIER_PRONO_VALIDE["quinte_sge"]
             resultats = DERNIER_PRONO_VALIDE["scores"]
@@ -309,22 +273,20 @@ def predict(response: Response):
             if not cotes:
                 cotes = DERNIER_PRONO_VALIDE["cotes"]
         else:
-            # Fallback direct
-            partants = list(range(1, 17))
+            partants = list(range(1, 16))
             resultats = calculer_resonances_pegasus(partants, favori, np_list, arrivee_veille)
             quinte_sge = [num for num, score in resultats[:5]]
     else:
-        # Fallback hors-ligne
         np_list = []
         tz_france = zoneinfo.ZoneInfo("Europe/Paris")
         date_str = datetime.now(tz_france).strftime("%d/%m/%Y")
         hippo_str = "Deauville (R1C3)"
-        nom_course = "Prix du Jour"
-        disc_str = "Plat - 1200m"
+        nom_course = "Sumbe Grand Handicap"
+        disc_str = "PLAT - 2000m"
         course_terminee = False
         arrivee_officielle = []
         cotes = {}
-        partants = list(range(1, 17))
+        partants = list(range(1, 16))
         favori = determiner_favori_sge_autonome(partants, arrivee_veille)
         resultats = calculer_resonances_pegasus(partants, favori, np_list, arrivee_veille)
         quinte_sge = [num for num, score in resultats[:5]]
