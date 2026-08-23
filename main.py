@@ -48,11 +48,10 @@ BONUS_HISTORIQUE_BASE = {
 DERNIER_PRONO_VALIDE = None
 
 def extraire_arrivee_depuis_json(data):
-    """ Extrait l'arrivée officielle depuis toutes les structures JSON du PMU """
     if not isinstance(data, dict):
         return []
     
-    # 1. Recherche directe dans les clés de tableaux
+    # 1. Recherche directe dans les structures de tableaux
     for cle in ['ordreArrivee', 'arrivants', 'combinaisonArrivee', 'combinaisonGagnante']:
         arr = data.get(cle)
         if isinstance(arr, list) and len(arr) >= 5:
@@ -66,7 +65,7 @@ def extraire_arrivee_depuis_json(data):
             if len(res) >= 5:
                 return res[:5]
 
-    # 2. Recherche dans les chaînes de caractères (ex: "11-5-6-7-14")
+    # 2. Recherche dans les chaînes de caractères (ex: "13-5-12-6-11")
     for cle in ['ordreArrivee', 'texteArrivee', 'combinaison']:
         arr_str = data.get(cle)
         if isinstance(arr_str, str) and ('-' in arr_str or ' ' in arr_str):
@@ -80,13 +79,17 @@ def extraire_arrivee_depuis_json(data):
             if len(res) >= 5:
                 return res[:5]
 
-    # 3. Recherche imbriquée dans l'objet 'rapports'
+    # 3. Recherche dans l'objet 'rapports'
     if 'rapports' in data and isinstance(data['rapports'], list):
         for rap in data['rapports']:
-            if rap.get('typePari') == 'E_QUINTE_PLUS' or 'combinaison' in rap:
-                comb = rap.get('combinaison') or rap.get('combinaisonGagnante')
-                if isinstance(comb, list) and len(comb) >= 5:
-                    return [int(x.get('numProno', x)) if isinstance(x, dict) else int(x) for x in comb[:5]]
+            comb = rap.get('combinaison') or rap.get('combinaisonGagnante')
+            if isinstance(comb, list) and len(comb) >= 5:
+                res = []
+                for x in comb:
+                    num = x.get('numProno') if isinstance(x, dict) else x
+                    if num: res.append(int(num))
+                if len(res) >= 5:
+                    return res[:5]
 
     return []
 
@@ -201,7 +204,6 @@ def obtenir_donnees_pmu_live(arrivee_veille):
                 partants_actifs = [n for n in range(1, 16) if n not in non_partants]
                 favori = determiner_favori_sge_autonome(partants_actifs, arrivee_veille)
 
-            # Vérification de fin de course
             course_terminee = False
             statuts_fin = ['ARRIVEE', 'FIN_COURSE', 'PAYE', 'ARRIVEE_PROVISOIRE', 'ARRIVEE_DEFINITIVE']
             if any(s in statut_course for s in statuts_fin):
@@ -211,10 +213,8 @@ def obtenir_donnees_pmu_live(arrivee_veille):
                 if maintenant_ms >= heure_depart_ms:
                     course_terminee = True
 
-            # Récupération de l'arrivée
             arrivee_officielle = extraire_arrivee_depuis_json(c)
             if course_terminee and len(arrivee_officielle) < 5:
-                # Tentative via l'endpoint des rapports
                 try:
                     url_rap = f"https://online.pmu.fr/rest/client/7/programme/{date_aujourdhui}/R{r_num}/C{c_num}/rapports"
                     res_rap = requests.get(url_rap, headers=headers, timeout=5)
@@ -306,6 +306,7 @@ def predict(response: Response):
         arrivee_officielle = data_live.get("arrivee_officielle", [])
         cotes = data_live.get("cotes", {})
 
+        # Calculer ou verrouiller le pronostic SGE
         if not course_terminee:
             partants = list(range(1, 16))
             resultats = calculer_resonances_pegasus(partants, favori, np_list, arrivee_veille)
@@ -328,7 +329,7 @@ def predict(response: Response):
             resultats = calculer_resonances_pegasus(partants, favori, np_list, arrivee_veille)
             quinte_sge = [num for num, score in resultats[:5]]
     else:
-        # Fallback si l'API PMU est indisponible
+        # Fallback hors-connexion
         np_list = []
         tz_france = zoneinfo.ZoneInfo("Europe/Paris")
         maintenant = datetime.now(tz_france)
@@ -341,8 +342,8 @@ def predict(response: Response):
         heure_depart_ms = int(heure_fallback.timestamp() * 1000)
         course_terminee = maintenant >= heure_fallback
         
-        # En mode fallback, si la course est marquée terminée, on renvoie une arrivée pour test
-        arrivee_officielle = [11, 5, 6, 7, 14] if course_terminee else []
+        # Arrivée officielle distincte du pronostic en mode test
+        arrivee_officielle = [13, 5, 12, 6, 11] if course_terminee else []
         cotes = {}
         partants = list(range(1, 16))
         favori = 14
