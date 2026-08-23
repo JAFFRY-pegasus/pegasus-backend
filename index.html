@@ -148,7 +148,7 @@
         <!-- Généré dynamiquement -->
     </div>
 
-    <!-- BOUTON D'ACTION POINTANT VERS LA ROUTE PREDICT -->
+    <!-- BOUTON D'ACTION CORRIGÉ VERS /predict -->
     <a href="https://pegasus-backend-zku1.vercel.app/predict" id="btn-refresh" class="btn-action">
         Actualiser le Pronostic
     </a>
@@ -205,7 +205,7 @@
             document.getElementById('extra-info').innerHTML = `
                 <strong>Favori Référent :</strong> N°${data.favori || '--'}<br>
                 <strong>Arrivée officielle :</strong> ${arrivee}<br>
-                <strong>Non-partants :</strong> ${data.non_partants.length > 0 ? data.non_partants.join(', ') : 'Aucun'}
+                <strong>Non-partants :</strong> ${data.non_partants && data.non_partants.length > 0 ? data.non_partants.join(', ') : 'Aucun'}
             `;
 
         } catch (err) {
