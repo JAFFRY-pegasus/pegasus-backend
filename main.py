@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 import zoneinfo
 from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse  # <-- MODIFICATION 1 : Import FileResponse
+from fastapi.responses import FileResponse
 
 app = FastAPI()
 
@@ -16,12 +16,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Table des résonances avec tes rectifications sur 2, 9 et 13
 PRIORITES_GEOMETRIQUES = {
-    1: [9, 2, 10, 8, 16], 2: [10, 1, 8, 9, 10], 3: [11, 4, 2, 12, 10],
-    4: [12, 5, 8, 13, 11], 5: [13, 4, 6, 12, 14], 6: [14, 5, 7, 13, 14],
-    7: [15, 8, 6, 16, 14], 8: [16, 7, 1, 15, 9], 9: [1, 2, 8, 10, 16],
-    10: [2, 1, 8, 9, 11], 11: [8, 3, 2, 12, 10], 12: [4, 5, 3, 13, 11],
-    13: [5, 4, 6, 12, 14], 14: [6, 5, 7, 13, 15], 15: [7, 8, 6, 16, 14],
+    1: [9, 2, 10, 8, 16], 
+    2: [10, 1, 8, 9, 11], 
+    3: [11, 4, 2, 12, 10],
+    4: [12, 5, 8, 13, 11], 
+    5: [13, 4, 6, 12, 14], 
+    6: [14, 5, 7, 13, 14],
+    7: [15, 8, 6, 16, 14], 
+    8: [16, 7, 1, 15, 9], 
+    9: [8, 4, 2, 12, 10], 
+    10: [2, 1, 8, 9, 11], 
+    11: [8, 3, 2, 12, 10], 
+    12: [4, 5, 3, 13, 11],
+    13: [5, 4, 6, 14, 12], 
+    14: [6, 5, 7, 13, 15], 
+    15: [7, 8, 6, 16, 14],
     16: [8, 1, 7, 9, 15]
 }
 
@@ -231,7 +242,6 @@ def calculer_resonances_pegasus(partants_actifs, favori_base, non_partants=[], a
 
     return sorted(scores.items(), key=lambda x: x[1], reverse=True)
 
-# <-- MODIFICATION 2 : La route racine sert désormais index.html -->
 @app.get("/", response_class=FileResponse)
 def home():
     return "index.html"
@@ -289,7 +299,6 @@ def predict(response: Response):
         nom_course = "Sumbe Grand Handicap"
         disc_str = "PLAT - 2000m"
         
-        # Secours : 15h15 si le scraping échoue
         heure_fallback = maintenant.replace(hour=15, minute=15, second=0, microsecond=0)
         heure_depart_ms = int(heure_fallback.timestamp() * 1000)
         course_terminee = maintenant >= heure_fallback
