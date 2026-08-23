@@ -107,7 +107,6 @@
             font-weight: bold;
             cursor: pointer;
             text-align: center;
-            text-decoration: none;
             transition: background 0.2s;
             box-sizing: border-box;
         }
@@ -148,10 +147,10 @@
         <!-- Généré dynamiquement -->
     </div>
 
-    <!-- BOUTON D'ACTION CORRIGÉ VERS /predict -->
-    <a href="https://pegasus-backend-zku1.vercel.app/predict" id="btn-refresh" class="btn-action">
+    <!-- BOUTON INTERACTIF SANS REDIRECTION -->
+    <button onclick="chargerDonnees()" id="btn-refresh" class="btn-action">
         Actualiser le Pronostic
-    </a>
+    </button>
 
     <div class="details-list" id="extra-info">
         <!-- Infos complémentaires -->
