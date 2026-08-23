@@ -3,20 +3,21 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <!-- Méta-tags pour désactiver la mise en cache navigateur -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <title>SGE - Système de Résonance Géométrique</title>
   <style>
     :root {
-      --bg-color: #0f172a;
-      --card-bg: #1e293b;
+      --bg-gradient: linear-gradient(135deg, #0b0f19 0%, #111827 50%, #070a12 100%);
+      --card-bg: rgba(30, 41, 59, 0.7);
+      --card-border: rgba(255, 215, 0, 0.15);
       --text-main: #f8fafc;
       --text-muted: #94a3b8;
       --accent-gold: #ffd700;
       --accent-blue: #38bdf8;
-      --border-color: #334155;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
     }
 
     * {
@@ -26,70 +27,103 @@
     }
 
     body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background-color: var(--bg-color);
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg-gradient);
+      background-size: 400% 400%;
+      animation: gradientBG 15s ease infinite;
       color: var(--text-main);
       display: flex;
       justify-content: center;
       align-items: center;
       min-height: 100vh;
       padding: 20px;
+      overflow-x: hidden;
     }
 
+    @keyframes gradientBG {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    /* Carte Principale Glassmorphism */
     .container {
-      background-color: var(--card-bg);
-      border: 1px solid var(--border-color);
-      border-radius: 16px;
-      padding: 30px;
-      max-width: 500px;
+      background: var(--card-bg);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--card-border);
+      border-radius: 24px;
+      padding: 32px 24px;
+      max-width: 480px;
       width: 100%;
-      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6),
+                  0 0 20px rgba(255, 215, 0, 0.05);
       text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .container::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle, rgba(56, 189, 248, 0.05) 0%, transparent 70%);
+      pointer-events: none;
     }
 
     .header-info {
-      margin-bottom: 24px;
-      border-bottom: 1px solid var(--border-color);
+      margin-bottom: 20px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
       padding-bottom: 16px;
     }
 
     .header-info p#date-course {
-      font-size: 0.9rem;
+      font-size: 0.85rem;
       color: var(--text-muted);
       text-transform: uppercase;
-      letter-spacing: 1px;
+      letter-spacing: 2px;
+      font-weight: 600;
     }
 
     .header-info h2#hippodrome-course {
-      font-size: 1.4rem;
-      color: var(--text-main);
+      font-size: 1.5rem;
+      color: #fff;
       margin-top: 4px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
     }
 
     .header-info h3#nom-course {
-      font-size: 1.1rem;
+      font-size: 1.15rem;
       color: var(--accent-gold);
       margin-top: 6px;
       font-style: italic;
-      font-weight: 600;
+      text-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
     }
 
     .header-info p#discipline-course {
-      font-size: 0.95rem;
+      font-size: 0.9rem;
       color: var(--accent-blue);
       margin-top: 4px;
+      font-weight: 500;
     }
 
+    /* Badge avec Animation Pulse */
     .status-badge {
       display: inline-flex;
       align-items: center;
-      gap: 8px;
-      padding: 6px 12px;
-      border-radius: 20px;
+      gap: 10px;
+      padding: 8px 16px;
+      border-radius: 30px;
       font-size: 0.85rem;
       font-weight: 600;
       margin-bottom: 20px;
-      background-color: rgba(255, 255, 255, 0.05);
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
     }
 
     .dot {
@@ -100,68 +134,88 @@
     }
 
     .dot.green {
-      background-color: #22c55e;
-      box-shadow: 0 0 8px #22c55e;
+      background-color: var(--accent-green);
+      box-shadow: 0 0 0 rgba(34, 197, 94, 0.4);
+      animation: pulseGreen 2s infinite;
     }
 
     .dot.red {
-      background-color: #ef4444;
-      box-shadow: 0 0 8px #ef4444;
+      background-color: var(--accent-red);
+      box-shadow: 0 0 10px var(--accent-red);
+    }
+
+    @keyframes pulseGreen {
+      0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
+      70% { box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
     }
 
     .section-title {
-      font-size: 0.85rem;
+      font-size: 0.8rem;
       text-transform: uppercase;
-      letter-spacing: 1.5px;
+      letter-spacing: 2px;
       color: var(--text-muted);
-      margin-bottom: 12px;
+      margin-bottom: 16px;
+      font-weight: 600;
     }
 
+    /* Boules avec Animation d'Apparition */
     .prono-container {
       display: flex;
       justify-content: center;
-      gap: 10px;
-      margin-bottom: 20px;
+      gap: 12px;
+      margin-bottom: 24px;
     }
 
     .number-ball {
-      width: 50px;
-      height: 50px;
+      width: 52px;
+      height: 52px;
       border-radius: 50%;
-      background: linear-gradient(135deg, #f59e0b, #d97706);
-      color: #ffffff;
-      font-weight: bold;
-      font-size: 1.3rem;
+      background: linear-gradient(135deg, #fbbf24, #d97706);
+      color: #0f172a;
+      font-weight: 800;
+      font-size: 1.35rem;
       display: flex;
       justify-content: center;
       align-items: center;
-      box-shadow: 0 4px 10px rgba(217, 119, 6, 0.4);
+      box-shadow: 0 6px 15px rgba(217, 119, 6, 0.4),
+                  inset 0 2px 4px rgba(255, 255, 255, 0.6);
       cursor: pointer;
-      transition: transform 0.2s ease;
-    }
-
-    .number-ball.red-ball {
-      background: linear-gradient(135deg, #ef4444, #dc2626);
-      box-shadow: 0 4px 10px rgba(239, 68, 68, 0.4);
+      opacity: 0;
+      transform: translateY(20px) scale(0.8);
+      animation: ballPop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
     }
 
     .number-ball:hover {
-      transform: scale(1.1);
+      transform: scale(1.15) translateY(-4px) !important;
+      box-shadow: 0 10px 20px rgba(251, 191, 36, 0.6);
     }
 
-    .officiel-section {
-      margin-top: 15px;
-      margin-bottom: 25px;
+    .number-ball.red-ball {
+      background: linear-gradient(135deg, #f87171, #dc2626);
+      color: #fff;
+      box-shadow: 0 6px 15px rgba(220, 38, 38, 0.4),
+                  inset 0 2px 4px rgba(255, 255, 255, 0.4);
+    }
+
+    @keyframes ballPop {
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
     }
 
     .details-box {
-      background-color: rgba(0, 0, 0, 0.2);
-      border-radius: 8px;
-      padding: 12px;
+      background: rgba(15, 23, 42, 0.5);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+      padding: 14px;
       font-size: 0.85rem;
       color: var(--text-muted);
       text-align: left;
-      line-height: 1.6;
+      line-height: 1.8;
+      margin-bottom: 20px;
     }
 
     .details-box span {
@@ -169,14 +223,44 @@
       font-weight: 600;
     }
 
+    /* Ticker Tape (Bandeau Défilant) */
+    .ticker-wrap {
+      width: 100%;
+      overflow: hidden;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 8px;
+      padding: 6px 0;
+      border: 1px solid rgba(255, 255, 255, 0.03);
+    }
+
+    .ticker {
+      display: inline-block;
+      white-space: nowrap;
+      padding-left: 100%;
+      animation: ticker 18s linear infinite;
+    }
+
+    .ticker-item {
+      display: inline-block;
+      padding: 0 15px;
+      font-size: 0.75rem;
+      color: var(--accent-gold);
+      letter-spacing: 0.5px;
+    }
+
+    @keyframes ticker {
+      0% { transform: translate3d(0, 0, 0); }
+      100% { transform: translate3d(-100%, 0, 0); }
+    }
+
     .loader {
-      border: 3px solid var(--border-color);
-      border-top: 3px solid var(--accent-blue);
+      border: 3px solid rgba(255, 255, 255, 0.1);
+      border-top: 3px solid var(--accent-gold);
       border-radius: 50%;
-      width: 24px;
-      height: 24px;
+      width: 30px;
+      height: 30px;
       animation: spin 1s linear infinite;
-      margin: 20px auto;
+      margin: 30px auto;
     }
 
     @keyframes spin {
@@ -195,7 +279,7 @@
       <p id="discipline-course">--</p>
     </div>
 
-    <div class="status-badge" id="status-badge">
+    <div class="status-badge">
       <span class="dot" id="status-dot"></span>
       <span id="status-text">Analyse en cours...</span>
     </div>
@@ -205,7 +289,7 @@
     <div class="prono-container" id="prono-container" style="display: none;"></div>
 
     <div class="officiel-section" id="officiel-section" style="display: none;">
-      <div class="section-title" style="color: #ef4444; margin-top: 15px;">ARRIVÉE OFFICIELLE</div>
+      <div class="section-title" style="color: var(--accent-red); margin-top: 15px;">ARRIVÉE OFFICIELLE</div>
       <div class="prono-container" id="officiel-container" style="margin-bottom: 0;"></div>
     </div>
 
@@ -214,17 +298,22 @@
       <div>Non-Partants : <span id="np-val">Aucun</span></div>
       <div>Apprentissage Veille : <span id="veille-val">--</span></div>
     </div>
+
+    <div class="ticker-wrap" id="ticker-wrap" style="display: none;">
+      <div class="ticker">
+        <span class="ticker-item">⚡ Système SGE v7.4 d'Analyse Géométrique</span>
+        <span class="ticker-item">● Calcul des matrices de résonance en temps réel</span>
+        <span class="ticker-item">● Arrivée de la veille synchronisée</span>
+      </div>
+    </div>
   </div>
 
   <script>
-    // URL Backend Render
     const BASE_URL = "https://pegasus-backend-c3a6.onrender.com/predict";
 
     async function chargerPronostic() {
       try {
-        // Ajout d'un horodatage unique (t=timestamp) pour casser le cache navigateur & Vercel
         const urlAntiCache = `${BASE_URL}?t=${new Date().getTime()}`;
-        
         const response = await fetch(urlAntiCache, {
           cache: 'no-store',
           headers: {
@@ -235,13 +324,11 @@
         
         const data = await response.json();
 
-        // 1. Infos course
         document.getElementById('date-course').innerText = data.date || "AUJOURD'HUI";
         document.getElementById('hippodrome-course').innerText = data.hippodrome || "Hippodrome";
         document.getElementById('nom-course').innerText = data.nom_course || "";
         document.getElementById('discipline-course').innerText = data.discipline_distance || "";
 
-        // 2. Diode d'état
         const dot = document.getElementById('status-dot');
         const statusText = document.getElementById('status-text');
 
@@ -253,31 +340,33 @@
           statusText.innerText = "Analyse Live Active";
         }
 
-        // 3. Affichage Pronostic SGE (Boules Jaunes)
+        // Animation des Boules de Pronostic
         const pronoContainer = document.getElementById('prono-container');
         pronoContainer.innerHTML = ''; 
 
         if (data.quinte_sge && data.quinte_sge.length >= 5) {
-          data.quinte_sge.forEach(num => {
+          data.quinte_sge.forEach((num, index) => {
             const ball = document.createElement('div');
             ball.className = 'number-ball';
             ball.innerText = num;
+            ball.style.animationDelay = `${index * 0.12}s`;
             const coteVal = (data.cotes && data.cotes[num]) ? data.cotes[num] : 'NC';
             ball.title = `Cote PMU : ${coteVal}`;
             pronoContainer.appendChild(ball);
           });
         }
 
-        // 4. Affichage Arrivée Officielle (Boules Rouges)
+        // Animation des Boules Rouges
         const officielSection = document.getElementById('officiel-section');
         const officielContainer = document.getElementById('officiel-container');
         officielContainer.innerHTML = '';
 
         if (data.arrivee_officielle && data.arrivee_officielle.length >= 5) {
-          data.arrivee_officielle.forEach(num => {
+          data.arrivee_officielle.forEach((num, index) => {
             const ball = document.createElement('div');
             ball.className = 'number-ball red-ball';
             ball.innerText = num;
+            ball.style.animationDelay = `${index * 0.12}s`;
             officielContainer.appendChild(ball);
           });
           officielSection.style.display = 'block';
@@ -285,7 +374,6 @@
           officielSection.style.display = 'none';
         }
 
-        // 5. Infos complémentaires
         document.getElementById('favori-val').innerText = data.favori ? `N° ${data.favori}` : "Non disponible";
         document.getElementById('np-val').innerText = (data.non_partants && data.non_partants.length > 0) 
           ? data.non_partants.map(n => `N°${n}`).join(', ') 
@@ -294,10 +382,10 @@
           ? data.arrivee_veille_injectee.join(' - ')
           : "Non disponible";
 
-        // Affichage final
         document.getElementById('loader').style.display = 'none';
         pronoContainer.style.display = 'flex';
         document.getElementById('details-box').style.display = 'block';
+        document.getElementById('ticker-wrap').style.display = 'block';
 
       } catch (error) {
         console.error("Erreur de synchronisation :", error);
