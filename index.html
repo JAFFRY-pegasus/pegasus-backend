@@ -46,7 +46,6 @@
       100% { background-position: 0% 50%; }
     }
 
-    /* Carte Principale Glassmorphism */
     .container {
       background: var(--card-bg);
       backdrop-filter: blur(16px);
@@ -63,19 +62,8 @@
       overflow: hidden;
     }
 
-    .container::before {
-      content: '';
-      position: absolute;
-      top: -50%;
-      left: -50%;
-      width: 200%;
-      height: 200%;
-      background: radial-gradient(circle, rgba(56, 189, 248, 0.05) 0%, transparent 70%);
-      pointer-events: none;
-    }
-
     .header-info {
-      margin-bottom: 20px;
+      margin-bottom: 16px;
       border-bottom: 1px solid rgba(255, 255, 255, 0.08);
       padding-bottom: 16px;
     }
@@ -93,7 +81,6 @@
       color: #fff;
       margin-top: 4px;
       font-weight: 700;
-      letter-spacing: 0.5px;
     }
 
     .header-info h3#nom-course {
@@ -111,7 +98,31 @@
       font-weight: 500;
     }
 
-    /* Badge avec Animation Pulse */
+    /* Compte à Rebours */
+    .timer-box {
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      border-radius: 12px;
+      padding: 8px 16px;
+      display: inline-block;
+      margin-bottom: 16px;
+    }
+
+    .timer-label {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .timer-val {
+      font-size: 1.2rem;
+      font-weight: 800;
+      color: var(--accent-blue);
+      font-family: monospace;
+      letter-spacing: 1px;
+    }
+
     .status-badge {
       display: inline-flex;
       align-items: center;
@@ -123,7 +134,6 @@
       margin-bottom: 20px;
       background: rgba(15, 23, 42, 0.6);
       border: 1px solid rgba(255, 255, 255, 0.1);
-      box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
     }
 
     .dot {
@@ -159,7 +169,6 @@
       font-weight: 600;
     }
 
-    /* Boules avec Animation d'Apparition */
     .prono-container {
       display: flex;
       justify-content: center;
@@ -195,8 +204,7 @@
     .number-ball.red-ball {
       background: linear-gradient(135deg, #f87171, #dc2626);
       color: #fff;
-      box-shadow: 0 6px 15px rgba(220, 38, 38, 0.4),
-                  inset 0 2px 4px rgba(255, 255, 255, 0.4);
+      box-shadow: 0 6px 15px rgba(220, 38, 38, 0.4);
     }
 
     @keyframes ballPop {
@@ -223,7 +231,6 @@
       font-weight: 600;
     }
 
-    /* Ticker Tape (Bandeau Défilant) */
     .ticker-wrap {
       width: 100%;
       overflow: hidden;
@@ -245,7 +252,6 @@
       padding: 0 15px;
       font-size: 0.75rem;
       color: var(--accent-gold);
-      letter-spacing: 0.5px;
     }
 
     @keyframes ticker {
@@ -279,9 +285,17 @@
       <p id="discipline-course">--</p>
     </div>
 
-    <div class="status-badge">
-      <span class="dot" id="status-dot"></span>
-      <span id="status-text">Analyse en cours...</span>
+    <!-- BLOC COMPTE À REBOURS -->
+    <div class="timer-box" id="timer-box" style="display: none;">
+      <div class="timer-label">Départ dans</div>
+      <div class="timer-val" id="timer-val">00h 00m 00s</div>
+    </div>
+
+    <div>
+      <div class="status-badge">
+        <span class="dot" id="status-dot"></span>
+        <span id="status-text">Analyse en cours...</span>
+      </div>
     </div>
 
     <div class="section-title">PRONOSTIC DE RÉSONANCE SGE</div>
@@ -310,6 +324,44 @@
 
   <script>
     const BASE_URL = "https://pegasus-backend-c3a6.onrender.com/predict";
+    let timerInterval = null;
+
+    function demarrerCompteARebours(heureDepartMs) {
+      if (timerInterval) clearInterval(timerInterval);
+      const timerBox = document.getElementById('timer-box');
+      const timerVal = document.getElementById('timer-val');
+
+      if (!heureDepartMs) {
+        timerBox.style.display = 'none';
+        return;
+      }
+
+      timerBox.style.display = 'inline-block';
+
+      function mettreAJourChrono() {
+        const maintenant = new Date().getTime();
+        const ecart = heureDepartMs - maintenant;
+
+        if (ecart <= 0) {
+          timerVal.innerText = "DÉPART IMMINENT";
+          clearInterval(timerInterval);
+          return;
+        }
+
+        const heures = Math.floor((ecart % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const minutes = Math.floor((ecart % (1000 * 60 * 60)) / (1000 * 60));
+        const secondes = Math.floor((ecart % (1000 * 60)) / 1000);
+
+        const hStr = heures < 10 ? `0${heures}` : heures;
+        const mStr = minutes < 10 ? `0${minutes}` : minutes;
+        const sStr = secondes < 10 ? `0${secondes}` : secondes;
+
+        timerVal.innerText = `${hStr}h ${mStr}m ${sStr}s`;
+      }
+
+      mettreAJourChrono();
+      timerInterval = setInterval(mettreAJourChrono, 1000);
+    }
 
     async function chargerPronostic() {
       try {
@@ -335,12 +387,16 @@
         if (data.course_terminee) {
           dot.className = "dot red";
           statusText.innerText = "Course Terminée";
+          document.getElementById('timer-box').style.display = 'none';
         } else {
           dot.className = "dot green";
           statusText.innerText = "Analyse Live Active";
+          if (data.heure_depart_ms) {
+            demarrerCompteARebours(data.heure_depart_ms);
+          }
         }
 
-        // Animation des Boules de Pronostic
+        // Boules Pronostic
         const pronoContainer = document.getElementById('prono-container');
         pronoContainer.innerHTML = ''; 
 
@@ -356,7 +412,7 @@
           });
         }
 
-        // Animation des Boules Rouges
+        // Boules Rouges
         const officielSection = document.getElementById('officiel-section');
         const officielContainer = document.getElementById('officiel-container');
         officielContainer.innerHTML = '';
