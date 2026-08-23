@@ -76,7 +76,7 @@
             align-items: center;
         }
 
-        /* BOULES JAUNES AVEC EFFET PULSANT / CLIGNOTANT */
+        /* BOULES JAUNES AVANT LA COURSE */
         .ball {
             width: 50px;
             height: 50px;
@@ -90,6 +90,14 @@
             font-weight: 800;
             box-shadow: 0 0 15px rgba(245, 158, 11, 0.6);
             animation: pulseGlow 2s infinite ease-in-out;
+        }
+
+        /* BOULES ROUGES APRES LA COURSE */
+        .ball.ball-finished {
+            background: linear-gradient(135deg, #ef4444, #991b1b);
+            color: #ffffff;
+            box-shadow: 0 0 15px rgba(239, 68, 68, 0.6);
+            animation: none;
         }
 
         @keyframes pulseGlow {
@@ -141,7 +149,6 @@
             line-height: 1.6;
         }
 
-        /* STATUT DE FIN EN ROUGE */
         .status-finished {
             color: var(--accent-red);
         }
@@ -189,7 +196,7 @@
             document.getElementById('nom-course').innerText = data.nom_course || "Sumbe Grand Handicap";
             document.getElementById('details-course').innerText = `${data.date} - ${data.hippodrome} (${data.discipline_distance})`;
 
-            // Affichage des boules Quinté SGE
+            // Affichage des boules
             const containerBalls = document.getElementById('quinte-balls');
             containerBalls.innerHTML = '';
             
@@ -200,8 +207,12 @@
                     
                     const wrapper = document.createElement('div');
                     wrapper.className = 'ball-wrapper';
+                    
+                    // Si la course est terminée, on ajoute la classe rouge 'ball-finished'
+                    const ballClass = data.course_terminee ? 'ball ball-finished' : 'ball';
+
                     wrapper.innerHTML = `
-                        <div class="ball">${strNum}</div>
+                        <div class="${ballClass}">${strNum}</div>
                         <div class="ball-cote">${cote}</div>
                     `;
                     containerBalls.appendChild(wrapper);
@@ -254,9 +265,9 @@
         }, 1000);
     }
 
-    // Chargement automatique
     chargerDonnees();
 </script>
 
 </body>
 </html>
+
