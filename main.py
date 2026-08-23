@@ -180,6 +180,7 @@ def obtenir_donnees_pmu_live(arrivee_veille):
                 "hippodrome": hippo,
                 "nom_course": nom_course,
                 "discipline_distance": f"{disc} - {dist}",
+                "heure_depart_ms": heure_depart_ms,
                 "favori": favori,
                 "cotes": cotes,
                 "non_partants": non_partants,
@@ -246,6 +247,7 @@ def predict(response: Response):
     
     if data_live:
         course_terminee = data_live["course_terminee"]
+        heure_depart_ms = data_live.get("heure_depart_ms")
         favori = data_live["favori"]
         np_list = data_live["non_partants"]
         date_str = data_live["date"]
@@ -279,11 +281,17 @@ def predict(response: Response):
     else:
         np_list = []
         tz_france = zoneinfo.ZoneInfo("Europe/Paris")
-        date_str = datetime.now(tz_france).strftime("%d/%m/%Y")
+        maintenant = datetime.now(tz_france)
+        date_str = maintenant.strftime("%d/%m/%Y")
         hippo_str = "Deauville (R1C3)"
         nom_course = "Sumbe Grand Handicap"
         disc_str = "PLAT - 2000m"
-        course_terminee = False
+        
+        # Secours : 15h15 si le scraping échoue
+        heure_fallback = maintenant.replace(hour=15, minute=15, second=0, microsecond=0)
+        heure_depart_ms = int(heure_fallback.timestamp() * 1000)
+        course_terminee = maintenant >= heure_fallback
+        
         arrivee_officielle = []
         cotes = {}
         partants = list(range(1, 16))
@@ -296,6 +304,7 @@ def predict(response: Response):
         "hippodrome": hippo_str,
         "nom_course": nom_course,
         "discipline_distance": disc_str,
+        "heure_depart_ms": heure_depart_ms,
         "favori": favori,
         "cotes": cotes,
         "non_partants": np_list,
