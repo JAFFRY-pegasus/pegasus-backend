@@ -3,70 +3,90 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SGE Resonance - Pegasus PMU</title>
+    <title>Pronostic Résonance SGE - Quinté+</title>
     <style>
         :root {
-            --bg-color: #0f172a;
-            --card-bg: #1e293b;
-            --accent-blue: #3b82f6;
-            --accent-yellow: #f59e0b;
-            --accent-red: #ef4444;
-            --text-main: #f8fafc;
-            --text-sub: #94a3b8;
+            --bg-color: #0d1117;
+            --card-bg: #161b22;
+            --border-color: #30363d;
+            --text-color: #c9d1d9;
+            --text-muted: #8b949e;
+            --accent-yellow: #f1e05a;
+            --accent-red: #ff4d4d;
+            --accent-blue: #58a6ff;
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             background-color: var(--bg-color);
-            color: var(--text-main);
-            margin: 0;
-            padding: 20px;
+            color: var(--text-color);
             display: flex;
             justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
         }
 
-        .container {
-            max-width: 600px;
-            width: 100%;
-            background: var(--card-bg);
-            border-radius: 16px;
+        .card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
             padding: 24px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-        }
-
-        .header {
+            max-width: 500px;
+            width: 100%;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
             text-align: center;
-            border-bottom: 1px solid #334155;
-            padding-bottom: 16px;
-            margin-bottom: 20px;
         }
 
         .header h1 {
+            color: var(--accent-blue);
             margin: 0 0 8px 0;
             font-size: 1.5rem;
-            color: var(--accent-blue);
         }
 
-        .info-badge {
+        .header p {
+            color: var(--text-muted);
+            margin: 0 0 20px 0;
             font-size: 0.9rem;
-            color: var(--text-sub);
         }
 
-        .timer-box {
-            text-align: center;
-            background: #0f172a;
-            padding: 12px;
-            border-radius: 8px;
-            margin-bottom: 20px;
+        .status-badge {
+            display: inline-block;
+            padding: 6px 16px;
+            border-radius: 20px;
             font-weight: bold;
-            color: var(--accent-yellow);
+            font-size: 0.85rem;
+            margin-bottom: 20px;
+            text-transform: uppercase;
+        }
+
+        .status-badge.attente {
+            background-color: rgba(88, 166, 255, 0.15);
+            color: var(--accent-blue);
+            border: 1px solid var(--accent-blue);
+        }
+
+        .status-badge.terminee {
+            background-color: rgba(255, 77, 77, 0.15);
+            color: var(--accent-red);
+            border: 1px solid var(--accent-red);
+        }
+
+        .section-title {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
         }
 
         .balls-container {
             display: flex;
             justify-content: center;
             gap: 12px;
-            margin: 20px 0;
+            margin-bottom: 20px;
             flex-wrap: wrap;
         }
 
@@ -76,196 +96,181 @@
             align-items: center;
         }
 
-        /* BOULES JAUNES AVANT LA COURSE */
         .ball {
-            width: 50px;
-            height: 50px;
+            width: 48px;
+            height: 48px;
             border-radius: 50%;
-            background: linear-gradient(135deg, #fbbf24, #d97706);
-            color: #0f172a;
             display: flex;
-            align-items: center;
             justify-content: center;
-            font-size: 1.3rem;
-            font-weight: 800;
-            box-shadow: 0 0 15px rgba(245, 158, 11, 0.6);
-            animation: pulseGlow 2s infinite ease-in-out;
+            align-items: center;
+            font-weight: bold;
+            font-size: 1.2rem;
+            color: #000;
         }
 
-        /* BOULES ROUGES APRES LA COURSE */
-        .ball.ball-finished {
-            background: linear-gradient(135deg, #ef4444, #991b1b);
-            color: #ffffff;
-            box-shadow: 0 0 15px rgba(239, 68, 68, 0.6);
-            animation: none;
+        /* Boules jaunes (SGE) */
+        .ball-yellow {
+            background: radial-gradient(circle at 30% 30%, #fff677, var(--accent-yellow), #bfa800);
+            box-shadow: 0 0 12px rgba(241, 224, 90, 0.6);
+            animation: pulse-yellow 2s infinite alternate;
         }
 
-        @keyframes pulseGlow {
-            0% {
-                box-shadow: 0 0 10px rgba(245, 158, 11, 0.5);
-                transform: scale(1);
-            }
-            50% {
-                box-shadow: 0 0 22px rgba(245, 158, 11, 0.9);
-                transform: scale(1.04);
-            }
-            100% {
-                box-shadow: 0 0 10px rgba(245, 158, 11, 0.5);
-                transform: scale(1);
-            }
+        @keyframes pulse-yellow {
+            0% { box-shadow: 0 0 8px rgba(241, 224, 90, 0.4); transform: scale(1); }
+            100% { box-shadow: 0 0 18px rgba(241, 224, 90, 0.8); transform: scale(1.04); }
         }
 
-        .ball-cote {
+        /* Boules rouges (Arrivée Officielle) */
+        .ball-red {
+            background: radial-gradient(circle at 30% 30%, #ff9999, var(--accent-red), #b30000);
+            box-shadow: 0 0 12px rgba(255, 77, 77, 0.6);
+            color: #fff;
+            animation: pulse-red 2s infinite alternate;
+        }
+
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 8px rgba(255, 77, 77, 0.4); transform: scale(1); }
+            100% { box-shadow: 0 0 18px rgba(255, 77, 77, 0.8); transform: scale(1.04); }
+        }
+
+        .cote {
             font-size: 0.75rem;
-            color: var(--text-sub);
-            margin-top: 6px;
-            font-weight: 600;
+            color: var(--text-muted);
+            margin-top: 4px;
         }
 
-        .btn-action {
-            display: block;
-            width: 100%;
-            padding: 14px;
-            background-color: var(--accent-blue);
-            color: white;
+        .arrivee-section {
+            margin-top: 24px;
+            padding-top: 20px;
+            border-top: 1px dashed var(--border-color);
+        }
+
+        .btn-refresh {
+            background-color: #238636;
+            color: #fff;
             border: none;
-            border-radius: 8px;
-            font-size: 1rem;
+            padding: 10px 20px;
+            border-radius: 6px;
             font-weight: bold;
             cursor: pointer;
-            text-align: center;
-            transition: background 0.2s;
-            box-sizing: border-box;
+            width: 100%;
+            margin-bottom: 20px;
+            transition: background-color 0.2s;
         }
 
-        .btn-action:hover {
-            background-color: #2563eb;
+        .btn-refresh:hover {
+            background-color: #2ea043;
         }
 
-        .details-list {
-            margin-top: 20px;
-            font-size: 0.9rem;
-            color: var(--text-sub);
+        .footer-info {
+            text-align: left;
+            font-size: 0.85rem;
+            color: var(--text-muted);
             line-height: 1.6;
-        }
-
-        .status-finished {
-            color: var(--accent-red);
+            background-color: rgba(0,0,0,0.2);
+            padding: 12px;
+            border-radius: 6px;
         }
     </style>
 </head>
 <body>
 
-<div class="container">
+<div class="card">
     <div class="header">
-        <h1 id="nom-course">Chargement de la course...</h1>
-        <div class="info-badge" id="details-course">-- / --</div>
+        <h1 id="nom-course">Chargement...</h1>
+        <p id="info-course">--/--/---- - Hippodrome (PLAT)</p>
     </div>
 
-    <div class="timer-box" id="timer-box">
-        Compte à rebours : <span id="countdown">--:--:--</span>
-    </div>
+    <div id="status-badge" class="status-badge attente">En attente du départ</div>
 
-    <div style="text-align: center; font-size: 0.9rem; color: var(--text-sub);">
-        Pronostic de Résonance SGE
-    </div>
-
-    <div class="balls-container" id="quinte-balls">
+    <!-- Pronostic SGE (Boules Jaunes) -->
+    <div class="section-title">Pronostic de Résonance SGE</div>
+    <div id="prono-container" class="balls-container">
         <!-- Généré dynamiquement -->
     </div>
 
-    <button onclick="chargerDonnees()" id="btn-refresh" class="btn-action">
-        Actualiser le Pronostic
-    </button>
+    <!-- Arrivée Officielle (Boules Rouges, masquée si pas encore disponible) -->
+    <div id="arrivee-section" class="arrivee-section" style="display: none;">
+        <div class="section-title" style="color: var(--accent-red);">Arrivée Officielle</div>
+        <div id="arrivee-container" class="balls-container">
+            <!-- Généré dynamiquement -->
+        </div>
+    </div>
 
-    <div class="details-list" id="extra-info">
-        <!-- Infos complémentaires -->
+    <button class="btn-refresh" onclick="chargerDonnees()">Actualiser le Pronostic</button>
+
+    <div class="footer-info">
+        <div><strong>Favori Référent :</strong> <span id="favori-val">--</span></div>
+        <div><strong>Non-partants :</strong> <span id="np-val">Aucun</span></div>
     </div>
 </div>
 
 <script>
-    const API_URL = "/predict";
-    let countdownInterval = null;
+async function chargerDonnees() {
+    try {
+        const response = await fetch('/predict');
+        const data = await response.json();
 
-    async function chargerDonnees() {
-        try {
-            const res = await fetch(API_URL);
-            const data = await res.json();
+        // Mettre à jour l'en-tête
+        document.getElementById('nom-course').innerText = data.nom_course;
+        document.getElementById('info-course').innerText = `${data.date} - ${data.hippodrome} (${data.discipline_distance})`;
 
-            // Remplissage En-tête
-            document.getElementById('nom-course').innerText = data.nom_course || "Sumbe Grand Handicap";
-            document.getElementById('details-course').innerText = `${data.date} - ${data.hippodrome} (${data.discipline_distance})`;
-
-            // Affichage des boules
-            const containerBalls = document.getElementById('quinte-balls');
-            containerBalls.innerHTML = '';
-            
-            if (data.quinte_sge && data.quinte_sge.length > 0) {
-                data.quinte_sge.forEach(num => {
-                    const strNum = String(num);
-                    const cote = (data.cotes && data.cotes[strNum]) ? `${data.cotes[strNum]}` : '-';
-                    
-                    const wrapper = document.createElement('div');
-                    wrapper.className = 'ball-wrapper';
-                    
-                    // Si la course est terminée, on ajoute la classe rouge 'ball-finished'
-                    const ballClass = data.course_terminee ? 'ball ball-finished' : 'ball';
-
-                    wrapper.innerHTML = `
-                        <div class="${ballClass}">${strNum}</div>
-                        <div class="ball-cote">${cote}</div>
-                    `;
-                    containerBalls.appendChild(wrapper);
-                });
-            }
-
-            // Gestion du Compte à rebours / Statut
-            if (data.course_terminee) {
-                document.getElementById('timer-box').innerHTML = '<span class="status-finished">Course terminée</span>';
-            } else if (data.heure_depart_ms) {
-                lancerCompteARebours(data.heure_depart_ms);
-            }
-
-            // Informations complémentaires
-            const arrivee = (data.arrivee_officielle && data.arrivee_officielle.length > 0) 
-                ? data.arrivee_officielle.join(' - ') 
-                : 'En attente';
-                
-            document.getElementById('extra-info').innerHTML = `
-                <strong>Favori Référent :</strong> N°${data.favori || '--'}<br>
-                <strong>Arrivée officielle :</strong> ${arrivee}<br>
-                <strong>Non-partants :</strong> ${data.non_partants && data.non_partants.length > 0 ? data.non_partants.join(', ') : 'Aucun'}
-            `;
-
-        } catch (err) {
-            console.error("Erreur de chargement des données :", err);
-            document.getElementById('nom-course').innerText = "Erreur de connexion au serveur";
+        // Badge de statut
+        const badge = document.getElementById('status-badge');
+        if (data.course_terminee) {
+            badge.innerText = "Course terminée";
+            badge.className = "status-badge terminee";
+        } else {
+            badge.innerText = "Course en cours / À venir";
+            badge.className = "status-badge attente";
         }
+
+        // Affichage du Pronostic SGE (Boules Jaunes)
+        const pronoContainer = document.getElementById('prono-container');
+        pronoContainer.innerHTML = '';
+        if (data.quinte_sge && data.quinte_sge.length > 0) {
+            data.quinte_sge.forEach(num => {
+                const cote = data.cotes && data.cotes[num] ? `${data.cotes[num]}` : '-';
+                pronoContainer.innerHTML += `
+                    <div class="ball-wrapper">
+                        <div class="ball ball-yellow">${num}</div>
+                        <div class="cote">${cote}</div>
+                    </div>
+                `;
+            });
+        }
+
+        // Affichage de l'Arrivée Officielle (Boules Rouges)
+        const arriveeSection = document.getElementById('arrivee-section');
+        const arriveeContainer = document.getElementById('arrivee-container');
+        arriveeContainer.innerHTML = '';
+
+        if (data.arrivee_officielle && data.arrivee_officielle.length >= 5) {
+            arriveeSection.style.display = 'block';
+            data.arrivee_officielle.slice(0, 5).forEach(num => {
+                arriveeContainer.innerHTML += `
+                    <div class="ball-wrapper">
+                        <div class="ball ball-red">${num}</div>
+                    </div>
+                `;
+            });
+        } else {
+            arriveeSection.style.display = 'none';
+        }
+
+        // Pied de page
+        document.getElementById('favori-val').innerText = data.favori ? `N°${data.favori}` : 'Non défini';
+        document.getElementById('np-val').innerText = (data.non_partants && data.non_partants.length > 0) 
+            ? data.non_partants.join(', ') 
+            : 'Aucun';
+
+    } catch (err) {
+        console.error("Erreur de chargement :", err);
     }
+}
 
-    function lancerCompteARebours(heureDepartMs) {
-        if (countdownInterval) clearInterval(countdownInterval);
-
-        countdownInterval = setInterval(() => {
-            const maintenant = new Date().getTime();
-            const diff = heureDepartMs - maintenant;
-
-            if (diff <= 0) {
-                clearInterval(countdownInterval);
-                document.getElementById('timer-box').innerHTML = '<span class="status-finished">Course terminée</span>';
-                return;
-            }
-
-            const heures = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-            const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-            const secondes = Math.floor((diff % (1000 * 60)) / 1000);
-
-            document.getElementById('countdown').innerText = 
-                `${String(heures).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secondes).padStart(2, '0')}`;
-        }, 1000);
-    }
-
-    chargerDonnees();
+// Chargement automatique au démarrage
+chargerDonnees();
 </script>
 
 </body>
