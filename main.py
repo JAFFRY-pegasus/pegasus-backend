@@ -16,6 +16,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Table des résonances avec tes rectifications sur 2, 9 et 13
 PRIORITES_GEOMETRIQUES = {
     1: [9, 2, 10, 8, 16], 
     2: [10, 1, 8, 9, 11], 
@@ -52,8 +53,8 @@ def extraire_arrivee_depuis_json(data):
     if not isinstance(data, dict):
         return []
     
-    # 1. Format sous forme de liste d'objets ou d'entiers
-    for cle in ['ordreArrivee', 'arrivants', 'combinaisonArrivee']:
+    # Format sous forme de liste d'objets ou d'entiers
+    for cle in ['ordreArrivee', 'arrivants', 'combinaisonArrivee', 'combinaisonGagnante']:
         arr = data.get(cle)
         if isinstance(arr, list) and len(arr) >= 5:
             res = []
@@ -66,8 +67,8 @@ def extraire_arrivee_depuis_json(data):
             if len(res) >= 5:
                 return res[:5]
 
-    # 2. Format sous forme de chaîne de caractères (ex: "14-9-5-12-10")
-    for cle in ['ordreArrivee', 'texteArrivee']:
+    # Format sous forme de chaîne de caractères (ex: "14-9-5-12-10")
+    for cle in ['ordreArrivee', 'texteArrivee', 'combinaison']:
         arr_str = data.get(cle)
         if isinstance(arr_str, str) and ('-' in arr_str or ' ' in arr_str):
             separateur = '-' if '-' in arr_str else ' '
@@ -158,6 +159,7 @@ def obtenir_donnees_pmu_live(arrivee_veille):
             heure_depart_ms = c.get('heureDepart')
             statut_course = str(c.get('statut', '')).upper()
 
+            # Non-partants
             url_partants = f"https://online.pmu.fr/rest/client/7/programme/{date_aujourdhui}/R{r_num}/C{c_num}/partants"
             res_p = requests.get(url_partants, headers=headers, timeout=6)
             non_partants = []
@@ -168,6 +170,7 @@ def obtenir_donnees_pmu_live(arrivee_veille):
                         if num: non_partants.append(num)
                 non_partants.sort()
 
+            # Cotes et Favori
             cotes = {}
             favori = None
             min_cote = 999.0
@@ -191,16 +194,28 @@ def obtenir_donnees_pmu_live(arrivee_veille):
                 partants_actifs = [n for n in range(1, 16) if n not in non_partants]
                 favori = determiner_favori_sge_autonome(partants_actifs, arrivee_veille)
 
-            arrivee_officielle = extraire_arrivee_depuis_json(c)
-
+            # Vérification du Statut
             course_terminee = False
             statuts_fin = ['ARRIVEE', 'FIN_COURSE', 'PAYE', 'ARRIVEE_PROVISOIRE', 'ARRIVEE_DEFINITIVE']
-            if any(s in statut_course for s in statuts_fin) or len(arrivee_officielle) >= 5:
+            if any(s in statut_course for s in statuts_fin):
                 course_terminee = True
             elif heure_depart_ms:
                 maintenant_ms = datetime.now(tz_france).timestamp() * 1000
                 if maintenant_ms >= heure_depart_ms:
                     course_terminee = True
+
+            # Récupération de l'arrivée officielle (standard + endpoint spécialisé)
+            arrivee_officielle = extraire_arrivee_depuis_json(c)
+            if course_terminee and len(arrivee_officielle) < 5:
+                try:
+                    url_res = f"https://online.pmu.fr/rest/client/7/programme/{date_aujourdhui}/R{r_num}/C{c_num}/combinaison-gagnante"
+                    res_gagnante = requests.get(url_res, headers=headers, timeout=5)
+                    if res_gagnante.status_code == 200:
+                        arr_gagnante = extraire_arrivee_depuis_json(res_gagnante.json())
+                        if len(arr_gagnante) >= 5:
+                            arrivee_officielle = arr_gagnante
+                except Exception as e_res:
+                    print("Erreur fetch combinaison gagnante:", e_res)
 
             return {
                 "date": date_str,
