@@ -2,7 +2,7 @@ import os
 import requests
 from datetime import datetime, timedelta
 import zoneinfo
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
@@ -34,6 +34,7 @@ BONUS_HISTORIQUE_BASE = {
     9: 2.5, 10: 3.1, 11: 3.8, 12: 4.0, 13: 4.6, 14: 4.8, 15: 2.9, 16: 2.1
 }
 
+# Variable mémoire pour geler le pronostic
 DERNIER_PRONO_VALIDE = None
 
 def extraire_arrivee_depuis_json(data):
@@ -97,7 +98,18 @@ def obtenir_arrivee_veille():
         print("Erreur fetch arrivée veille:", e)
     return [14, 9, 5, 12, 10]
 
-def obtenir_donnees_pmu_live():
+def determiner_favori_sge_autonome(partants_actifs, arrivee_veille):
+    scores_base = {}
+    poids_veille = [5.0, 4.0, 3.0, 2.0, 1.0]
+    for num in partants_actifs:
+        score = BONUS_HISTORIQUE_BASE.get(num, 1.0)
+        if num in arrivee_veille:
+            idx = arrivee_veille.index(num)
+            score += poids_veille[idx]
+        scores_base[num] = score
+    return max(scores_base, key=scores_base.get)
+
+def obtenir_donnees_pmu_live(arrivee_veille):
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
         "Accept": "application/json, text/plain, */*"
@@ -136,6 +148,7 @@ def obtenir_donnees_pmu_live():
                     break
 
             if r_num and c_num:
+                # Partants & Non-Partants
                 url_partants = f"https://online.pmu.fr/rest/client/7/programme/{iso_date}/R{r_num}/C{c_num}/partants"
                 res_p = requests.get(url_partants, headers=headers, timeout=6)
                 non_partants = []
@@ -151,6 +164,7 @@ def obtenir_donnees_pmu_live():
                             non_partants.append(num)
                     non_partants.sort()
 
+                # Cotes PMU
                 cotes = {}
                 favori = None
                 min_cote = 999.0
@@ -171,6 +185,12 @@ def obtenir_donnees_pmu_live():
                             except (ValueError, TypeError):
                                 pass
 
+                # Fallback : Si pas encore de favori aux cotes, on prend le favori SGE autonome
+                if favori is None:
+                    partants_actifs = [n for n in range(1, 17) if n not in non_partants]
+                    favori = determiner_favori_sge_autonome(partants_actifs, arrivee_veille)
+
+                # Récupération Arrivée Officielle
                 arrivee_officielle = []
                 url_details = f"https://online.pmu.fr/rest/client/7/programme/{iso_date}/R{r_num}/C{c_num}"
                 res_d = requests.get(url_details, headers=headers, timeout=5)
@@ -178,6 +198,7 @@ def obtenir_donnees_pmu_live():
                     data_d = res_d.json()
                     arrivee_officielle = extraire_arrivee_depuis_json(data_d)
 
+                # Détection de fin de course
                 course_terminee = False
                 statuts_fin = ['ARRIVEE', 'FIN_COURSE', 'PAYE', 'ARRIVEE_PROVISOIRE', 'ARRIVEE_DEFINITIVE']
                 if any(s in statut_course for s in statuts_fin) or len(arrivee_officielle) >= 5:
@@ -205,7 +226,7 @@ def obtenir_donnees_pmu_live():
 
 def calculer_resonances_pegasus(partants_actifs, favori_base, non_partants=[], arrivee_veille=[]):
     if not favori_base:
-        favori_base = 3
+        favori_base = determiner_favori_sge_autonome(partants_actifs, arrivee_veille)
         
     scores = {num: 0.0 for num in partants_actifs if num not in non_partants}
     
@@ -243,14 +264,19 @@ def calculer_resonances_pegasus(partants_actifs, favori_base, non_partants=[], a
 
 @app.get("/")
 def home():
-    return {"status": "PEGASUS Backend en ligne", "version": "SGE v7.2"}
+    return {"status": "PEGASUS Backend en ligne", "version": "SGE v7.3 (Anti-Cache & Autonome)"}
 
 @app.get("/predict")
-def predict():
+def predict(response: Response):
     global DERNIER_PRONO_VALIDE
     
-    data_live = obtenir_donnees_pmu_live()
+    # En-têtes HTTP Anti-Cache (Force le client et Vercel à ne pas mettre la réponse en mémoire)
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    
     arrivee_veille = obtenir_arrivee_veille()
+    data_live = obtenir_donnees_pmu_live(arrivee_veille)
     
     if data_live:
         course_terminee = data_live["course_terminee"]
@@ -263,7 +289,8 @@ def predict():
         arrivee_officielle = data_live.get("arrivee_officielle", [])
         cotes = data_live.get("cotes", {})
 
-        if not course_terminee and favori is not None:
+        # Si la course est EN COURS : Calcul dynamique et mise en mémoire de sauvegarde
+        if not course_terminee:
             partants = list(range(1, 17))
             resultats = calculer_resonances_pegasus(partants, favori, np_list, arrivee_veille)
             quinte_sge = [num for num, score in resultats[:5]]
@@ -274,6 +301,7 @@ def predict():
                 "favori": favori,
                 "cotes": cotes
             }
+        # Si la course est TERMINÉE : Verrouillage strict du pronostic
         elif course_terminee and DERNIER_PRONO_VALIDE is not None:
             quinte_sge = DERNIER_PRONO_VALIDE["quinte_sge"]
             resultats = DERNIER_PRONO_VALIDE["scores"]
@@ -281,22 +309,23 @@ def predict():
             if not cotes:
                 cotes = DERNIER_PRONO_VALIDE["cotes"]
         else:
-            favori = favori or 3
+            # Fallback direct
             partants = list(range(1, 17))
             resultats = calculer_resonances_pegasus(partants, favori, np_list, arrivee_veille)
             quinte_sge = [num for num, score in resultats[:5]]
     else:
-        favori = 3
+        # Fallback hors-ligne
         np_list = []
         tz_france = zoneinfo.ZoneInfo("Europe/Paris")
         date_str = datetime.now(tz_france).strftime("%d/%m/%Y")
         hippo_str = "Deauville (R1C3)"
-        nom_course = "Prix de la Place Morny"
+        nom_course = "Prix du Jour"
         disc_str = "Plat - 1200m"
-        course_terminee = True
-        arrivee_officielle = [14, 9, 5, 12, 10]
+        course_terminee = False
+        arrivee_officielle = []
         cotes = {}
         partants = list(range(1, 17))
+        favori = determiner_favori_sge_autonome(partants, arrivee_veille)
         resultats = calculer_resonances_pegasus(partants, favori, np_list, arrivee_veille)
         quinte_sge = [num for num, score in resultats[:5]]
 
