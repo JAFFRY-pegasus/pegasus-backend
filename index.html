@@ -9,7 +9,8 @@
             --bg-color: #0f172a;
             --card-bg: #1e293b;
             --accent-blue: #3b82f6;
-            --accent-green: #10b981;
+            --accent-yellow: #f59e0b;
+            --accent-red: #ef4444;
             --text-main: #f8fafc;
             --text-sub: #94a3b8;
         }
@@ -58,7 +59,7 @@
             border-radius: 8px;
             margin-bottom: 20px;
             font-weight: bold;
-            color: #f59e0b;
+            color: var(--accent-yellow);
         }
 
         .balls-container {
@@ -75,24 +76,42 @@
             align-items: center;
         }
 
+        /* BOULES JAUNES AVEC EFFET PULSANT / CLIGNOTANT */
         .ball {
             width: 50px;
             height: 50px;
             border-radius: 50%;
-            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
-            color: white;
+            background: linear-gradient(135deg, #fbbf24, #d97706);
+            color: #0f172a;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.2rem;
-            font-weight: bold;
-            box-shadow: 0 4px 10px rgba(59, 130, 246, 0.4);
+            font-size: 1.3rem;
+            font-weight: 800;
+            box-shadow: 0 0 15px rgba(245, 158, 11, 0.6);
+            animation: pulseGlow 2s infinite ease-in-out;
+        }
+
+        @keyframes pulseGlow {
+            0% {
+                box-shadow: 0 0 10px rgba(245, 158, 11, 0.5);
+                transform: scale(1);
+            }
+            50% {
+                box-shadow: 0 0 22px rgba(245, 158, 11, 0.9);
+                transform: scale(1.04);
+            }
+            100% {
+                box-shadow: 0 0 10px rgba(245, 158, 11, 0.5);
+                transform: scale(1);
+            }
         }
 
         .ball-cote {
             font-size: 0.75rem;
             color: var(--text-sub);
-            margin-top: 4px;
+            margin-top: 6px;
+            font-weight: 600;
         }
 
         .btn-action {
@@ -122,8 +141,9 @@
             line-height: 1.6;
         }
 
+        /* STATUT DE FIN EN ROUGE */
         .status-finished {
-            color: var(--accent-green);
+            color: var(--accent-red);
         }
     </style>
 </head>
@@ -147,7 +167,6 @@
         <!-- Généré dynamiquement -->
     </div>
 
-    <!-- BOUTON INTERACTIF SANS REDIRECTION -->
     <button onclick="chargerDonnees()" id="btn-refresh" class="btn-action">
         Actualiser le Pronostic
     </button>
@@ -158,7 +177,7 @@
 </div>
 
 <script>
-    const API_URL = "/predict"; // Chemin relatif optimisé pour Vercel
+    const API_URL = "/predict";
     let countdownInterval = null;
 
     async function chargerDonnees() {
@@ -222,7 +241,7 @@
 
             if (diff <= 0) {
                 clearInterval(countdownInterval);
-                document.getElementById('timer-box').innerHTML = '<span class="status-finished">Course en cours ou terminée</span>';
+                document.getElementById('timer-box').innerHTML = '<span class="status-finished">Course terminée</span>';
                 return;
             }
 
@@ -235,7 +254,7 @@
         }, 1000);
     }
 
-    // Chargement automatique au démarrage
+    // Chargement automatique
     chargerDonnees();
 </script>
 
