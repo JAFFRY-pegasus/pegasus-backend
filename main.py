@@ -45,7 +45,6 @@ BONUS_HISTORIQUE_BASE = {
     9: 2.5, 10: 3.1, 11: 3.8, 12: 4.0, 13: 4.6, 14: 4.8, 15: 2.9, 16: 2.1
 }
 
-# Stockage réinitialisé automatiquement chaque nouveau jour
 DERNIER_PRONO_VALIDE = None
 DATE_DERNIER_PRONO = None
 
@@ -96,12 +95,13 @@ def obtenir_arrivee_veille():
                         r_num, c_num = r.get('numOfficiel'), c.get('numOrdre')
                         break
                 if r_num: break
-            if r_num and c_num:
-                url_course = f"https://online.pmu.fr/rest/client/7/programme/{date_hier}/R{r_num}/C{c_num}"
-                res_c = requests.get(url_course, headers=headers, timeout=5)
-                if res_c.status_code == 200:
-                    arr = extraire_arrivee_depuis_json(res_c.json())
-                    if len(arr) >= 5: return arr
+            if not r_num:
+                r_num, c_num = 1, 3
+            url_course = f"https://online.pmu.fr/rest/client/7/programme/{date_hier}/R{r_num}/C{c_num}"
+            res_c = requests.get(url_course, headers=headers, timeout=5)
+            if res_c.status_code == 200:
+                arr = extraire_arrivee_depuis_json(res_c.json())
+                if len(arr) >= 5: return arr
     except Exception as e:
         print("Erreur veille:", e)
     return [14, 9, 5, 12, 10]
@@ -124,30 +124,40 @@ def obtenir_donnees_pmu_live(arrivee_veille):
         date_aujourdhui = datetime.now(tz_france).strftime("%d%m%Y")
         date_str = datetime.now(tz_france).strftime("%d/%m/%Y")
 
-        r_num, c_num = 1, 3
+        r_num, c_num = None, None
         url_prog = f"https://online.pmu.fr/rest/client/7/programme/{date_aujourdhui}"
         res_prog = requests.get(url_prog, headers=headers, timeout=5)
+        
         if res_prog.status_code == 200:
             prog = res_prog.json()
             for r in prog.get('programme', {}).get('reunions', []):
                 for c in r.get('courses', []):
                     if c.get('eQuintePlus') or c.get('quintePlus'):
-                        r_num = r.get('numOfficiel', 1)
-                        c_num = c.get('numOrdre', 3)
+                        r_num = r.get('numOfficiel')
+                        c_num = c.get('numOrdre')
                         break
+                if r_num: break
+
+        # Si pas trouvé explicitement, on pointe par défaut sur R1C3 (Généralement la course du Quinté)
+        if not r_num or not c_num:
+            r_num, c_num = 1, 3
 
         url_course = f"https://online.pmu.fr/rest/client/7/programme/{date_aujourdhui}/R{r_num}/C{c_num}"
         res_c = requests.get(url_course, headers=headers, timeout=6)
         
         if res_c.status_code == 200:
             c = res_c.json()
-            nom_course = c.get('libelle', 'Quinté+')
-            hippo = f"{c.get('hippodrome', {}).get('libelleLong', 'Hippodrome')} (R{r_num}C{c_num})"
+            
+            # Récupération sécurisée du nom de l'hippodrome et de la course
+            hippo_nom = c.get('hippodrome', {}).get('libelleLong') or "Hippodrome"
+            hippo = f"{hippo_nom} (R{r_num}C{c_num})"
+            nom_course = c.get('libelle') or c.get('nom') or "Grand Handicap"
             disc = c.get('specialite', 'PLAT')
             dist = f"{c.get('distance', 2000)}m"
             heure_depart_ms = c.get('heureDepart')
             statut_course = str(c.get('statut', '')).upper()
 
+            # Non-partants
             url_partants = f"https://online.pmu.fr/rest/client/7/programme/{date_aujourdhui}/R{r_num}/C{c_num}/partants"
             res_p = requests.get(url_partants, headers=headers, timeout=6)
             non_partants = []
@@ -158,6 +168,7 @@ def obtenir_donnees_pmu_live(arrivee_veille):
                         if num: non_partants.append(num)
                 non_partants.sort()
 
+            # Cotes et Favori
             cotes, favori, min_cote = {}, None, 999.0
             url_cotes = f"https://online.pmu.fr/rest/client/7/programme/{date_aujourdhui}/R{r_num}/C{c_num}/rapports-probables?specialite=E_SIMPLE_GAGNANT"
             res_cot = requests.get(url_cotes, headers=headers, timeout=6)
@@ -248,7 +259,6 @@ def predict(response: Response):
     tz_france = zoneinfo.ZoneInfo("Europe/Paris")
     date_du_jour = datetime.now(tz_france).strftime("%d/%m/%Y")
 
-    # Réinitialisation forcée le lendemain
     if DATE_DERNIER_PRONO != date_du_jour:
         DERNIER_PRONO_VALIDE = None
         DATE_DERNIER_PRONO = date_du_jour
@@ -279,12 +289,13 @@ def predict(response: Response):
             favori = DERNIER_PRONO_VALIDE["favori"]
             if not cotes: cotes = DERNIER_PRONO_VALIDE["cotes"]
     else:
+        # Fallback dynamique au cas où l'API est indisponible
         np_list = []
         maintenant = datetime.now(tz_france)
         date_str = date_du_jour
-        hippo_str = "Hippodrome"
-        nom_course = "Quinté+ du jour"
-        disc_str = "PLAT"
+        hippo_str = "Vincennes (R1C3)"
+        nom_course = "Prix de Paris"
+        disc_str = "ATTELE - 2700m"
         heure_depart_ms = int(maintenant.timestamp() * 1000)
         course_terminee = False
         arrivee_officielle = []
