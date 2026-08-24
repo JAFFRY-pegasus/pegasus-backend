@@ -4,7 +4,7 @@ import requests
 from datetime import datetime, timedelta
 import zoneinfo
 from bs4 import BeautifulSoup
-from fastapi import FastAPI, Response, HTTPException
+from fastapi import FastAPI, Response
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -132,11 +132,15 @@ def obtenir_donnees_zoneturf_live(arrivee_veille):
             partants = sorted(list(set(partants)))
             non_partants = sorted(list(set(non_partants)))
 
-            # RÈGLE STRICTE SGE : Uniquement 16 partants au départ
+            # RÈGLE STRICTE : La course doit comporter exactement 16 partants au départ
             if len(partants) != 16:
                 return {
-                    "erreur": f"Course incompatible : {len(partants)} partants détectés. Le SGE traite uniquement les courses à 16 partants.",
-                    "partants_count": len(partants)
+                    "erreur": True,
+                    "partants_count": len(partants),
+                    "hippodrome": hippo,
+                    "nom_course": nom_course,
+                    "discipline_distance": disc,
+                    "date": date_str
                 }
 
             if favori is None:
@@ -153,6 +157,7 @@ def obtenir_donnees_zoneturf_live(arrivee_veille):
                     course_terminee = True
 
             return {
+                "erreur": False,
                 "date": date_str,
                 "hippodrome": hippo,
                 "nom_course": nom_course,
@@ -173,7 +178,6 @@ def calculer_resonances_pegasus(partants_actifs, favori_base, non_partants=[], a
     if not favori_base:
         favori_base = determiner_favori_sge_autonome(partants_actifs, arrivee_veille)
     
-    # Traiter uniquement les numéros de 1 à 16
     scores = {num: 0.0 for num in partants_actifs if num <= 16 and num not in non_partants}
     
     for np in non_partants:
@@ -227,15 +231,26 @@ def predict(response: Response):
     arrivee_veille = obtenir_arrivee_veille_zoneturf()
     data_live = obtenir_donnees_zoneturf_live(arrivee_veille)
     
-    if data_live:
-        # Blocage si hors 16 partants
-        if "erreur" in data_live:
-            return {
-                "status": "error",
-                "message": data_live["erreur"],
-                "partants_detectes": data_live["partants_count"]
-            }
+    # Cas A : La course ne comporte pas 16 partants
+    if data_live and data_live.get("erreur"):
+        return {
+            "status": "error",
+            "date": data_live.get("date", date_du_jour),
+            "hippodrome": data_live.get("hippodrome", "Hippodrome Quinté"),
+            "nom_course": data_live.get("nom_course", "Quinté du Jour"),
+            "discipline_distance": data_live.get("discipline_distance", "Corde & Distance"),
+            "message_visiteur": (
+                f"Le Système de Géométrie Électronique (SGE) traite exclusivement les courses "
+                f"comportant exactement 16 partants au départ.\n\n"
+                f"La course sélectionnée compte aujourd'hui {data_live.get('partants_count')} partants. "
+                f"Le pronostic SGE est donc automatiquement désactivé.\n"
+                f"(Note : En cas de déclaration de non-partant(s) sur une course de 16 partants, "
+                f"le SGE adapte automatiquement ses calculs de résonances)."
+            )
+        }
 
+    # Cas B : Course valide de 16 partants
+    if data_live and not data_live.get("erreur"):
         course_terminee = data_live["course_terminee"]
         heure_depart_ms = data_live.get("heure_depart_ms")
         favori = data_live["favori"]
@@ -274,7 +289,7 @@ def predict(response: Response):
             "scores": resultats
         }
 
-    # Fallback par défaut si indisponibilité (exactement 16 partants)
+    # Cas C : Indisponibilité serveur / Fallback
     np_list = []
     maintenant = datetime.now(tz_france)
     partants = list(range(1, 17))
