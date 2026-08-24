@@ -1,276 +1,215 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pronostic Résonance SGE - Quinté+</title>
-    <style>
-        :root {
-            --bg-color: #0d1117;
-            --card-bg: #161b22;
-            --border-color: #30363d;
-            --text-color: #c9d1d9;
-            --text-muted: #8b949e;
-            --accent-yellow: #f1e05a;
-            --accent-red: #ff4d4d;
-            --accent-blue: #58a6ff;
-        }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Système de Géométrie Électronique (SGE)</title>
+  <style>
+    :root {
+      --bg-color: #0f172a;
+      --card-bg: #1e293b;
+      --accent-color: #3b82f6;
+      --text-color: #f8fafc;
+      --text-muted: #94a3b8;
+      --warning-bg: rgba(245, 158, 11, 0.1);
+      --warning-border: #f59e0b;
+      --warning-text: #fbbf24;
+    }
 
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            margin: 0;
-            padding: 20px;
-            box-sizing: border-box;
-        }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
 
-        .card {
-            background-color: var(--card-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            padding: 24px;
-            max-width: 500px;
-            width: 100%;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
-            text-align: center;
-        }
+    .container {
+      width: 100%;
+      max-width: 600px;
+      background-color: var(--card-bg);
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+    }
 
-        .header h1 {
-            color: var(--accent-blue);
-            margin: 0 0 8px 0;
-            font-size: 1.5rem;
-        }
+    .header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
 
-        .header p {
-            color: var(--text-muted);
-            margin: 0 0 20px 0;
-            font-size: 0.9rem;
-        }
+    .nom-course {
+      font-size: 1.5rem;
+      font-weight: bold;
+      color: var(--accent-color);
+      margin-bottom: 5px;
+    }
 
-        .status-badge {
-            display: inline-block;
-            padding: 6px 16px;
-            border-radius: 20px;
-            font-weight: bold;
-            font-size: 0.85rem;
-            margin-bottom: 20px;
-            text-transform: uppercase;
-        }
+    .info-course {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+    }
 
-        .status-badge.attente {
-            background-color: rgba(88, 166, 255, 0.15);
-            color: var(--accent-blue);
-            border: 1px solid var(--accent-blue);
-        }
+    .status-badge {
+      display: inline-block;
+      margin-top: 10px;
+      padding: 6px 16px;
+      border-radius: 20px;
+      border: 1px solid var(--accent-color);
+      color: var(--accent-color);
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
 
-        .status-badge.terminee {
-            background-color: rgba(255, 77, 77, 0.15);
-            color: var(--accent-red);
-            border: 1px solid var(--accent-red);
-        }
+    .btn-actualiser {
+      width: 100%;
+      padding: 12px;
+      margin: 20px 0;
+      background-color: #10b981;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-weight: bold;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
 
-        .section-title {
-            color: var(--text-muted);
-            font-size: 0.9rem;
-            margin-bottom: 12px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
+    .btn-actualiser:hover {
+      background-color: #059669;
+    }
 
-        .balls-container {
-            display: flex;
-            justify-content: center;
-            gap: 12px;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
-        }
+    .prono-section {
+      text-align: center;
+      margin-top: 15px;
+    }
 
-        .ball-wrapper {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
+    .prono-title {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      letter-spacing: 1.5px;
+      margin-bottom: 15px;
+    }
 
-        .ball {
-            width: 48px;
-            height: 48px;
-            border-radius: 50%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-weight: bold;
-            font-size: 1.2rem;
-            color: #000;
-        }
+    .chevaux-grid {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
 
-        /* Boules jaunes (SGE) */
-        .ball-yellow {
-            background: radial-gradient(circle at 30% 30%, #fff677, var(--accent-yellow), #bfa800);
-            box-shadow: 0 0 12px rgba(241, 224, 90, 0.6);
-            animation: pulse-yellow 2s infinite alternate;
-        }
+    .cheval-ball {
+      width: 45px;
+      height: 45px;
+      background-color: var(--accent-color);
+      color: white;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 1.2rem;
+      box-shadow: 0 4px 10px rgba(59, 130, 246, 0.4);
+    }
 
-        @keyframes pulse-yellow {
-            0% { box-shadow: 0 0 8px rgba(241, 224, 90, 0.4); transform: scale(1); }
-            100% { box-shadow: 0 0 18px rgba(241, 224, 90, 0.8); transform: scale(1.04); }
-        }
+    .info-details {
+      background: rgba(0, 0, 0, 0.2);
+      padding: 15px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      line-height: 1.6;
+    }
 
-        /* Boules rouges (Arrivée Officielle) */
-        .ball-red {
-            background: radial-gradient(circle at 30% 30%, #ff9999, var(--accent-red), #b30000);
-            box-shadow: 0 0 12px rgba(255, 77, 77, 0.6);
-            color: #fff;
-            animation: pulse-red 2s infinite alternate;
-        }
+    .warning-box {
+      background: var(--warning-bg);
+      border: 1px solid var(--warning-border);
+      color: var(--warning-text);
+      padding: 18px;
+      border-radius: 10px;
+      text-align: center;
+      line-height: 1.5;
+      font-size: 0.95rem;
+      margin: 15px 0;
+    }
 
-        @keyframes pulse-red {
-            0% { box-shadow: 0 0 8px rgba(255, 77, 77, 0.4); transform: scale(1); }
-            100% { box-shadow: 0 0 18px rgba(255, 77, 77, 0.8); transform: scale(1.04); }
-        }
-
-        .cote {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            margin-top: 4px;
-        }
-
-        .arrivee-section {
-            margin-top: 24px;
-            padding-top: 20px;
-            border-top: 1px dashed var(--border-color);
-        }
-
-        .btn-refresh {
-            background-color: #238636;
-            color: #fff;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 6px;
-            font-weight: bold;
-            cursor: pointer;
-            width: 100%;
-            margin-bottom: 20px;
-            transition: background-color 0.2s;
-        }
-
-        .btn-refresh:hover {
-            background-color: #2ea043;
-        }
-
-        .footer-info {
-            text-align: left;
-            font-size: 0.85rem;
-            color: var(--text-muted);
-            line-height: 1.6;
-            background-color: rgba(0,0,0,0.2);
-            padding: 12px;
-            border-radius: 6px;
-        }
-    </style>
+    .warning-box strong {
+      font-size: 1.05rem;
+      display: inline-block;
+      margin-bottom: 8px;
+    }
+  </style>
 </head>
 <body>
 
-<div class="card">
-    <div class="header">
-        <h1 id="nom-course">Chargement...</h1>
-        <p id="info-course">--/--/---- - Hippodrome (PLAT)</p>
-    </div>
+<div class="container">
+  <div class="header">
+    <div id="nom-course" class="nom-course">Chargement...</div>
+    <div id="info-course" class="info-course">Veuillez patienter...</div>
+    <div id="status-badge" class="status-badge">SESSION SGE</div>
+  </div>
 
-    <div id="status-badge" class="status-badge attente">En attente du départ</div>
+  <button class="btn-actualiser" onclick="chargerPronostic()">Actualiser le Pronostic</button>
 
-    <!-- Pronostic SGE (Boules Jaunes) -->
-    <div class="section-title">Pronostic de Résonance SGE</div>
-    <div id="prono-container" class="balls-container">
-        <!-- Généré dynamiquement -->
-    </div>
-
-    <!-- Arrivée Officielle (Boules Rouges, masquée si pas encore disponible) -->
-    <div id="arrivee-section" class="arrivee-section" style="display: none;">
-        <div class="section-title" style="color: var(--accent-red);">Arrivée Officielle</div>
-        <div id="arrivee-container" class="balls-container">
-            <!-- Généré dynamiquement -->
-        </div>
-    </div>
-
-    <button class="btn-refresh" onclick="chargerDonnees()">Actualiser le Pronostic</button>
-
-    <div class="footer-info">
-        <div><strong>Favori Référent :</strong> <span id="favori-val">--</span></div>
-        <div><strong>Non-partants :</strong> <span id="np-val">Aucun</span></div>
-    </div>
+  <div id="zone-affichage">
+    <!-- Le contenu sera injecté dynamiquement par JavaScript -->
+  </div>
 </div>
 
 <script>
-async function chargerDonnees() {
-    try {
-        const response = await fetch('/predict');
-        const data = await response.json();
+  function chargerPronostic() {
+    fetch('/predict')
+      .then(res => res.json())
+      .then(data => {
+        // Mise à jour de l'en-tête de la course
+        document.getElementById('nom-course').textContent = data.nom_course || "SGE - Course du Jour";
+        document.getElementById('info-course').textContent = `${data.hippodrome || ''} ${data.discipline_distance ? '- ' + data.discipline_distance : ''} (${data.date || ''})`;
 
-        // Mettre à jour l'en-tête
-        document.getElementById('nom-course').innerText = data.nom_course;
-        document.getElementById('info-course').innerText = `${data.date} - ${data.hippodrome} (${data.discipline_distance})`;
+        const zoneAffichage = document.getElementById('zone-affichage');
 
-        // Badge de statut
-        const badge = document.getElementById('status-badge');
-        if (data.course_terminee) {
-            badge.innerText = "Course terminée";
-            badge.className = "status-badge terminee";
-        } else {
-            badge.innerText = "Course en cours / À venir";
-            badge.className = "status-badge attente";
+        // Cas : Message d'avertissement si la course ne comporte pas 16 partants
+        if (data.status === "error" || data.message_visiteur) {
+          zoneAffichage.innerHTML = `
+            <div class="warning-box">
+              <strong> Information SGE :</strong><br/>
+              ${data.message_visiteur.replace(/\n/g, '<br/>')}
+            </div>
+          `;
+          return;
         }
 
-        // Affichage du Pronostic SGE (Boules Jaunes)
-        const pronoContainer = document.getElementById('prono-container');
-        pronoContainer.innerHTML = '';
-        if (data.quinte_sge && data.quinte_sge.length > 0) {
-            data.quinte_sge.forEach(num => {
-                const cote = data.cotes && data.cotes[num] ? `${data.cotes[num]}` : '-';
-                pronoContainer.innerHTML += `
-                    <div class="ball-wrapper">
-                        <div class="ball ball-yellow">${num}</div>
-                        <div class="cote">${cote}</div>
-                    </div>
-                `;
-            });
-        }
+        // Cas : Course de 16 partants (Affichage normal du Pronostic)
+        let htmlChevaux = data.quinte_sge.map(num => `<div class="cheval-ball">${num}</div>`).join('');
+        let nonPartantsText = data.non_partants && data.non_partants.length > 0 ? data.non_partants.join(', ') : 'Aucun';
 
-        // Affichage de l'Arrivée Officielle (Boules Rouges)
-        const arriveeSection = document.getElementById('arrivee-section');
-        const arriveeContainer = document.getElementById('arrivee-container');
-        arriveeContainer.innerHTML = '';
+        zoneAffichage.innerHTML = `
+          <div class="prono-section">
+            <div class="prono-title">PRONOSTIC DE RÉSONANCE SGE</div>
+            <div class="chevaux-grid">${htmlChevaux}</div>
+          </div>
+          <div class="info-details">
+            <strong>Favori Référent :</strong> N° ${data.favori || 'Non défini'}<br/>
+            <strong>Non-partants :</strong> ${nonPartantsText}
+          </div>
+        `;
+      })
+      .catch(err => {
+        console.error("Erreur chargement:", err);
+        document.getElementById('zone-affichage').innerHTML = `
+          <div class="warning-box">
+            <strong> Erreur de connexion :</strong><br/>
+            Impossible de contacter le serveur SGE. Veuillez réessayer.
+          </div>
+        `;
+      });
+  }
 
-        if (data.arrivee_officielle && data.arrivee_officielle.length >= 5) {
-            arriveeSection.style.display = 'block';
-            data.arrivee_officielle.slice(0, 5).forEach(num => {
-                arriveeContainer.innerHTML += `
-                    <div class="ball-wrapper">
-                        <div class="ball ball-red">${num}</div>
-                    </div>
-                `;
-            });
-        } else {
-            arriveeSection.style.display = 'none';
-        }
-
-        // Pied de page
-        document.getElementById('favori-val').innerText = data.favori ? `N°${data.favori}` : 'Non défini';
-        document.getElementById('np-val').innerText = (data.non_partants && data.non_partants.length > 0) 
-            ? data.non_partants.join(', ') 
-            : 'Aucun';
-
-    } catch (err) {
-        console.error("Erreur de chargement :", err);
-    }
-}
-
-// Chargement automatique au démarrage
-chargerDonnees();
+  // Lancement automatique au chargement de la page
+  window.onload = chargerPronostic;
 </script>
 
 </body>
