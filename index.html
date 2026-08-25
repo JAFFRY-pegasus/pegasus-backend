@@ -17,7 +17,7 @@
     }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       background-color: var(--bg-color);
       color: var(--text-color);
       margin: 0;
@@ -146,12 +146,6 @@
       font-size: 0.95rem;
       margin: 15px 0;
     }
-
-    .warning-box strong {
-      font-size: 1.05rem;
-      display: inline-block;
-      margin-bottom: 8px;
-    }
   </style>
 </head>
 <body>
@@ -169,36 +163,39 @@
 
   <button class="btn-actualiser" onclick="chargerPronostic()">Actualiser le Pronostic</button>
 
-  <div id="zone-affichage">
-    <!-- Contenu dynamique -->
-  </div>
+  <div id="zone-affichage"></div>
 </div>
 
 <script>
   function chargerPronostic() {
-    fetch('/predict')
-      .then(res => res.json())
+    const zoneAffichage = document.getElementById('zone-affichage');
+    document.getElementById('nom-course').textContent = "Chargement des données...";
+
+    const targetUrl = window.location.origin + '/predict';
+
+    fetch(targetUrl)
+      .then(res => {
+        if (!res.ok) {
+          throw new Error('Erreur réseau (' + res.status + ')');
+        }
+        return res.json();
+      })
       .then(data => {
-        // En-tête de course détaillé
         document.getElementById('nom-course').textContent = data.nom_course || "Tiercé Quarté Quinté +";
         document.getElementById('badge-hippo').textContent = data.hippodrome || "Hippodrome";
         document.getElementById('disc-course').textContent = data.discipline_distance ? ` | ${data.discipline_distance}` : '';
         document.getElementById('date-course').textContent = `Date : ${data.date || ''}`;
 
-        const zoneAffichage = document.getElementById('zone-affichage');
-
-        // Course non éligible (Hors 16 partants)
         if (data.status === "error" || data.message_visiteur) {
           zoneAffichage.innerHTML = `
             <div class="warning-box">
-              <strong> Information SGE :</strong><br/>
+              <strong>Information SGE :</strong><br/>
               ${data.message_visiteur.replace(/\n/g, '<br/>')}
             </div>
           `;
           return;
         }
 
-        // Course de 16 partants
         let htmlChevaux = data.quinte_sge.map(num => `<div class="cheval-ball">${num}</div>`).join('');
         let nonPartantsText = data.non_partants && data.non_partants.length > 0 ? data.non_partants.join(', ') : 'Aucun';
 
@@ -214,11 +211,12 @@
         `;
       })
       .catch(err => {
-        console.error("Erreur chargement:", err);
-        document.getElementById('zone-affichage').innerHTML = `
+        console.error("Erreur SGE:", err);
+        document.getElementById('nom-course').textContent = "Erreur de chargement";
+        zoneAffichage.innerHTML = `
           <div class="warning-box">
-            <strong> Erreur de connexion :</strong><br/>
-            Impossible de contacter le serveur SGE. Veuillez réessayer.
+            <strong>Erreur de connexion :</strong><br/>
+            Impossible d'obtenir les données (${err.message}). Vérifie l'état du serveur.
           </div>
         `;
       });
@@ -229,7 +227,6 @@
 
 </body>
 </html>
-
 
 
 
