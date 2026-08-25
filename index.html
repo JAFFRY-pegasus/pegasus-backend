@@ -178,7 +178,6 @@
     
     document.getElementById('nom-course').textContent = "Chargement...";
 
-    // Anti-cache HTTP avec horodatage
     const urlApi = window.location.origin + '/predict?t=' + new Date().getTime();
 
     fetch(urlApi, { cache: 'no-store' })
@@ -189,8 +188,7 @@
         document.getElementById('disc-course').textContent = ` | ${data.discipline_distance}`;
         document.getElementById('date-course').textContent = `Date : ${data.date}`;
 
-        // Détection de l'état de la course (si l'arrivée est là ou si course_terminee est vrai)
-        const aUneArrivee = data.arrivee_officielle && data.arrivee_officielle.length >= 5;
+        const aUneArrivee = data.arrivee_officielle && data.arrivee_officielle.length > 0;
         const estTerminee = data.course_terminee || aUneArrivee;
 
         if (estTerminee) {
