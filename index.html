@@ -11,9 +11,9 @@
       --accent-color: #3b82f6;
       --text-color: #f8fafc;
       --text-muted: #94a3b8;
-      --warning-bg: rgba(245, 158, 11, 0.1);
-      --warning-border: #f59e0b;
-      --warning-text: #fbbf24;
+      --status-green: #10b981;
+      --status-red: #ef4444;
+      --orange-ball: #f97316;
     }
 
     body {
@@ -69,11 +69,22 @@
       margin-top: 12px;
       padding: 6px 16px;
       border-radius: 20px;
-      border: 1px solid var(--accent-color);
-      color: var(--accent-color);
-      font-size: 0.8rem;
+      font-size: 0.85rem;
+      font-weight: bold;
       text-transform: uppercase;
       letter-spacing: 1px;
+    }
+
+    .status-green {
+      background-color: rgba(16, 185, 129, 0.15);
+      border: 1px solid var(--status-green);
+      color: var(--status-green);
+    }
+
+    .status-red {
+      background-color: rgba(239, 68, 68, 0.15);
+      border: 1px solid var(--status-red);
+      color: var(--status-red);
     }
 
     .btn-actualiser {
@@ -87,11 +98,6 @@
       font-weight: bold;
       font-size: 1rem;
       cursor: pointer;
-      transition: background 0.2s;
-    }
-
-    .btn-actualiser:hover {
-      background-color: #059669;
     }
 
     .prono-section {
@@ -127,24 +133,17 @@
       box-shadow: 0 4px 10px rgba(59, 130, 246, 0.4);
     }
 
+    .cheval-ball-orange {
+      background-color: var(--orange-ball);
+      box-shadow: 0 4px 10px rgba(249, 115, 22, 0.4);
+    }
+
     .info-details {
       background: rgba(0, 0, 0, 0.2);
       padding: 15px;
       border-radius: 8px;
       font-size: 0.9rem;
       line-height: 1.6;
-    }
-
-    .warning-box {
-      background: var(--warning-bg);
-      border: 1px solid var(--warning-border);
-      color: var(--warning-text);
-      padding: 18px;
-      border-radius: 10px;
-      text-align: center;
-      line-height: 1.5;
-      font-size: 0.95rem;
-      margin: 15px 0;
     }
   </style>
 </head>
@@ -158,7 +157,7 @@
       <span id="disc-course">--</span>
     </div>
     <div id="date-course" class="info-course-ligne" style="font-size: 0.85rem;">(--/--/----)</div>
-    <div id="status-badge" class="status-badge">SESSION SGE</div>
+    <div id="status-badge" class="status-badge status-green">COURSE NON DÉBUTÉE</div>
   </div>
 
   <button class="btn-actualiser" onclick="chargerPronostic()">Actualiser le Pronostic</button>
@@ -169,56 +168,56 @@
 <script>
   function chargerPronostic() {
     const zoneAffichage = document.getElementById('zone-affichage');
-    document.getElementById('nom-course').textContent = "Chargement des données...";
+    const badgeStatus = document.getElementById('status-badge');
+    
+    document.getElementById('nom-course').textContent = "Chargement...";
 
-    const targetUrl = window.location.origin + '/predict';
-
-    fetch(targetUrl)
-      .then(res => {
-        if (!res.ok) {
-          throw new Error('Erreur réseau (' + res.status + ')');
-        }
-        return res.json();
-      })
+    fetch(window.location.origin + '/predict')
+      .then(res => res.json())
       .then(data => {
-        document.getElementById('nom-course').textContent = data.nom_course || "Tiercé Quarté Quinté +";
-        document.getElementById('badge-hippo').textContent = data.hippodrome || "Hippodrome";
-        document.getElementById('disc-course').textContent = data.discipline_distance ? ` | ${data.discipline_distance}` : '';
-        document.getElementById('date-course').textContent = `Date : ${data.date || ''}`;
+        document.getElementById('nom-course').textContent = data.nom_course;
+        document.getElementById('badge-hippo').textContent = data.hippodrome;
+        document.getElementById('disc-course').textContent = ` | ${data.discipline_distance}`;
+        document.getElementById('date-course').textContent = `Date : ${data.date}`;
 
-        if (data.status === "error" || data.message_visiteur) {
-          zoneAffichage.innerHTML = `
-            <div class="warning-box">
-              <strong>Information SGE :</strong><br/>
-              ${data.message_visiteur.replace(/\n/g, '<br/>')}
+        // Gestion de l'état de la course
+        if (data.course_terminee) {
+          badgeStatus.textContent = "COURSE TERMINEE";
+          badgeStatus.className = "status-badge status-red";
+        } else {
+          badgeStatus.textContent = "COURSE NON DÉBUTÉE";
+          badgeStatus.className = "status-badge status-green";
+        }
+
+        let htmlProno = data.quinte_sge.map(num => `<div class="cheval-ball">${num}</div>`).join('');
+        let nonPartantsText = data.non_partants && data.non_partants.length > 0 ? data.non_partants.join(', ') : 'Aucun';
+
+        let htmlArrivee = '';
+        if (data.course_terminee && data.arrivee_officielle.length >= 5) {
+          let ballsArrivee = data.arrivee_officielle.map(num => `<div class="cheval-ball cheval-ball-orange">${num}</div>`).join('');
+          htmlArrivee = `
+            <div class="prono-section" style="margin-top: 25px;">
+              <div class="prono-title" style="color: var(--orange-ball);">ARRIVÉE OFFICIELLE DU QUINTÉ</div>
+              <div class="chevaux-grid">${ballsArrivee}</div>
             </div>
           `;
-          return;
         }
-
-        let htmlChevaux = data.quinte_sge.map(num => `<div class="cheval-ball">${num}</div>`).join('');
-        let nonPartantsText = data.non_partants && data.non_partants.length > 0 ? data.non_partants.join(', ') : 'Aucun';
 
         zoneAffichage.innerHTML = `
           <div class="prono-section">
             <div class="prono-title">PRONOSTIC DE RÉSONANCE SGE</div>
-            <div class="chevaux-grid">${htmlChevaux}</div>
+            <div class="chevaux-grid">${htmlProno}</div>
           </div>
+          ${htmlArrivee}
           <div class="info-details">
-            <strong>Favori Référent :</strong> N° ${data.favori || 'Non défini'}<br/>
-            <strong>Non-partants :</strong> ${nonPartantsText}
+            <strong>Favori de la Presse :</strong> N° ${data.favori}<br/>
+            <strong>Non-partant(s) :</strong> ${nonPartantsText}
           </div>
         `;
       })
       .catch(err => {
-        console.error("Erreur SGE:", err);
+        console.error(err);
         document.getElementById('nom-course').textContent = "Erreur de chargement";
-        zoneAffichage.innerHTML = `
-          <div class="warning-box">
-            <strong>Erreur de connexion :</strong><br/>
-            Impossible d'obtenir les données (${err.message}). Vérifie l'état du serveur.
-          </div>
-        `;
       });
   }
 
@@ -227,6 +226,5 @@
 
 </body>
 </html>
-
 
 
