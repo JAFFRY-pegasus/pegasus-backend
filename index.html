@@ -178,7 +178,10 @@
     
     document.getElementById('nom-course').textContent = "Chargement...";
 
-    fetch(window.location.origin + '/predict')
+    // Anti-cache HTTP avec horodatage
+    const urlApi = window.location.origin + '/predict?t=' + new Date().getTime();
+
+    fetch(urlApi, { cache: 'no-store' })
       .then(res => res.json())
       .then(data => {
         document.getElementById('nom-course').textContent = data.nom_course;
@@ -186,8 +189,12 @@
         document.getElementById('disc-course').textContent = ` | ${data.discipline_distance}`;
         document.getElementById('date-course').textContent = `Date : ${data.date}`;
 
-        if (data.course_terminee) {
-          badgeStatus.textContent = "COURSE TERMINEE";
+        // Détection de l'état de la course (si l'arrivée est là ou si course_terminee est vrai)
+        const aUneArrivee = data.arrivee_officielle && data.arrivee_officielle.length >= 5;
+        const estTerminee = data.course_terminee || aUneArrivee;
+
+        if (estTerminee) {
+          badgeStatus.textContent = "COURSE TERMINÉE";
           badgeStatus.className = "status-badge status-red";
           btnAction.textContent = "Actualiser l'Arrivée";
         } else {
@@ -200,7 +207,7 @@
         let nonPartantsText = data.non_partants && data.non_partants.length > 0 ? data.non_partants.join(', ') : 'Aucun';
 
         let htmlArrivee = '';
-        if (data.course_terminee && data.arrivee_officielle.length >= 5) {
+        if (aUneArrivee) {
           let ballsArrivee = data.arrivee_officielle.map(num => `<div class="cheval-ball cheval-ball-orange">${num}</div>`).join('');
           htmlArrivee = `
             <div class="prono-section" style="margin-top: 25px;">
