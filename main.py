@@ -18,6 +18,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Matrice de Géométrie Électronique
 PRIORITES_GEOMETRIQUES = {
     1: [9, 2, 10, 8, 16], 2: [10, 1, 8, 9, 11], 3: [11, 4, 2, 12, 10],
     4: [12, 5, 8, 13, 11], 5: [13, 4, 6, 12, 14], 6: [14, 5, 7, 13, 14],
@@ -62,7 +63,36 @@ def obtenir_arrivee_veille_zoneturf():
         pass
     return [14, 9, 5, 12, 10]
 
+def extraction_favori_presse_zoneturf(soup):
+    """ Extrait le premier cheval de la Synthèse de la Presse de Zone-Turf """
+    try:
+        # 1. Cherche spécifiquement la ligne "Synthèse Quinté de la presse"
+        for tr in soup.find_all('tr'):
+            texte_ligne = tr.get_text()
+            if "synthèse" in texte_ligne.lower() or "synthese" in texte_ligne.lower():
+                # On extrait les numéros uniquement dans les cellules après l'intitulé
+                tds = tr.find_all(['td', 'th'])
+                if len(tds) > 1:
+                    nums_ligne = []
+                    for td in tds[1:]:
+                        found = re.findall(r'\b(1[0-6]|[1-9])\b', td.get_text())
+                        if found:
+                            nums_ligne.extend([int(x) for x in found])
+                    if nums_ligne:
+                        return nums_ligne[0]  # Le 1er cheval de la synthèse
+
+        # 2. Secours : Cherche dans le premier bloc de pronostics du tableau de la presse
+        bloc_prono = soup.find('table', class_=re.compile(r'pronostic|presse|synthese', re.I))
+        if bloc_prono:
+            nums = re.findall(r'\b(1[0-6]|[1-9])\b', bloc_prono.text)
+            if nums:
+                return int(nums[0])
+    except Exception as e:
+        print("Erreur scraping favori presse ZT:", e)
+    return None
+
 def obtenir_favori_secours_canalturf():
+    """ Secours n°1 sur Canalturf si Zone-Turf est indisponible """
     url = "https://www.canalturf.com/pronostics-TURF/"
     try:
         res = requests.get(url, headers=HEADERS, timeout=6)
@@ -78,6 +108,7 @@ def obtenir_favori_secours_canalturf():
     return None
 
 def determiner_favori_sge_autonome(partants_actifs, arrivee_veille):
+    """ Secours n°2 : Calcul algorithmique autonome """
     scores_base = {}
     poids_veille = [5.0, 4.0, 3.0, 2.0, 1.0]
     for num in partants_actifs:
@@ -118,9 +149,8 @@ def obtenir_donnees_zoneturf_live(arrivee_veille):
 
             partants = list(range(1, 17))
             non_partants = []
-            cotes = {}
-            min_cote, favori_presse = 999.0, None
 
+            # Extraction des non-partants
             lignes = soup.find_all(['tr', 'li', 'div'], class_=re.compile(r'partant|runner|horse', re.I))
             for ligne in lignes:
                 text_ligne = ligne.get_text()
@@ -130,26 +160,21 @@ def obtenir_donnees_zoneturf_live(arrivee_veille):
                     if "NP" in text_ligne or "non-partant" in text_ligne.lower():
                         non_partants.append(num)
 
-                    cote_match = re.search(r'\b(\d+[,.]\d+)\b', text_ligne)
-                    if cote_match:
-                        try:
-                            val_cote = float(cote_match.group(1).replace(',', '.'))
-                            cotes[str(num)] = val_cote
-                            if 0 < val_cote < min_cote:
-                                min_cote, favori_presse = val_cote, num
-                        except ValueError:
-                            pass
-
             non_partants = sorted(list(set(non_partants)))
 
-            # Double secours pour le favori de la presse
+            # --- EXTRACTION PRÉCISE DU FAVORI DE LA PRESSE ---
+            favori_presse = extraction_favori_presse_zoneturf(soup)
+
+            # Secours 1 : Canalturf
             if favori_presse is None:
                 favori_presse = obtenir_favori_secours_canalturf()
 
+            # Secours 2 : Calcul SGE Autonome
             if favori_presse is None:
                 partants_actifs = [n for n in partants if n not in non_partants]
                 favori_presse = determiner_favori_sge_autonome(partants_actifs, arrivee_veille)
 
+            # Vérification de l'arrivée officielle
             arrivee_officielle = []
             course_terminee = False
             bloc_arr = soup.find('div', class_=re.compile(r'arrivee|resultat', re.I))
@@ -166,7 +191,6 @@ def obtenir_donnees_zoneturf_live(arrivee_veille):
                 "nom_course": nom_course,
                 "discipline_distance": disc,
                 "favori": favori_presse,
-                "cotes": cotes,
                 "partants": partants,
                 "non_partants": non_partants,
                 "course_terminee": course_terminee,
