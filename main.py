@@ -62,6 +62,21 @@ def obtenir_arrivee_veille_zoneturf():
         pass
     return [14, 9, 5, 12, 10]
 
+def obtenir_favori_secours_canalturf():
+    url = "https://www.canalturf.com/pronostics-TURF/"
+    try:
+        res = requests.get(url, headers=HEADERS, timeout=6)
+        if res.status_code == 200:
+            soup = BeautifulSoup(res.text, 'html.parser')
+            bloc_prono = soup.find('div', class_=re.compile(r'pronostic|synthese|quinte', re.I))
+            if bloc_prono:
+                nums = re.findall(r'\b(1[0-6]|[1-9])\b', bloc_prono.text)
+                if nums:
+                    return int(nums[0])
+    except Exception as e:
+        print("Erreur scrap Canalturf:", e)
+    return None
+
 def determiner_favori_sge_autonome(partants_actifs, arrivee_veille):
     scores_base = {}
     poids_veille = [5.0, 4.0, 3.0, 2.0, 1.0]
@@ -82,11 +97,9 @@ def obtenir_donnees_zoneturf_live(arrivee_veille):
         if res.status_code == 200:
             soup = BeautifulSoup(res.text, 'html.parser')
 
-            # Nom course
             titre_el = soup.find('h1') or soup.find('h2')
             nom_course = titre_el.get_text(strip=True) if titre_el else "Tiercé Quarté Quinté +"
             
-            # Hippodrome
             hippo = "Hippodrome Inconnu"
             hippo_match = re.search(r'Prix\s+[^–-]+[–-]\s*([A-Za-zÀ-ÖOU-öø-ÿ\s]+)', nom_course)
             if hippo_match:
@@ -108,7 +121,6 @@ def obtenir_donnees_zoneturf_live(arrivee_veille):
             cotes = {}
             min_cote, favori_presse = 999.0, None
 
-            # Extraction partants / cotes / non-partants
             lignes = soup.find_all(['tr', 'li', 'div'], class_=re.compile(r'partant|runner|horse', re.I))
             for ligne in lignes:
                 text_ligne = ligne.get_text()
@@ -130,11 +142,14 @@ def obtenir_donnees_zoneturf_live(arrivee_veille):
 
             non_partants = sorted(list(set(non_partants)))
 
+            # Double secours pour le favori de la presse
+            if favori_presse is None:
+                favori_presse = obtenir_favori_secours_canalturf()
+
             if favori_presse is None:
                 partants_actifs = [n for n in partants if n not in non_partants]
                 favori_presse = determiner_favori_sge_autonome(partants_actifs, arrivee_veille)
 
-            # Vérification de l'arrivée officielle
             arrivee_officielle = []
             course_terminee = False
             bloc_arr = soup.find('div', class_=re.compile(r'arrivee|resultat', re.I))
@@ -158,7 +173,7 @@ def obtenir_donnees_zoneturf_live(arrivee_veille):
                 "arrivee_officielle": arrivee_officielle
             }
     except Exception as e:
-        print("Erreur scrap:", e)
+        print("Erreur scrap Zone-Turf:", e)
     return None
 
 def calculer_resonances_pegasus(partants_actifs, favori_base, non_partants=[], arrivee_veille=[]):
@@ -246,17 +261,17 @@ def predict(response: Response):
             "quinte_sge": quinte_sge
         }
 
-    # Secours
+    # Secours global
     partants = list(range(1, 17))
-    favori = 14
-    resultats = calculer_resonances_pegasus(partants, favori, [], arrivee_veille)
+    favori_secours = obtenir_favori_secours_canalturf() or 1
+    resultats = calculer_resonances_pegasus(partants, favori_secours, [], arrivee_veille)
     return {
         "status": "success",
         "date": date_du_jour,
-        "hippodrome": "R1C3 - Vincennes",
-        "nom_course": "Prix de Paris",
+        "hippodrome": "R1C3 - Hippodrome",
+        "nom_course": "Tiercé Quarté Quinté +",
         "discipline_distance": "ATTELE - 2700m",
-        "favori": favori,
+        "favori": favori_secours,
         "non_partants": [],
         "course_terminee": False,
         "arrivee_officielle": [],
