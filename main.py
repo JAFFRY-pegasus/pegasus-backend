@@ -19,21 +19,11 @@ app.add_middleware(
 )
 
 PRIORITES_GEOMETRIQUES = {
-    1: [9, 2, 10, 8, 16], 
-    2: [10, 1, 8, 9, 11], 
-    3: [11, 4, 2, 12, 10],
-    4: [12, 5, 8, 13, 11], 
-    5: [13, 4, 6, 12, 14], 
-    6: [14, 5, 7, 13, 14],
-    7: [15, 8, 6, 16, 14], 
-    8: [16, 7, 1, 15, 9], 
-    9: [8, 4, 2, 12, 10], 
-    10: [2, 1, 8, 9, 11], 
-    11: [8, 3, 2, 12, 10], 
-    12: [4, 5, 3, 13, 11],
-    13: [5, 4, 6, 14, 12], 
-    14: [6, 5, 7, 13, 15], 
-    15: [7, 8, 6, 16, 14],
+    1: [9, 2, 10, 8, 16], 2: [10, 1, 8, 9, 11], 3: [11, 4, 2, 12, 10],
+    4: [12, 5, 8, 13, 11], 5: [13, 4, 6, 12, 14], 6: [14, 5, 7, 13, 14],
+    7: [15, 8, 6, 16, 14], 8: [16, 7, 1, 15, 9], 9: [8, 4, 2, 12, 10], 
+    10: [2, 1, 8, 9, 11], 11: [8, 3, 2, 12, 10], 12: [4, 5, 3, 13, 11],
+    13: [5, 4, 6, 14, 12], 14: [6, 5, 7, 13, 15], 15: [7, 8, 6, 16, 14],
     16: [8, 1, 7, 9, 15]
 }
 
@@ -58,7 +48,6 @@ def obtenir_arrivee_veille_zoneturf():
     tz_france = zoneinfo.ZoneInfo("Europe/Paris")
     date_hier = (datetime.now(tz_france) - timedelta(days=1)).strftime("%Y%m%d")
     url = f"https://www.zone-turf.fr/quinte/{date_hier}/"
-    
     try:
         res = requests.get(url, headers=HEADERS, timeout=6)
         if res.status_code == 200:
@@ -66,12 +55,11 @@ def obtenir_arrivee_veille_zoneturf():
             bloc_arrivee = soup.find('div', class_=re.compile(r'arrivee|resultats', re.I))
             if bloc_arrivee:
                 nums = re.findall(r'\b(1[0-6]|[1-9])\b', bloc_arrivee.text)
-                nums_int = [int(n) for n in nums]
-                arrivee = list(dict.fromkeys(nums_int))
+                arrivee = list(dict.fromkeys([int(n) for n in nums]))
                 if len(arrivee) >= 5:
                     return arrivee[:5]
-    except Exception as e:
-        print("Erreur scrap veille:", e)
+    except Exception:
+        pass
     return [14, 9, 5, 12, 10]
 
 def determiner_favori_sge_autonome(partants_actifs, arrivee_veille):
@@ -94,18 +82,23 @@ def obtenir_donnees_zoneturf_live(arrivee_veille):
         if res.status_code == 200:
             soup = BeautifulSoup(res.text, 'html.parser')
 
+            # Nom course
             titre_el = soup.find('h1') or soup.find('h2')
             nom_course = titre_el.get_text(strip=True) if titre_el else "Tiercé Quarté Quinté +"
             
-            rc_match = re.search(r'R\d+C\d+', soup.text)
-            rc_str = rc_match.group(0) if rc_match else "R1C3"
-            
-            hippo_el = soup.find('span', class_=re.compile(r'hippodrome|reunion', re.I)) or soup.find('a', class_=re.compile(r'hippodrome', re.I))
-            if hippo_el:
-                hippo_nom = hippo_el.get_text(strip=True)
-                hippo = f"{rc_str} - {hippo_nom}" if rc_str not in hippo_nom else hippo_nom
+            # Hippodrome
+            hippo = "Hippodrome Inconnu"
+            hippo_match = re.search(r'Prix\s+[^–-]+[–-]\s*([A-Za-zÀ-ÖOU-öø-ÿ\s]+)', nom_course)
+            if hippo_match:
+                hippo = hippo_match.group(1).strip()
             else:
-                hippo = f"{rc_str} - Hippodrome"
+                el_hippo = soup.find(class_=re.compile(r'hippodrome|reunion', re.I))
+                if el_hippo:
+                    hippo = el_hippo.get_text(strip=True)
+
+            rc_match = re.search(r'R\d+C\d+', soup.text)
+            if rc_match:
+                hippo = f"{rc_match.group(0)} - {hippo}"
 
             disc_el = soup.find('span', class_=re.compile(r'discipline|distance', re.I))
             disc = disc_el.get_text(strip=True) if disc_el else "ATTELE - 2700m"
@@ -113,9 +106,10 @@ def obtenir_donnees_zoneturf_live(arrivee_veille):
             partants = list(range(1, 17))
             non_partants = []
             cotes = {}
-            min_cote, favori = 999.0, None
+            min_cote, favori_presse = 999.0, None
 
-            lignes = soup.find_all(['tr', 'li', 'div'], class_=re.compile(r'partant|runner|horse|chevaux', re.I))
+            # Extraction partants / cotes / non-partants
+            lignes = soup.find_all(['tr', 'li', 'div'], class_=re.compile(r'partant|runner|horse', re.I))
             for ligne in lignes:
                 text_ligne = ligne.get_text()
                 num_match = re.search(r'\b(1[0-6]|[1-9])\b', text_ligne)
@@ -130,16 +124,17 @@ def obtenir_donnees_zoneturf_live(arrivee_veille):
                             val_cote = float(cote_match.group(1).replace(',', '.'))
                             cotes[str(num)] = val_cote
                             if 0 < val_cote < min_cote:
-                                min_cote, favori = val_cote, num
+                                min_cote, favori_presse = val_cote, num
                         except ValueError:
                             pass
 
             non_partants = sorted(list(set(non_partants)))
 
-            if favori is None:
+            if favori_presse is None:
                 partants_actifs = [n for n in partants if n not in non_partants]
-                favori = determiner_favori_sge_autonome(partants_actifs, arrivee_veille)
+                favori_presse = determiner_favori_sge_autonome(partants_actifs, arrivee_veille)
 
+            # Vérification de l'arrivée officielle
             arrivee_officielle = []
             course_terminee = False
             bloc_arr = soup.find('div', class_=re.compile(r'arrivee|resultat', re.I))
@@ -155,8 +150,7 @@ def obtenir_donnees_zoneturf_live(arrivee_veille):
                 "hippodrome": hippo,
                 "nom_course": nom_course,
                 "discipline_distance": disc,
-                "heure_depart_ms": int(datetime.now(tz_france).timestamp() * 1000),
-                "favori": favori,
+                "favori": favori_presse,
                 "cotes": cotes,
                 "partants": partants,
                 "non_partants": non_partants,
@@ -164,7 +158,7 @@ def obtenir_donnees_zoneturf_live(arrivee_veille):
                 "arrivee_officielle": arrivee_officielle
             }
     except Exception as e:
-        print("Erreur scrap live:", e)
+        print("Erreur scrap:", e)
     return None
 
 def calculer_resonances_pegasus(partants_actifs, favori_base, non_partants=[], arrivee_veille=[]):
@@ -224,64 +218,47 @@ def predict(response: Response):
     arrivee_veille = obtenir_arrivee_veille_zoneturf()
     data_live = obtenir_donnees_zoneturf_live(arrivee_veille)
     
-    if data_live and not data_live.get("erreur"):
+    if data_live:
         course_terminee = data_live["course_terminee"]
-        heure_depart_ms = data_live.get("heure_depart_ms")
         favori = data_live["favori"]
         np_list = data_live["non_partants"]
         partants = data_live.get("partants", list(range(1, 17)))
-        date_str = data_live["date"]
-        hippo_str = data_live["hippodrome"]
-        nom_course = data_live["nom_course"]
-        disc_str = data_live["discipline_distance"]
-        arrivee_officielle = data_live.get("arrivee_officielle", [])
-        cotes = data_live.get("cotes", {})
 
         if not course_terminee or DERNIER_PRONO_VALIDE is None:
             resultats = calculer_resonances_pegasus(partants, favori, np_list, arrivee_veille)
             quinte_sge = [num for num, score in resultats[:5]]
-            DERNIER_PRONO_VALIDE = {"quinte_sge": quinte_sge, "scores": resultats, "favori": favori, "cotes": cotes}
+            DERNIER_PRONO_VALIDE = {"quinte_sge": quinte_sge, "scores": resultats, "favori": favori}
         else:
             quinte_sge = DERNIER_PRONO_VALIDE["quinte_sge"]
             resultats = DERNIER_PRONO_VALIDE["scores"]
             favori = DERNIER_PRONO_VALIDE["favori"]
-            if not cotes: cotes = DERNIER_PRONO_VALIDE["cotes"]
 
         return {
             "status": "success",
-            "date": date_str,
-            "hippodrome": hippo_str,
-            "nom_course": nom_course,
-            "discipline_distance": disc_str,
-            "heure_depart_ms": heure_depart_ms,
+            "date": data_live["date"],
+            "hippodrome": data_live["hippodrome"],
+            "nom_course": data_live["nom_course"],
+            "discipline_distance": data_live["discipline_distance"],
             "favori": favori,
-            "cotes": cotes,
             "non_partants": np_list,
             "course_terminee": course_terminee,
-            "arrivee_officielle": arrivee_officielle,
-            "quinte_sge": quinte_sge,
-            "scores": resultats
+            "arrivee_officielle": data_live["arrivee_officielle"],
+            "quinte_sge": quinte_sge
         }
 
-    np_list = []
-    maintenant = datetime.now(tz_france)
+    # Secours
     partants = list(range(1, 17))
     favori = 14
-    resultats = calculer_resonances_pegasus(partants, favori, np_list, arrivee_veille)
-    quinte_sge = [num for num, score in resultats[:5]]
-
+    resultats = calculer_resonances_pegasus(partants, favori, [], arrivee_veille)
     return {
         "status": "success",
         "date": date_du_jour,
-        "hippodrome": "R1C3 - Hippodrome",
-        "nom_course": "Tiercé Quarté Quinté +",
+        "hippodrome": "R1C3 - Vincennes",
+        "nom_course": "Prix de Paris",
         "discipline_distance": "ATTELE - 2700m",
-        "heure_depart_ms": int(maintenant.timestamp() * 1000),
         "favori": favori,
-        "cotes": {},
-        "non_partants": np_list,
+        "non_partants": [],
         "course_terminee": False,
         "arrivee_officielle": [],
-        "quinte_sge": quinte_sge,
-        "scores": resultats
+        "quinte_sge": [num for num, score in resultats[:5]]
     }
