@@ -46,17 +46,27 @@
       font-size: 1.5rem;
       font-weight: bold;
       color: var(--accent-color);
-      margin-bottom: 5px;
+      margin-bottom: 6px;
     }
 
-    .info-course {
-      font-size: 0.9rem;
+    .info-course-ligne {
+      font-size: 0.95rem;
       color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+
+    .badge-reunion {
+      background-color: #334155;
+      color: #38bdf8;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-weight: bold;
+      font-size: 0.85rem;
     }
 
     .status-badge {
       display: inline-block;
-      margin-top: 10px;
+      margin-top: 12px;
       padding: 6px 16px;
       border-radius: 20px;
       border: 1px solid var(--accent-color);
@@ -149,14 +159,18 @@
 <div class="container">
   <div class="header">
     <div id="nom-course" class="nom-course">Chargement...</div>
-    <div id="info-course" class="info-course">Veuillez patienter...</div>
+    <div class="info-course-ligne">
+      <span id="badge-hippo" class="badge-reunion">--</span>
+      <span id="disc-course">--</span>
+    </div>
+    <div id="date-course" class="info-course-ligne" style="font-size: 0.85rem;">(--/--/----)</div>
     <div id="status-badge" class="status-badge">SESSION SGE</div>
   </div>
 
   <button class="btn-actualiser" onclick="chargerPronostic()">Actualiser le Pronostic</button>
 
   <div id="zone-affichage">
-    <!-- Le contenu sera injecté dynamiquement par JavaScript -->
+    <!-- Contenu dynamique -->
   </div>
 </div>
 
@@ -165,13 +179,15 @@
     fetch('/predict')
       .then(res => res.json())
       .then(data => {
-        // Mise à jour de l'en-tête de la course
-        document.getElementById('nom-course').textContent = data.nom_course || "SGE - Course du Jour";
-        document.getElementById('info-course').textContent = `${data.hippodrome || ''} ${data.discipline_distance ? '- ' + data.discipline_distance : ''} (${data.date || ''})`;
+        // En-tête de course détaillé
+        document.getElementById('nom-course').textContent = data.nom_course || "Tiercé Quarté Quinté +";
+        document.getElementById('badge-hippo').textContent = data.hippodrome || "Hippodrome";
+        document.getElementById('disc-course').textContent = data.discipline_distance ? ` | ${data.discipline_distance}` : '';
+        document.getElementById('date-course').textContent = `Date : ${data.date || ''}`;
 
         const zoneAffichage = document.getElementById('zone-affichage');
 
-        // Cas : Message d'avertissement si la course ne comporte pas 16 partants
+        // Course non éligible (Hors 16 partants)
         if (data.status === "error" || data.message_visiteur) {
           zoneAffichage.innerHTML = `
             <div class="warning-box">
@@ -182,7 +198,7 @@
           return;
         }
 
-        // Cas : Course de 16 partants (Affichage normal du Pronostic)
+        // Course de 16 partants
         let htmlChevaux = data.quinte_sge.map(num => `<div class="cheval-ball">${num}</div>`).join('');
         let nonPartantsText = data.non_partants && data.non_partants.length > 0 ? data.non_partants.join(', ') : 'Aucun';
 
@@ -208,10 +224,12 @@
       });
   }
 
-  // Lancement automatique au chargement de la page
   window.onload = chargerPronostic;
 </script>
 
 </body>
 </html>
+
+
+
 
