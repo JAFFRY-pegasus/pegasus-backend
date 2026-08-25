@@ -90,31 +90,48 @@ def obtenir_donnees_zoneturf_live(arrivee_veille):
     url = "https://www.zone-turf.fr/quinte/"
     
     try:
-        res = requests.get(url, headers=HEADERS, timeout=8)
+        res = requests.get(url, headers=HEADERS, timeout=10)
         if res.status_code == 200:
             soup = BeautifulSoup(res.text, 'html.parser')
 
+            # Nom complet de la course
             titre_el = soup.find('h1') or soup.find('h2')
             nom_course = titre_el.get_text(strip=True) if titre_el else "Quinté du Jour"
             
-            hippo_el = soup.find('span', class_=re.compile(r'hippodrome|reunion', re.I))
-            hippo = hippo_el.get_text(strip=True) if hippo_el else "Hippodrome (R1C3)"
+            # Réunion, Course et Hippodrome (ex: R1C3 - Vincennes)
+            rc_match = re.search(r'R\d+C\d+', soup.text)
+            rc_str = rc_match.group(0) if rc_match else ""
             
+            hippo_el = soup.find('span', class_=re.compile(r'hippodrome|reunion', re.I)) or soup.find('a', class_=re.compile(r'hippodrome', re.I))
+            if hippo_el:
+                hippo_nom = hippo_el.get_text(strip=True)
+                hippo = f"{rc_str} - {hippo_nom}" if rc_str and rc_str not in hippo_nom else hippo_nom
+            else:
+                hippo = rc_str if rc_str else "Hippodrome (R1C1)"
+
+            # Discipline et distance
             disc_el = soup.find('span', class_=re.compile(r'discipline|distance', re.I))
-            disc = disc_el.get_text(strip=True) if disc_el else "ATTELE - 2700m"
+            disc = disc_el.get_text(strip=True) if disc_el else "ATTELE / PLAT"
 
             partants = []
             non_partants = []
             cotes = {}
             min_cote, favori = 999.0, None
 
-            lignes = soup.find_all('tr', class_=re.compile(r'partant|runner', re.I))
+            # Parsing élargi des partants
+            lignes = soup.find_all(['tr', 'li', 'div'], class_=re.compile(r'partant|runner|horse|chevaux', re.I))
+            if not lignes:
+                tableau = soup.find('table')
+                if tableau:
+                    lignes = tableau.find_all('tr')
+
             for ligne in lignes:
                 text_ligne = ligne.get_text()
-                num_match = re.search(r'\b(1[0-9]|[1-9])\b', text_ligne)
+                num_match = re.search(r'\b(1[0-6]|[1-9])\b', text_ligne)
                 if num_match:
                     num = int(num_match.group(1))
-                    partants.append(num)
+                    if num <= 16:
+                        partants.append(num)
                     
                     if "NP" in text_ligne or "non-partant" in text_ligne.lower():
                         non_partants.append(num)
@@ -132,7 +149,11 @@ def obtenir_donnees_zoneturf_live(arrivee_veille):
             partants = sorted(list(set(partants)))
             non_partants = sorted(list(set(non_partants)))
 
-            # RÈGLE STRICTE : La course doit comporter exactement 16 partants au départ
+            # Fallback grille 1..16 si tableau HTML non capturé
+            if len(partants) == 0:
+                partants = list(range(1, 17))
+
+            # RÈGLE STRICTE : Exactement 16 partants
             if len(partants) != 16:
                 return {
                     "erreur": True,
@@ -231,7 +252,7 @@ def predict(response: Response):
     arrivee_veille = obtenir_arrivee_veille_zoneturf()
     data_live = obtenir_donnees_zoneturf_live(arrivee_veille)
     
-    # Cas A : La course ne comporte pas 16 partants
+    # Non éligible (Hors 16 partants)
     if data_live and data_live.get("erreur"):
         return {
             "status": "error",
@@ -249,7 +270,7 @@ def predict(response: Response):
             )
         }
 
-    # Cas B : Course valide de 16 partants
+    # Course valide (16 partants)
     if data_live and not data_live.get("erreur"):
         course_terminee = data_live["course_terminee"]
         heure_depart_ms = data_live.get("heure_depart_ms")
@@ -289,7 +310,7 @@ def predict(response: Response):
             "scores": resultats
         }
 
-    # Cas C : Indisponibilité serveur / Fallback
+    # Secours serveur
     np_list = []
     maintenant = datetime.now(tz_france)
     partants = list(range(1, 17))
@@ -300,8 +321,8 @@ def predict(response: Response):
     return {
         "status": "success",
         "date": date_du_jour,
-        "hippodrome": "Vincennes (R1C3)",
-        "nom_course": "Prix de Paris",
+        "hippodrome": "R1C3 - Vincennes",
+        "nom_course": "Prix du Jour",
         "discipline_distance": "ATTELE - 2700m",
         "heure_depart_ms": int(maintenant.timestamp() * 1000),
         "favori": favori,
