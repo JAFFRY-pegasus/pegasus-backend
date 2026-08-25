@@ -160,7 +160,7 @@
     <div id="status-badge" class="status-badge status-green">COURSE NON DÉBUTÉE</div>
   </div>
 
-  <button class="btn-actualiser" onclick="chargerPronostic()">Actualiser le Pronostic</button>
+  <button id="btn-action" class="btn-actualiser" onclick="chargerPronostic()">Actualiser le Pronostic</button>
 
   <div id="zone-affichage"></div>
 </div>
@@ -169,6 +169,7 @@
   function chargerPronostic() {
     const zoneAffichage = document.getElementById('zone-affichage');
     const badgeStatus = document.getElementById('status-badge');
+    const btnAction = document.getElementById('btn-action');
     
     document.getElementById('nom-course').textContent = "Chargement...";
 
@@ -180,13 +181,14 @@
         document.getElementById('disc-course').textContent = ` | ${data.discipline_distance}`;
         document.getElementById('date-course').textContent = `Date : ${data.date}`;
 
-        // Gestion de l'état de la course
         if (data.course_terminee) {
           badgeStatus.textContent = "COURSE TERMINEE";
           badgeStatus.className = "status-badge status-red";
+          btnAction.textContent = "Actualiser l'Arrivée";
         } else {
           badgeStatus.textContent = "COURSE NON DÉBUTÉE";
           badgeStatus.className = "status-badge status-green";
+          btnAction.textContent = "Actualiser le Pronostic";
         }
 
         let htmlProno = data.quinte_sge.map(num => `<div class="cheval-ball">${num}</div>`).join('');
