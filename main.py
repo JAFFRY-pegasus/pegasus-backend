@@ -8,7 +8,6 @@ from fastapi import FastAPI, Response
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-# Definition de l'application FastAPI obligatoire pour Uvicorn
 app = FastAPI()
 
 app.add_middleware(
@@ -165,15 +164,30 @@ def obtenir_donnees_zoneturf_live(arrivee_veille):
                 favori_presse = determiner_favori_sge_autonome(partants_actifs, arrivee_veille)
 
             arrivee_officielle = []
-            course_terminee = False
+            
+            blocs_arrivee = soup.find_all(class_=re.compile(r'arrivee|resultat|top5|ordre|finish', re.I))
+            for b in blocs_arrivee:
+                nums = re.findall(r'\b(1[0-6]|[1-9])\b', b.text)
+                clean_nums = list(dict.fromkeys([int(n) for n in nums]))
+                if len(clean_nums) >= 5:
+                    arrivee_officielle = clean_nums[:5]
+                    break
 
-            bloc_arr = soup.find(class_=re.compile(r'arrivee|resultat|top5|ordre', re.I))
-            if bloc_arr:
-                nums_arr = re.findall(r'\b(1[0-6]|[1-9])\b', bloc_arr.text)
-                arrivee_officielle = list(dict.fromkeys([int(n) for n in nums_arr]))[:5]
+            if not arrivee_officielle:
+                try:
+                    res_secours = requests.get("https://www.canalturf.com/resultats-PMU/", headers=HEADERS, timeout=5)
+                    if res_secours.status_code == 200:
+                        soup_secours = BeautifulSoup(res_secours.text, 'html.parser')
+                        bloc_q = soup_secours.find(class_=re.compile(r'quinte|resultat', re.I))
+                        if bloc_q:
+                            nums = re.findall(r'\b(1[0-6]|[1-9])\b', bloc_q.text)
+                            clean_nums = list(dict.fromkeys([int(n) for n in nums]))
+                            if len(clean_nums) >= 5:
+                                arrivee_officielle = clean_nums[:5]
+                except Exception:
+                    pass
 
-            if len(arrivee_officielle) >= 5 or maintenant.hour >= 19:
-                course_terminee = True
+            course_terminee = len(arrivee_officielle) >= 5 or maintenant.hour >= 19
 
             return {
                 "erreur": False,
