@@ -51,7 +51,7 @@
             margin: 0;
         }
 
-        /* CARTE DES INFORMATIONS DU JOUR */
+        /* CARTE DES INFORMATIONS ET PRONOSTIC */
         .card {
             background: var(--card-bg);
             border: 1px solid var(--border-color);
@@ -97,6 +97,11 @@
             font-weight: bold;
             font-size: 13px;
             letter-spacing: 1px;
+        }
+
+        .badge-sge {
+            background: #e67e22;
+            color: #ffffff;
         }
 
         /* ANALYSEUR GÉOMÉTRIQUE */
@@ -198,7 +203,7 @@
             <p class="subtitle">Espace Visiteur — Synthèse & Analyseur d'Axes</p>
         </header>
 
-        <!-- SEC. 1 : INFORMATIONS DE LA COURSE ET PRONOSTIC -->
+        <!-- SEC. 1 : INFORMATIONS DE LA COURSE, PRONOSTIC ET ARRIVÉE DE LA VEILLE -->
         <div class="card">
             <div class="card-title">Informations de la Course</div>
             <div class="info-grid">
@@ -212,6 +217,10 @@
                     <span class="info-label">Course :</span> <span id="race-name">—</span>
                 </div>
                 <div class="info-item" style="grid-column: 1 / -1; margin-top: 5px;">
+                    <span class="info-label">Pronostic SGE :</span> 
+                    <span id="race-prono" class="badge badge-sge">—</span>
+                </div>
+                <div class="info-item" style="grid-column: 1 / -1; margin-top: 2px;">
                     <span class="info-label">Arrivée Réf. Veille :</span> 
                     <span id="race-ref" class="badge">—</span>
                 </div>
@@ -237,7 +246,7 @@
 <script>
     let selection = [];
 
-    // Récupération automatique des données de la course au chargement
+    // Récupération automatique des données au chargement
     async function chargerInfosCourse() {
         try {
             const res = await fetch('/race-info');
@@ -248,6 +257,10 @@
             document.getElementById('race-hip').innerText = data.hippodrome || "N/C";
             document.getElementById('race-name').innerText = data.course || "N/C";
             
+            if (data.pronostic_sge && data.pronostic_sge.length > 0) {
+                document.getElementById('race-prono').innerText = data.pronostic_sge.join(' - ');
+            }
+
             if (data.arrivee_veille && data.arrivee_veille.length > 0) {
                 document.getElementById('race-ref').innerText = data.arrivee_veille.join(' - ');
             }
@@ -314,7 +327,7 @@
         }
     }
 
-    // Initialisation au chargement de la page
+    // Chargement initial des données de la course
     chargerInfosCourse();
 </script>
 </body>
