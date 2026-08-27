@@ -2,40 +2,261 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Analyseur Géométrique Quinté</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pegasus Quinté — Pronostics et Analyse Géométrique</title>
     <style>
-        body { font-family: Arial, sans-serif; background: #121212; color: #fff; padding: 20px; text-align: center; }
-        h1 { color: #f39c12; }
-        .grid-container { display: grid; grid-template-columns: repeat(8, 50px); gap: 10px; justify-content: center; margin: 20px auto; }
-        .cell { width: 50px; height: 50px; background: #222; border: 2px solid #444; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: bold; cursor: pointer; user-select: none; }
-        .cell.selected { background: #e67e22; border-color: #f39c12; color: #fff; }
-        .cell.central-pillar { border-color: #3498db; }
-        .controls { margin: 20px 0; }
-        button { background: #27ae60; color: white; border: none; padding: 10px 20px; font-size: 16px; border-radius: 5px; cursor: pointer; }
-        button:hover { background: #2ec771; }
-        #result { margin-top: 20px; font-size: 18px; font-weight: bold; }
-        .status-valide { color: #2ecc71; }
-        .status-invalide { color: #e74c3c; }
+        :root {
+            --bg-color: #121212;
+            --card-bg: #1e1e1e;
+            --accent-gold: #f39c12;
+            --accent-blue: #3498db;
+            --accent-green: #2ecc71;
+            --accent-red: #e74c3c;
+            --text-main: #ffffff;
+            --text-sub: #b0b0b0;
+            --border-color: #333333;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 650px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 25px;
+        }
+
+        h1 {
+            color: var(--accent-gold);
+            margin: 0 0 8px 0;
+            font-size: 26px;
+            letter-spacing: 0.5px;
+        }
+
+        .subtitle {
+            color: var(--text-sub);
+            font-size: 14px;
+            margin: 0;
+        }
+
+        /* CARTE DES INFORMATIONS DU JOUR */
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 18px 22px;
+            margin-bottom: 25px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+
+        .card-title {
+            color: var(--accent-gold);
+            font-size: 16px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 12px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 6px;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            font-size: 14px;
+        }
+
+        .info-item {
+            margin-bottom: 6px;
+        }
+
+        .info-label {
+            color: var(--text-sub);
+            font-weight: 600;
+        }
+
+        .badge {
+            display: inline-block;
+            background: #2c3e50;
+            color: #f1c40f;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 13px;
+            letter-spacing: 1px;
+        }
+
+        /* ANALYSEUR GÉOMÉTRIQUE */
+        .analyzer-section {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(8, 48px);
+            gap: 8px;
+            justify-content: center;
+            margin: 20px auto;
+        }
+
+        @media (max-width: 480px) {
+            .grid-container {
+                grid-template-columns: repeat(8, 36px);
+                gap: 5px;
+            }
+            .cell {
+                height: 36px !important;
+                font-size: 12px !important;
+            }
+        }
+
+        .cell {
+            height: 48px;
+            background: #262626;
+            border: 2px solid #444;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 15px;
+            cursor: pointer;
+            user-select: none;
+            transition: all 0.2s ease;
+        }
+
+        .cell:hover {
+            border-color: var(--accent-gold);
+        }
+
+        .cell.selected {
+            background: #e67e22;
+            border-color: var(--accent-gold);
+            color: #fff;
+            box-shadow: 0 0 8px rgba(230, 126, 34, 0.6);
+        }
+
+        .cell.central-pillar {
+            border-color: var(--accent-blue);
+        }
+
+        .controls {
+            margin: 15px 0 10px 0;
+        }
+
+        button {
+            background: #27ae60;
+            color: white;
+            border: none;
+            padding: 10px 22px;
+            font-size: 14px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background: #2ec771;
+        }
+
+        #result {
+            margin-top: 15px;
+            font-size: 16px;
+            font-weight: bold;
+            min-height: 45px;
+        }
+
+        .status-valide { color: var(--accent-green); }
+        .status-invalide { color: var(--accent-red); }
     </style>
 </head>
 <body>
 
-    <h1>Analyseur Géométrique Quinté (1–16)</h1>
-    <p>Sélectionne 5 numéros pour analyser l'ancrage et la géométrie des axes.</p>
+    <div class="container">
+        
+        <header>
+            <h1>PEGASUS QUINTÉ</h1>
+            <p class="subtitle">Espace Visiteur — Synthèse & Analyseur d'Axes</p>
+        </header>
 
-    <div class="grid-container" id="grid"></div>
+        <!-- SEC. 1 : INFORMATIONS DE LA COURSE ET PRONOSTIC -->
+        <div class="card">
+            <div class="card-title">Informations de la Course</div>
+            <div class="info-grid">
+                <div class="info-item">
+                    <span class="info-label">Date :</span> <span id="race-date">—</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Hippodrome :</span> <span id="race-hip">—</span>
+                </div>
+                <div class="info-item" style="grid-column: 1 / -1;">
+                    <span class="info-label">Course :</span> <span id="race-name">—</span>
+                </div>
+                <div class="info-item" style="grid-column: 1 / -1; margin-top: 5px;">
+                    <span class="info-label">Arrivée Réf. Veille :</span> 
+                    <span id="race-ref" class="badge">—</span>
+                </div>
+            </div>
+        </div>
 
-    <div class="controls">
-        <button onclick="reinitialiser()">Réinitialiser</button>
+        <!-- SEC. 2 : ANALYSEUR GÉOMÉTRIQUE INTERACTIF -->
+        <div class="analyzer-section">
+            <div class="card-title" style="border:none; margin:0;">Analyseur Géométrique (1–16)</div>
+            <p class="subtitle" style="margin-top: 4px;">Sélectionne 5 numéros pour analyser la grille</p>
+
+            <div class="grid-container" id="grid"></div>
+
+            <div class="controls">
+                <button onclick="reinitialiser()">Réinitialiser la sélection</button>
+            </div>
+
+            <div id="result">Sélectionne 5 numéros pour démarrer l'analyse</div>
+        </div>
+
     </div>
 
-    <div id="result">Sélectionne 5 numéros</div>
-
 <script>
-    // URL relative : s'adapte automatiquement à Render ou Vercel
-    const API_URL = "/evaluate";
     let selection = [];
 
+    // Récupération automatique des données de la course au chargement
+    async function chargerInfosCourse() {
+        try {
+            const res = await fetch('/race-info');
+            if (!res.ok) throw new Error("Erreur réseau");
+            const data = await res.json();
+            
+            document.getElementById('race-date').innerText = data.date || "N/C";
+            document.getElementById('race-hip').innerText = data.hippodrome || "N/C";
+            document.getElementById('race-name').innerText = data.course || "N/C";
+            
+            if (data.arrivee_veille && data.arrivee_veille.length > 0) {
+                document.getElementById('race-ref').innerText = data.arrivee_veille.join(' - ');
+            }
+        } catch (e) {
+            console.error("Impossible de récupérer les infos de la course :", e);
+        }
+    }
+
+    // Construction de la grille 2x8
     const gridEl = document.getElementById('grid');
     for (let i = 1; i <= 16; i++) {
         const cell = document.createElement('div');
@@ -62,7 +283,7 @@
     function reinitialiser() {
         selection = [];
         document.querySelectorAll('.cell').forEach(c => c.classList.remove('selected'));
-        document.getElementById('result').innerHTML = "Sélectionne 5 numéros";
+        document.getElementById('result').innerHTML = "Sélectionne 5 numéros pour démarrer l'analyse";
     }
 
     async function analyserGrille() {
@@ -72,10 +293,10 @@
             return;
         }
 
-        resultEl.innerHTML = "Calcul en cours...";
+        resultEl.innerHTML = "Calcul géométrique en cours…";
 
         try {
-            const response = await fetch(API_URL, {
+            const response = await fetch('/evaluate', {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ numbers: selection })
@@ -84,14 +305,17 @@
             const data = await response.json();
 
             if (!data.is_valid) {
-                resultEl.innerHTML = `<span class="status-invalide">ÉLIMINÉE : Absence d'ancrage central (3, 5, 11, 13) ou déséquilibre 1-8 / 9-16</span>`;
+                resultEl.innerHTML = `<span class="status-invalide">ÉLIMINÉE : Absence d'ancrage central (3, 5, 11, 13) ou déséquilibre 1–8 / 9–16</span>`;
             } else {
                 resultEl.innerHTML = `<span class="status-valide">GRILLE VALIDE</span><br>Score Géométrique : <strong>${data.score}</strong>`;
             }
         } catch (err) {
-            resultEl.innerHTML = `<span class="status-invalide">Erreur de communication avec le serveur</span>`;
+            resultEl.innerHTML = `<span class="status-invalide">Erreur de connexion avec le serveur</span>`;
         }
     }
+
+    // Initialisation au chargement de la page
+    chargerInfosCourse();
 </script>
 </body>
 </html>
