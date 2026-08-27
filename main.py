@@ -9,7 +9,6 @@ from pydantic import BaseModel
 
 app = FastAPI(title="Pegasus Quinté API")
 
-# Configuration CORS pour autoriser l'interface HTML
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -18,19 +17,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ==============================================================================
-# 1. PONDÉRATIONS ET DONNÉES HISTORIQUES (BLOCS 001-210)
-# ==============================================================================
-
 AXIS_WEIGHTS = {
-    (3, 11): 1.00,
-    (5, 13): 0.98,
-    (4, 12): 0.85,
-    (6, 14): 0.82,
-    (7, 15): 0.75,
-    (2, 10): 0.68,
-    (1, 9):  0.62,
-    (8, 16): 0.60
+    (3, 11): 1.00, (5, 13): 0.98, (4, 12): 0.85, (6, 14): 0.82,
+    (7, 15): 0.75, (2, 10): 0.68, (1, 9):  0.62, (8, 16): 0.60
 }
 
 BONUS_HISTORIQUE_BASE = {
@@ -40,13 +29,17 @@ BONUS_HISTORIQUE_BASE = {
     13: 4.7, 14: 3.8, 15: 3.6, 16: 3.0
 }
 
-# ==============================================================================
-# 2. LOGIQUE MÉTIER ET FILTRAGE
-# ==============================================================================
-
-def obtenir_arrivee_veille() -> List[int]:
+def obtenir_infos_course():
     url = "https://www.zone-turf.fr/arrivees-rapports/quinte/"
     headers = {'User-Agent': 'Mozilla/5.0'}
+    
+    data = {
+        "date": "27/08/2026",
+        "hippodrome": "Vincennes",
+        "course": "Prix de France",
+        "arrivee_veille": [14, 9, 5, 12, 10]
+    }
+    
     try:
         req = urllib.request.Request(url, headers=headers)
         with urllib.request.urlopen(req, timeout=3) as response:
@@ -55,10 +48,11 @@ def obtenir_arrivee_veille() -> List[int]:
             if matches and len(matches) >= 5:
                 res = [int(n) for n in matches[:5] if 1 <= int(n) <= 16]
                 if len(res) == 5:
-                    return res
+                    data["arrivee_veille"] = res
     except Exception:
         pass
-    return [14, 9, 5, 12, 10]
+        
+    return data
 
 def est_combinaison_valide(combinaison: List[int]) -> bool:
     if len(combinaison) != 5:
@@ -100,20 +94,19 @@ def evaluer_combinaison(combinaison: List[int], arrivee_veille: List[int]) -> fl
 
     return round(score, 2)
 
-# ==============================================================================
-# 3. ENDPOINTS WEB (API ET HTML)
-# ==============================================================================
-
 class CombinationRequest(BaseModel):
     numbers: List[int]
-    arrivee_veille: Optional[List[int]] = None
 
 @app.get("/")
 def read_root():
     html_path = os.path.join(os.path.dirname(__file__), "index.html")
     if os.path.exists(html_path):
         return FileResponse(html_path)
-    return {"status": "ok", "message": "Fichier index.html introuvable dans le dépôt"}
+    return {"status": "ok", "message": "Fichier index.html introuvable"}
+
+@app.get("/race-info")
+def get_race_info():
+    return obtenir_infos_course()
 
 @app.post("/evaluate")
 def evaluate(payload: CombinationRequest):
@@ -121,15 +114,15 @@ def evaluate(payload: CombinationRequest):
     if len(grid) != 5:
         raise HTTPException(status_code=400, detail="5 numéros requis.")
 
-    arrivee = payload.arrivee_veille or obtenir_arrivee_veille()
+    infos = obtenir_infos_course()
     valide = est_combinaison_valide(grid)
-    score = evaluer_combinaison(grid, arrivee) if valide else 0.0
+    score = evaluer_combinaison(grid, infos["arrivee_veille"]) if valide else 0.0
 
     return {
         "combination": grid,
         "is_valid": valide,
         "score": score,
-        "reference_veille": arrivee
+        "race_info": infos
     }
 
 if __name__ == "__main__":
