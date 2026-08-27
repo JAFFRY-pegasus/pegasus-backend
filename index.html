@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -11,6 +12,7 @@
       --accent-color: #3b82f6;
       --text-color: #f8fafc;
       --text-muted: #94a3b8;
+      --border-color: #334155;
       --status-green: #10b981;
       --status-red: #ef4444;
       --orange-ball: #f97316;
@@ -30,43 +32,69 @@
 
     .container {
       width: 100%;
-      max-width: 600px;
+      max-width: 580px;
       background-color: var(--card-bg);
       border-radius: 16px;
       padding: 24px;
       box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
     }
 
-    .header {
-      text-align: center;
+    /* Tableau des informations de la course */
+    .info-table {
+      width: 100%;
+      border-collapse: collapse;
       margin-bottom: 20px;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--border-color);
+      font-size: 0.9rem;
     }
 
-    .info-course-ligne {
-      font-size: 0.95rem;
+    .info-table th, .info-table td {
+      padding: 10px 14px;
+      text-align: left;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .info-table tr:last-child th, 
+    .info-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .info-table th {
+      background-color: rgba(255, 255, 255, 0.04);
       color: var(--text-muted);
-      margin-bottom: 6px;
-      line-height: 1.4;
+      font-weight: 500;
+      width: 38%;
+    }
+
+    .info-table td {
+      color: var(--text-color);
+      font-weight: 600;
     }
 
     .badge-reunion {
       background-color: #334155;
       color: #38bdf8;
-      padding: 3px 8px;
-      border-radius: 6px;
+      padding: 2px 6px;
+      border-radius: 4px;
       font-weight: bold;
       font-size: 0.85rem;
+      margin-left: 6px;
     }
 
     .status-badge {
-      display: inline-block;
-      margin-top: 10px;
-      padding: 6px 16px;
-      border-radius: 20px;
+      display: block;
+      width: 100%;
+      text-align: center;
+      padding: 10px 0;
+      border-radius: 8px;
       font-size: 0.85rem;
       font-weight: bold;
       text-transform: uppercase;
       letter-spacing: 1px;
+      margin-bottom: 15px;
+      box-sizing: border-box;
     }
 
     .status-green {
@@ -84,7 +112,7 @@
     .btn-actualiser {
       width: 100%;
       padding: 12px;
-      margin: 20px 0;
+      margin-bottom: 20px;
       background-color: #10b981;
       color: white;
       border: none;
@@ -109,6 +137,7 @@
       color: var(--text-muted);
       letter-spacing: 1.5px;
       margin-bottom: 15px;
+      font-weight: 600;
     }
 
     .chevaux-grid {
@@ -141,21 +170,40 @@
 <body>
 
 <div class="container">
-  <div class="header">
-    <div id="date-course" class="info-course-ligne" style="font-size: 1.1rem; font-weight: bold; color: var(--text-color);">Date : --/--/----</div>
-    <div class="info-course-ligne">
-      <span id="badge-hippo" class="badge-reunion">--</span>
-      <span id="disc-course">--</span>
-    </div>
-    <div id="favori-np-course" class="info-course-ligne" style="font-size: 0.9rem;">
-      Favori : <strong>--</strong> | Non-partant(s) : <strong>--</strong>
-    </div>
-    <div id="status-badge" class="status-badge status-green">COURSE NON DÉBUTÉE</div>
-  </div>
 
+  <!-- Tableau récapitulatif des informations de la course -->
+  <table class="info-table">
+    <tr>
+      <th>Date du jour</th>
+      <td id="date-course">--/--/----</td>
+    </tr>
+    <tr>
+      <th>Hippodrome</th>
+      <td id="hippodrome-course">-- <span id="reunion-badge" class="badge-reunion">(--)</span></td>
+    </tr>
+    <tr>
+      <th>Discipline & Distance</th>
+      <td id="disc-course">--</td>
+    </tr>
+    <tr>
+      <th>Favori de la presse</th>
+      <td id="favori-course">N° --</td>
+    </tr>
+    <tr>
+      <th>Non-partant(s)</th>
+      <td id="np-course">--</td>
+    </tr>
+  </table>
+
+  <!-- Bandeau vert/rouge de statut -->
+  <div id="status-badge" class="status-badge status-green">COURSE NON DÉBUTÉE</div>
+
+  <!-- Bouton d'action -->
   <button id="btn-action" class="btn-actualiser" onclick="chargerPronostic()">Actualiser le Pronostic</button>
 
+  <!-- Zone d'affichage du pronostic et de l'arrivée -->
   <div id="zone-affichage"></div>
+
 </div>
 
 <script>
@@ -169,12 +217,14 @@
     fetch(urlApi, { cache: 'no-store' })
       .then(res => res.json())
       .then(data => {
-        document.getElementById('date-course').textContent = `Date : ${data.date}`;
-        document.getElementById('badge-hippo').textContent = data.hippodrome;
-        document.getElementById('disc-course').textContent = ` | ${data.discipline_distance}`;
+        document.getElementById('date-course').textContent = data.date || '--/--/----';
+        document.getElementById('hippodrome-course').childNodes[0].nodeValue = (data.hippodrome || '--') + ' ';
+        document.getElementById('reunion-badge').textContent = data.coords_reunion ? `(${data.coords_reunion})` : '(--)';
+        document.getElementById('disc-course').textContent = data.discipline_distance || '--';
+        document.getElementById('favori-course').textContent = `N° ${data.favori || '--'}`;
         
         let nonPartantsText = data.non_partants && data.non_partants.length > 0 ? data.non_partants.join(', ') : 'Aucun';
-        document.getElementById('favori-np-course').innerHTML = `Favori de la presse : <strong>N° ${data.favori}</strong> | Non-partant(s) : <strong>${nonPartantsText}</strong>`;
+        document.getElementById('np-course').textContent = nonPartantsText;
 
         const aUneArrivee = data.arrivee_officielle && data.arrivee_officielle.length > 0;
         const estTerminee = data.course_terminee || aUneArrivee;
@@ -221,4 +271,3 @@
 
 </body>
 </html>
-
