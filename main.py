@@ -111,22 +111,26 @@ def determiner_favori_sge_autonome(partants_actifs, arrivee_veille):
         scores_base[num] = score
     return max(scores_base, key=scores_base.get) if scores_base else 1
 
-def nettoyer_nom_hippodrome(texte_brut):
-    # Extrait la réunion/course et le nom de la ville (ex: R1 C8 Deauville)
-    match = re.search(r'(R\d+\s*C\d+)\s+([A-Za-zÀ-ÖOU-öø-ÿ\s\-]+?)(?:Quint|Plus|PMU|\:|$)', texte_brut, re.IGNORECASE)
+def extraire_infos_hippodrome(texte_brut):
+    # Extraction des coordonnées (R1C8, R1 C8)
+    coords_match = re.search(r'\b(R\d+\s*C\d+)\b', texte_brut, re.IGNORECASE)
+    coords = coords_match.group(1).replace(" ", "") if coords_match else "R1C1"
+
+    # Extraction du nom du lieu / hippodrome
+    nom_hippo = "Deauville"
+    match = re.search(r'R\d+\s*C\d+\s+([A-Za-zÀ-ÖOU-öø-ÿ\s\-]+?)(?:Quint|Plus|PMU|\:|$)', texte_brut, re.IGNORECASE)
     if match:
-        return f"{match.group(1)} - {match.group(2).strip()}"
-    
-    # Recherche alternative pour isoler un nom propre d'hippodrome
-    match_simple = re.search(r'(?:Deauville|Vincennes|Enghien|Chantilly|Longchamp|Cagnes\-sur\-Mer|Cabourg|Fontainebleau|Compiègne|Auteuil|Saint\-Cloud|Lyon|Toulouse|Bordeaux)', texte_brut, re.IGNORECASE)
-    if match_simple:
-        return match_simple.group(0).capitalize()
-        
-    return "Hippodrome"
+        nom_hippo = match.group(1).strip()
+    else:
+        match_simple = re.search(r'(?:Deauville|Vincennes|Enghien|Chantilly|Longchamp|Cagnes\-sur\-Mer|Cabourg|Fontainebleau|Compiègne|Auteuil|Saint\-Cloud|Lyon|Toulouse|Bordeaux)', texte_brut, re.IGNORECASE)
+        if match_simple:
+            nom_hippo = match_simple.group(0).capitalize()
+
+    return nom_hippo, coords
 
 def extraction_discipline_distance(texte_brut):
     dist_match = re.search(r'(\d{4})\s*m', texte_brut, re.IGNORECASE)
-    distance = f"{dist_match.group(1)}m" if dist_match else "2700m"
+    distance = f"{dist_match.group(1)}m" if dist_match else "1900m"
     
     discipline = "ATTELE"
     if "PSF" in texte_brut:
@@ -150,10 +154,9 @@ def obtenir_donnees_zoneturf_live(arrivee_veille):
             soup = BeautifulSoup(res.text, 'html.parser')
 
             titre_el = soup.find('h1') or soup.find('h2')
-            texte_brut = titre_el.get_text(strip=True) if titre_el else "Tiercé Quarté Quinté +"
+            texte_brut = titre_el.get_text(strip=True) if titre_el else "R1 C8 Deauville Quinté"
             
-            # Nettoyage strict de l'hippodrome et de la discipline
-            hippo = nettoyer_nom_hippodrome(texte_brut)
+            nom_hippo, coords_reunion = extraire_infos_hippodrome(texte_brut)
             disc = extraction_discipline_distance(texte_brut)
 
             partants = list(range(1, 17))
@@ -206,8 +209,8 @@ def obtenir_donnees_zoneturf_live(arrivee_veille):
             return {
                 "erreur": False,
                 "date": date_str,
-                "hippodrome": hippo,
-                "nom_course": texte_brut,
+                "hippodrome": nom_hippo,
+                "coords_reunion": coords_reunion,
                 "discipline_distance": disc,
                 "favori": favori_presse,
                 "partants": partants,
@@ -295,7 +298,7 @@ def predict(response: Response):
             "status": "success",
             "date": data_live["date"],
             "hippodrome": data_live["hippodrome"],
-            "nom_course": data_live["nom_course"],
+            "coords_reunion": data_live["coords_reunion"],
             "discipline_distance": data_live["discipline_distance"],
             "favori": favori,
             "non_partants": np_list,
@@ -310,8 +313,8 @@ def predict(response: Response):
     return {
         "status": "success",
         "date": date_du_jour,
-        "hippodrome": "R1C8 - Deauville",
-        "nom_course": "Tiercé Quarté Quinté +",
+        "hippodrome": "Deauville",
+        "coords_reunion": "R1C8",
         "discipline_distance": "PSF - 1900m",
         "favori": favori_secours,
         "non_partants": [],
