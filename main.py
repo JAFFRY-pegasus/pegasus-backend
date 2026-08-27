@@ -39,40 +39,61 @@ BONUS_HISTORIQUE_BASE = {
 # ==============================================================================
 
 def obtenir_infos_course():
-    """ Scrape automatiquement Zone-Turf pour extraire la date, le programme Quinté du jour et l'arrivée de la veille """
+    """ Extrait les données de la course, la réunion (R1C1), le statut et le pronostic SGE """
     aujourdhui = datetime.now().strftime("%d/%m/%Y")
     
     data = {
         "date": aujourdhui,
-        "hippodrome": "Hippodrome Quinté",
-        "course": "Prix du Jour (Quinté+)",
+        "hippodrome": "Deauville",
+        "code_course": "R1C8",
+        "course": "Prix de la Villa Lucie",
+        "statut": "NON_PARTIE",  # NON_PARTIE ou TERMINEE
         "arrivee_veille": [14, 9, 5, 12, 10],
         "pronostic_sge": [3, 5, 11, 13, 8]
     }
 
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
 
-    # 1. Extraction de la course du jour (Nom + Hippodrome)
+    # 1. Scraping des informations du programme du jour
     try:
         url_programme = "https://www.zone-turf.fr/quinte/"
         req = urllib.request.Request(url_programme, headers=headers)
         with urllib.request.urlopen(req, timeout=4) as response:
             html = response.read().decode('utf-8', errors='ignore')
             
-            # Recherche du titre de la course / hippodrome dans la page
-            match_title = re.search(r'<h1[^>]*>(.*?)</h1>', html, re.IGNORECASE | re.DOTALL)
+            # Extraction du code Réunion/Course (ex: R1C1 ou R1C8)
+            match_rc = re.search(r'R\d{1,2}\s*C\d{1,2}', html, re.IGNORECASE)
+            if match_rc:
+                data["code_course"] = match_rc.group(0).upper().replace(" ", "")
+
+            # Extraction du titre du Quinté
+            match_title = re.search(r'<h1[^>]*>(.*?)</h1>', html, re.DOTALL | re.IGNORECASE)
             if match_title:
-                titre_brut = re.sub(r'<[^>]+>', '', match_title.group(1)).strip()
-                if " - " in titre_brut:
-                    parts = titre_brut.split(" - ")
+                titre = re.sub(r'<[^>]+>', '', match_title.group(1)).strip()
+                titre = re.sub(r'^(Tiercé|Quinté\+|Quinté| Quarté|\+|\s|:)+', '', titre, flags=re.IGNORECASE).strip()
+                if " - " in titre:
+                    parts = titre.split(" - ")
                     data["hippodrome"] = parts[0].strip()
                     data["course"] = " - ".join(parts[1:]).strip()
-                else:
-                    data["course"] = titre_brut
+                elif titre:
+                    data["course"] = titre
     except Exception:
         pass
 
-    # 2. Extraction de l'arrivée de la veille (pour les miroirs/références)
+    # 2. Vérification de l'arrivée officielle du jour pour déterminer le statut (Terminée ou Non partie)
+    try:
+        url_du_jour = "https://www.zone-turf.fr/quinte/rapport/"
+        req_jour = urllib.request.Request(url_du_jour, headers=headers)
+        with urllib.request.urlopen(req_jour, timeout=3) as resp_jour:
+            html_jour = resp_jour.read().decode('utf-8', errors='ignore')
+            if "Arrivée officielle" in html_jour or "Arrivée définitive" in html_jour:
+                data["statut"] = "TERMINEE"
+            else:
+                data["statut"] = "NON_PARTIE"
+    except Exception:
+        data["statut"] = "NON_PARTIE"
+
+    # 3. Extraction de l'arrivée de la veille (référence)
     try:
         url_arrivee = "https://www.zone-turf.fr/arrivees-rapports/quinte/"
         req = urllib.request.Request(url_arrivee, headers=headers)
@@ -86,28 +107,25 @@ def obtenir_infos_course():
     except Exception:
         pass
 
-    # 3. Calcul dynamique du pronostic SGE optimisé à partir de la veille
+    # 4. Calcul du pronostic SGE du jour
     data["pronostic_sge"] = generer_pronostic_sge(data["arrivee_veille"])
 
     return data
 
 def generer_pronostic_sge(arrivee_ref: List[int]) -> List[int]:
-    """ Génère les 5 meilleurs numéros selon le score géométrique """
     scores = {}
     for num in range(1, 17):
-        # Base géométrique + bonus miroir veille
         score = BONUS_HISTORIQUE_BASE.get(num, 1.0)
         if num in arrivee_ref:
             score += 1.5
         scores[num] = score
 
-    # Sélectionne les numéros avec le plus haut potentiel en garantissant un pivot central
     tri = sorted(scores.items(), key=lambda x: x[1], reverse=True)
     top_5 = [num for num, sc in tri[:5]]
 
     piliers = {3, 5, 11, 13}
     if not any(n in piliers for n in top_5):
-        top_5[4] = 5  # Forçage pilier central si absent
+        top_5[4] = 5
 
     return sorted(top_5)
 
