@@ -51,7 +51,6 @@
             margin: 0;
         }
 
-        /* CARTE DES INFORMATIONS ET PRONOSTIC */
         .card {
             background: var(--card-bg);
             border: 1px solid var(--border-color);
@@ -102,6 +101,29 @@
         .badge-sge {
             background: #e67e22;
             color: #ffffff;
+        }
+
+        /* BADGES DE STATUT COURSE */
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 13px;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        .status-green {
+            background: rgba(46, 204, 113, 0.2);
+            color: #2ecc71;
+            border: 1px solid #2ecc71;
+        }
+
+        .status-red {
+            background: rgba(231, 76, 60, 0.2);
+            color: #e74c3c;
+            border: 1px solid #e74c3c;
         }
 
         /* ANALYSEUR GÉOMÉTRIQUE */
@@ -216,6 +238,10 @@
                 <div class="info-item" style="grid-column: 1 / -1;">
                     <span class="info-label">Course :</span> <span id="race-name">—</span>
                 </div>
+                <div class="info-item" style="grid-column: 1 / -1;">
+                    <span class="info-label">Statut :</span> 
+                    <span id="race-status" class="status-badge status-green">Course non partie</span>
+                </div>
                 <div class="info-item" style="grid-column: 1 / -1; margin-top: 5px;">
                     <span class="info-label">Pronostic SGE :</span> 
                     <span id="race-prono" class="badge badge-sge">—</span>
@@ -246,7 +272,6 @@
 <script>
     let selection = [];
 
-    // Récupération automatique des données au chargement
     async function chargerInfosCourse() {
         try {
             const res = await fetch('/race-info');
@@ -255,8 +280,21 @@
             
             document.getElementById('race-date').innerText = data.date || "N/C";
             document.getElementById('race-hip').innerText = data.hippodrome || "N/C";
-            document.getElementById('race-name').innerText = data.course || "N/C";
             
+            // Formatage de la ligne Course avec code R1C1
+            const code = data.code_course ? `[${data.code_course}] ` : "";
+            document.getElementById('race-name').innerText = code + (data.course || "N/C");
+            
+            // Gestion dynamique de la ligne de Statut (Vert / Rouge)
+            const statusEl = document.getElementById('race-status');
+            if (data.statut === "TERMINEE") {
+                statusEl.innerText = "Course terminée";
+                statusEl.className = "status-badge status-red";
+            } else {
+                statusEl.innerText = "Course non partie";
+                statusEl.className = "status-badge status-green";
+            }
+
             if (data.pronostic_sge && data.pronostic_sge.length > 0) {
                 document.getElementById('race-prono').innerText = data.pronostic_sge.join(' - ');
             }
@@ -327,7 +365,6 @@
         }
     }
 
-    // Chargement initial des données de la course
     chargerInfosCourse();
 </script>
 </body>
