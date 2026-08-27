@@ -1,14 +1,14 @@
 import os
 import re
 import urllib.request
+from typing import List, Optional
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List
 
 app = FastAPI(title="Pegasus Quinté API")
 
-# Configuration CORS pour autoriser les requêtes HTML
+# Configuration CORS complète pour Vercel/HTML local
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -18,7 +18,7 @@ app.add_middleware(
 )
 
 # ==============================================================================
-# PONDÉRATIONS ET DONNÉES HISTORIQUES
+# PONDÉRATIONS ET DONNÉES HISTORIQUES (BLOCS 001-210)
 # ==============================================================================
 
 AXIS_WEIGHTS = {
@@ -40,8 +40,24 @@ BONUS_HISTORIQUE_BASE = {
 }
 
 # ==============================================================================
-# LOGIQUE GÉOMÉTRIQUE
+# LOGIQUE MÉTIER
 # ==============================================================================
+
+def obtenir_arrivee_veille() -> List[int]:
+    url = "https://www.zone-turf.fr/arrivees-rapports/quinte/"
+    headers = {'User-Agent': 'Mozilla/5.0'}
+    try:
+        req = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(req, timeout=3) as response:
+            html = response.read().decode('utf-8')
+            matches = re.findall(r'arrivee-quinte.*?(\d{1,2})', html, re.DOTALL)
+            if matches and len(matches) >= 5:
+                res = [int(n) for n in matches[:5] if 1 <= int(n) <= 16]
+                if len(res) == 5:
+                    return res
+    except Exception:
+        pass
+    return [14, 9, 5, 12, 10]
 
 def est_combinaison_valide(combinaison: List[int]) -> bool:
     if len(combinaison) != 5:
@@ -84,11 +100,12 @@ def evaluer_combinaison(combinaison: List[int], arrivee_veille: List[int]) -> fl
     return round(score, 2)
 
 # ==============================================================================
-# ENDPOINTS API (FastAPI)
+# ENDPOINTS VERCEL
 # ==============================================================================
 
 class CombinationRequest(BaseModel):
     numbers: List[int]
+    arrivee_veille: Optional[List[int]] = None
 
 @app.get("/")
 def read_root():
@@ -98,18 +115,15 @@ def read_root():
 def evaluate(payload: CombinationRequest):
     grid = payload.numbers
     if len(grid) != 5:
-        raise HTTPException(status_code=400, detail="La combinaison doit contenir exactement 5 numéros.")
+        raise HTTPException(status_code=400, detail="5 numéros requis.")
 
+    arrivee = payload.arrivee_veille or obtenir_arrivee_veille()
     valide = est_combinaison_valide(grid)
-    score = evaluer_combinaison(grid, []) if valide else 0.0
+    score = evaluer_combinaison(grid, arrivee) if valide else 0.0
 
     return {
         "combination": grid,
         "is_valid": valide,
-        "score": score
+        "score": score,
+        "reference_veille": arrivee
     }
-
-if __name__ == "__main__":
-    import uvicorn
-    port = int(os.environ.get("PORT", 10000))
-    uvicorn.run(app, host="0.0.0.0", port=port)
