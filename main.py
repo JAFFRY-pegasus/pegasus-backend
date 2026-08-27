@@ -1,7 +1,7 @@
-
 import os
 import re
 import urllib.request
+from datetime import datetime
 from typing import List, Optional
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,7 +10,6 @@ from pydantic import BaseModel
 
 app = FastAPI(title="Pegasus Quinté API")
 
-# Configuration CORS pour autoriser l'interface HTML
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -20,18 +19,12 @@ app.add_middleware(
 )
 
 # ==============================================================================
-# 1. PONDÉRATIONS ET DONNÉES HISTORIQUES (BLOCS 001-210)
+# 1. PONDÉRATIONS ET DONNÉES HISTORIQUES
 # ==============================================================================
 
 AXIS_WEIGHTS = {
-    (3, 11): 1.00,
-    (5, 13): 0.98,
-    (4, 12): 0.85,
-    (6, 14): 0.82,
-    (7, 15): 0.75,
-    (2, 10): 0.68,
-    (1, 9):  0.62,
-    (8, 16): 0.60
+    (3, 11): 1.00, (5, 13): 0.98, (4, 12): 0.85, (6, 14): 0.82,
+    (7, 15): 0.75, (2, 10): 0.68, (1, 9):  0.62, (8, 16): 0.60
 }
 
 BONUS_HISTORIQUE_BASE = {
@@ -42,26 +35,49 @@ BONUS_HISTORIQUE_BASE = {
 }
 
 # ==============================================================================
-# 2. LOGIQUE MÉTIER ET EXTRACTION DES DONNÉES
+# 2. SCRAPING ET EXTRACTION AUTOMATIQUE DU JOUR
 # ==============================================================================
 
 def obtenir_infos_course():
-    """ Extrait les données de la course du jour et le pronostic SGE """
-    url = "https://www.zone-turf.fr/arrivees-rapports/quinte/"
-    headers = {'User-Agent': 'Mozilla/5.0'}
+    """ Scrape automatiquement Zone-Turf pour extraire la date, le programme Quinté du jour et l'arrivée de la veille """
+    aujourdhui = datetime.now().strftime("%d/%m/%Y")
     
     data = {
-        "date": "27/08/2026",
-        "hippodrome": "Vincennes",
-        "course": "Prix de France",
+        "date": aujourdhui,
+        "hippodrome": "Hippodrome Quinté",
+        "course": "Prix du Jour (Quinté+)",
         "arrivee_veille": [14, 9, 5, 12, 10],
         "pronostic_sge": [3, 5, 11, 13, 8]
     }
-    
+
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+
+    # 1. Extraction de la course du jour (Nom + Hippodrome)
     try:
-        req = urllib.request.Request(url, headers=headers)
-        with urllib.request.urlopen(req, timeout=3) as response:
-            html = response.read().decode('utf-8')
+        url_programme = "https://www.zone-turf.fr/quinte/"
+        req = urllib.request.Request(url_programme, headers=headers)
+        with urllib.request.urlopen(req, timeout=4) as response:
+            html = response.read().decode('utf-8', errors='ignore')
+            
+            # Recherche du titre de la course / hippodrome dans la page
+            match_title = re.search(r'<h1[^>]*>(.*?)</h1>', html, re.IGNORECASE | re.DOTALL)
+            if match_title:
+                titre_brut = re.sub(r'<[^>]+>', '', match_title.group(1)).strip()
+                if " - " in titre_brut:
+                    parts = titre_brut.split(" - ")
+                    data["hippodrome"] = parts[0].strip()
+                    data["course"] = " - ".join(parts[1:]).strip()
+                else:
+                    data["course"] = titre_brut
+    except Exception:
+        pass
+
+    # 2. Extraction de l'arrivée de la veille (pour les miroirs/références)
+    try:
+        url_arrivee = "https://www.zone-turf.fr/arrivees-rapports/quinte/"
+        req = urllib.request.Request(url_arrivee, headers=headers)
+        with urllib.request.urlopen(req, timeout=4) as response:
+            html = response.read().decode('utf-8', errors='ignore')
             matches = re.findall(r'arrivee-quinte.*?(\d{1,2})', html, re.DOTALL)
             if matches and len(matches) >= 5:
                 res = [int(n) for n in matches[:5] if 1 <= int(n) <= 16]
@@ -69,8 +85,31 @@ def obtenir_infos_course():
                     data["arrivee_veille"] = res
     except Exception:
         pass
-        
+
+    # 3. Calcul dynamique du pronostic SGE optimisé à partir de la veille
+    data["pronostic_sge"] = generer_pronostic_sge(data["arrivee_veille"])
+
     return data
+
+def generer_pronostic_sge(arrivee_ref: List[int]) -> List[int]:
+    """ Génère les 5 meilleurs numéros selon le score géométrique """
+    scores = {}
+    for num in range(1, 17):
+        # Base géométrique + bonus miroir veille
+        score = BONUS_HISTORIQUE_BASE.get(num, 1.0)
+        if num in arrivee_ref:
+            score += 1.5
+        scores[num] = score
+
+    # Sélectionne les numéros avec le plus haut potentiel en garantissant un pivot central
+    tri = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+    top_5 = [num for num, sc in tri[:5]]
+
+    piliers = {3, 5, 11, 13}
+    if not any(n in piliers for n in top_5):
+        top_5[4] = 5  # Forçage pilier central si absent
+
+    return sorted(top_5)
 
 def est_combinaison_valide(combinaison: List[int]) -> bool:
     if len(combinaison) != 5:
@@ -113,7 +152,7 @@ def evaluer_combinaison(combinaison: List[int], arrivee_veille: List[int]) -> fl
     return round(score, 2)
 
 # ==============================================================================
-# 3. ENDPOINTS API & DEPLOIEMENT WEB
+# 3. ENDPOINTS API
 # ==============================================================================
 
 class CombinationRequest(BaseModel):
