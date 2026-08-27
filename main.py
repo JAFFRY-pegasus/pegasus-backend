@@ -1,3 +1,4 @@
+
 import os
 import re
 import urllib.request
@@ -9,6 +10,7 @@ from pydantic import BaseModel
 
 app = FastAPI(title="Pegasus Quinté API")
 
+# Configuration CORS pour autoriser l'interface HTML
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -17,9 +19,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ==============================================================================
+# 1. PONDÉRATIONS ET DONNÉES HISTORIQUES (BLOCS 001-210)
+# ==============================================================================
+
 AXIS_WEIGHTS = {
-    (3, 11): 1.00, (5, 13): 0.98, (4, 12): 0.85, (6, 14): 0.82,
-    (7, 15): 0.75, (2, 10): 0.68, (1, 9):  0.62, (8, 16): 0.60
+    (3, 11): 1.00,
+    (5, 13): 0.98,
+    (4, 12): 0.85,
+    (6, 14): 0.82,
+    (7, 15): 0.75,
+    (2, 10): 0.68,
+    (1, 9):  0.62,
+    (8, 16): 0.60
 }
 
 BONUS_HISTORIQUE_BASE = {
@@ -29,7 +41,12 @@ BONUS_HISTORIQUE_BASE = {
     13: 4.7, 14: 3.8, 15: 3.6, 16: 3.0
 }
 
+# ==============================================================================
+# 2. LOGIQUE MÉTIER ET EXTRACTION DES DONNÉES
+# ==============================================================================
+
 def obtenir_infos_course():
+    """ Extrait les données de la course du jour et le pronostic SGE """
     url = "https://www.zone-turf.fr/arrivees-rapports/quinte/"
     headers = {'User-Agent': 'Mozilla/5.0'}
     
@@ -37,7 +54,8 @@ def obtenir_infos_course():
         "date": "27/08/2026",
         "hippodrome": "Vincennes",
         "course": "Prix de France",
-        "arrivee_veille": [14, 9, 5, 12, 10]
+        "arrivee_veille": [14, 9, 5, 12, 10],
+        "pronostic_sge": [3, 5, 11, 13, 8]
     }
     
     try:
@@ -94,8 +112,13 @@ def evaluer_combinaison(combinaison: List[int], arrivee_veille: List[int]) -> fl
 
     return round(score, 2)
 
+# ==============================================================================
+# 3. ENDPOINTS API & DEPLOIEMENT WEB
+# ==============================================================================
+
 class CombinationRequest(BaseModel):
     numbers: List[int]
+    arrivee_veille: Optional[List[int]] = None
 
 @app.get("/")
 def read_root():
