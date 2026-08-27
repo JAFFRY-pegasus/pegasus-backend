@@ -21,7 +21,7 @@
 <body>
 
     <h1>Analyseur Géométrique Quinté (1–16)</h1>
-    <p>Sélectionne 5 numéros pour analyser l'ancrage et la géométrie via l'API Vercel.</p>
+    <p>Sélectionne 5 numéros pour analyser l'ancrage et la géométrie des axes.</p>
 
     <div class="grid-container" id="grid"></div>
 
@@ -32,7 +32,8 @@
     <div id="result">Sélectionne 5 numéros</div>
 
 <script>
-    const API_URL = "https://pegasus-backend-zku1.vercel.app/evaluate";
+    // URL relative : s'adapte automatiquement à Render ou Vercel
+    const API_URL = "/evaluate";
     let selection = [];
 
     const gridEl = document.getElementById('grid');
@@ -71,7 +72,7 @@
             return;
         }
 
-        resultEl.innerHTML = "Calcul en cours via Vercel...";
+        resultEl.innerHTML = "Calcul en cours...";
 
         try {
             const response = await fetch(API_URL, {
@@ -88,7 +89,7 @@
                 resultEl.innerHTML = `<span class="status-valide">GRILLE VALIDE</span><br>Score Géométrique : <strong>${data.score}</strong>`;
             }
         } catch (err) {
-            resultEl.innerHTML = `<span class="status-invalide">Erreur de connexion avec l'API Vercel</span>`;
+            resultEl.innerHTML = `<span class="status-invalide">Erreur de communication avec le serveur</span>`;
         }
     }
 </script>
