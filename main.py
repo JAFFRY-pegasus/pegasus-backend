@@ -4,11 +4,12 @@ import urllib.request
 from typing import List, Optional
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 app = FastAPI(title="Pegasus Quinté API")
 
-# Configuration CORS complète pour Vercel/HTML local
+# Configuration CORS pour autoriser l'interface HTML
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -18,7 +19,7 @@ app.add_middleware(
 )
 
 # ==============================================================================
-# PONDÉRATIONS ET DONNÉES HISTORIQUES (BLOCS 001-210)
+# 1. PONDÉRATIONS ET DONNÉES HISTORIQUES (BLOCS 001-210)
 # ==============================================================================
 
 AXIS_WEIGHTS = {
@@ -40,7 +41,7 @@ BONUS_HISTORIQUE_BASE = {
 }
 
 # ==============================================================================
-# LOGIQUE MÉTIER
+# 2. LOGIQUE MÉTIER ET FILTRAGE
 # ==============================================================================
 
 def obtenir_arrivee_veille() -> List[int]:
@@ -100,7 +101,7 @@ def evaluer_combinaison(combinaison: List[int], arrivee_veille: List[int]) -> fl
     return round(score, 2)
 
 # ==============================================================================
-# ENDPOINTS VERCEL
+# 3. ENDPOINTS WEB (API ET HTML)
 # ==============================================================================
 
 class CombinationRequest(BaseModel):
@@ -109,7 +110,10 @@ class CombinationRequest(BaseModel):
 
 @app.get("/")
 def read_root():
-    return {"status": "ok", "message": "Pegasus Backend is running"}
+    html_path = os.path.join(os.path.dirname(__file__), "index.html")
+    if os.path.exists(html_path):
+        return FileResponse(html_path)
+    return {"status": "ok", "message": "Fichier index.html introuvable dans le dépôt"}
 
 @app.post("/evaluate")
 def evaluate(payload: CombinationRequest):
@@ -127,3 +131,8 @@ def evaluate(payload: CombinationRequest):
         "score": score,
         "reference_veille": arrivee
     }
+
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.environ.get("PORT", 10000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
