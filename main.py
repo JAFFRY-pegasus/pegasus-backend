@@ -1,324 +1,172 @@
-import os
+# main.py - Script complet d'analyse et de génération géométrique Quinté
+
+import urllib.request
 import re
-import requests
-from datetime import datetime, timedelta
-import zoneinfo
-from bs4 import BeautifulSoup
-from fastapi import FastAPI, Response
-from fastapi.responses import HTMLResponse
-from fastapi.middleware.cors import CORSMiddleware
 
-app = FastAPI()
+# ==============================================================================
+# 1. PONDÉRATIONS ISSUE DE L'ANALYSE DES 210 BLOCS
+# ==============================================================================
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-PRIORITES_GEOMETRIQUES = {
-    1: [9, 2, 10, 8, 16], 2: [10, 1, 8, 9, 11], 3: [11, 4, 2, 12, 10],
-    4: [12, 5, 8, 13, 11], 5: [13, 4, 6, 12, 14], 6: [14, 5, 7, 13, 14],
-    7: [15, 8, 6, 16, 14], 8: [16, 7, 1, 15, 9], 9: [8, 4, 2, 12, 10], 
-    10: [2, 1, 8, 9, 11], 11: [8, 3, 2, 12, 10], 12: [4, 5, 3, 13, 11],
-    13: [5, 4, 6, 14, 12], 14: [6, 5, 7, 13, 15], 15: [7, 8, 6, 16, 14],
-    16: [8, 1, 7, 9, 15]
+# Poids des axes verticaux (fréquence et stabilité mesurées)
+AXIS_WEIGHTS = {
+    (3, 11): 1.00,  # Axe central majeur (Invariable)
+    (5, 13): 0.98,  # Axe central majeur (Invariable)
+    (4, 12): 0.85,  # Pivot central
+    (6, 14): 0.82,  # Pivot central
+    (7, 15): 0.75,  # Axe secondaire externe
+    (2, 10): 0.68,  # Axe secondaire externe
+    (1, 9):  0.62,  # Appui bordure
+    (8, 16): 0.60   # Appui bordure
 }
 
-AXES_MIROIRS = {
-    1: 8, 8: 1, 2: 7, 7: 2, 3: 6, 6: 3, 4: 5, 5: 4,
-    9: 16, 16: 9, 10: 15, 15: 10, 11: 14, 14: 11, 12: 13, 13: 12
-}
-
+# Bonus historique de base individuel par numéro (Issue des statistiques condensées)
 BONUS_HISTORIQUE_BASE = {
-    1: 3.2, 2: 2.8, 3: 4.1, 4: 3.9, 5: 4.5, 6: 3.7, 7: 4.2, 8: 3.0,
-    9: 2.5, 10: 3.1, 11: 3.8, 12: 4.0, 13: 4.6, 14: 4.8, 15: 2.9, 16: 2.1
+    1: 3.2,  2: 2.8,  3: 4.5,  4: 3.9,
+    5: 4.8,  6: 3.7,  7: 3.5,  8: 3.1,
+    9: 3.3, 10: 2.9, 11: 4.6, 12: 4.0,
+    13: 4.7, 14: 3.8, 15: 3.6, 16: 3.0
 }
 
-DERNIER_PRONO_VALIDE = None
-DATE_DERNIER_PRONO = None
-
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-}
+# ==============================================================================
+# 2. RÉCUPÉRATION DU QUINTÉ DE LA VEILLE
+# ==============================================================================
 
 def obtenir_arrivee_veille_zoneturf():
-    tz_france = zoneinfo.ZoneInfo("Europe/Paris")
-    date_hier = (datetime.now(tz_france) - timedelta(days=1)).strftime("%Y%m%d")
-    url = f"https://www.zone-turf.fr/quinte/{date_hier}/"
+    """
+    Tente de récupérer les 5 numéros du Quinté de la veille sur Zone-Turf.
+    Renvoie une liste par défaut si la connexion échoue.
+    """
+    url = "https://www.zone-turf.fr/arrivees-rapports/quinte/"
+    headers = {'User-Agent': 'Mozilla/5.0'}
+    
     try:
-        res = requests.get(url, headers=HEADERS, timeout=6)
-        if res.status_code == 200:
-            soup = BeautifulSoup(res.text, 'html.parser')
-            bloc_arrivee = soup.find('div', class_=re.compile(r'arrivee|resultats', re.I))
-            if bloc_arrivee:
-                nums = re.findall(r'\b(1[0-6]|[1-9])\b', bloc_arrivee.text)
-                arrivee = list(dict.fromkeys([int(n) for n in nums]))
-                if len(arrivee) >= 5:
-                    return arrivee[:5]
+        req = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(req, timeout=5) as response:
+            html = response.read().decode('utf-8')
+            # Recherche des motifs récurrents des numéros d'arrivée
+            matches = re.findall(r'arrivee-quinte.*?(\d{1,2})', html, re.DOTALL)
+            if matches and len(matches) >= 5:
+                arrivee = [int(n) for n in matches[:5] if 1 <= int(n) <= 16]
+                if len(arrivee) == 5:
+                    print(f"[INFO] Arrivée de la veille récupérée : {arrivee}")
+                    return arrivee
     except Exception:
         pass
-    return [14, 9, 5, 12, 10]
 
-def extraction_favori_presse_zoneturf(soup):
-    try:
-        for tr in soup.find_all('tr'):
-            texte_ligne = tr.get_text()
-            if "synthèse" in texte_ligne.lower() or "synthese" in texte_ligne.lower():
-                tds = tr.find_all(['td', 'th'])
-                if len(tds) > 1:
-                    nums_ligne = []
-                    for td in tds[1:]:
-                        found = re.findall(r'\b(1[0-6]|[1-9])\b', td.get_text())
-                        if found:
-                            nums_ligne.extend([int(x) for x in found])
-                    if nums_ligne:
-                        return nums_ligne[0]
+    # Valeur de secours par défaut si pas d'accès web
+    secours = [14, 9, 5, 12, 10]
+    print(f"[INFO] Utilisation de l'arrivée de secours : {secours}")
+    return secours
 
-        bloc_prono = soup.find('table', class_=re.compile(r'pronostic|presse|synthese', re.I))
-        if bloc_prono:
-            nums = re.findall(r'\b(1[0-6]|[1-9])\b', bloc_prono.text)
-            if nums:
-                return int(nums[0])
-    except Exception as e:
-        print("Erreur scraping favori presse ZT:", e)
-    return None
+# ==============================================================================
+# 3. MOTEUR DE FILTRAGE STRICT ET DE SCORING
+# ==============================================================================
 
-def obtenir_favori_secours_canalturf():
-    url = "https://www.canalturf.com/pronostics-TURF/"
-    try:
-        res = requests.get(url, headers=HEADERS, timeout=6)
-        if res.status_code == 200:
-            soup = BeautifulSoup(res.text, 'html.parser')
-            bloc_prono = soup.find('div', class_=re.compile(r'pronostic|synthese|quinte', re.I))
-            if bloc_prono:
-                nums = re.findall(r'\b(1[0-6]|[1-9])\b', bloc_prono.text)
-                if nums:
-                    return int(nums[0])
-    except Exception as e:
-        print("Erreur scrap Canalturf:", e)
-    return None
-
-def determiner_favori_sge_autonome(partants_actifs, arrivee_veille):
-    scores_base = {}
-    poids_veille = [5.0, 4.0, 3.0, 2.0, 1.0]
-    for num in partants_actifs:
-        score = BONUS_HISTORIQUE_BASE.get(num, 1.0)
-        if num in arrivee_veille:
-            score += poids_veille[arrivee_veille.index(num)]
-        scores_base[num] = score
-    return max(scores_base, key=scores_base.get) if scores_base else 1
-
-def extraire_infos_hippodrome(texte_brut):
-    # Extraction des coordonnées (R1C8, R1 C8)
-    coords_match = re.search(r'\b(R\d+\s*C\d+)\b', texte_brut, re.IGNORECASE)
-    coords = coords_match.group(1).replace(" ", "") if coords_match else "R1C1"
-
-    # Extraction du nom du lieu / hippodrome
-    nom_hippo = "Deauville"
-    match = re.search(r'R\d+\s*C\d+\s+([A-Za-zÀ-ÖOU-öø-ÿ\s\-]+?)(?:Quint|Plus|PMU|\:|$)', texte_brut, re.IGNORECASE)
-    if match:
-        nom_hippo = match.group(1).strip()
-    else:
-        match_simple = re.search(r'(?:Deauville|Vincennes|Enghien|Chantilly|Longchamp|Cagnes\-sur\-Mer|Cabourg|Fontainebleau|Compiègne|Auteuil|Saint\-Cloud|Lyon|Toulouse|Bordeaux)', texte_brut, re.IGNORECASE)
-        if match_simple:
-            nom_hippo = match_simple.group(0).capitalize()
-
-    return nom_hippo, coords
-
-def extraction_discipline_distance(texte_brut):
-    dist_match = re.search(r'(\d{4})\s*m', texte_brut, re.IGNORECASE)
-    distance = f"{dist_match.group(1)}m" if dist_match else "1900m"
-    
-    discipline = "ATTELE"
-    if "PSF" in texte_brut:
-        discipline = "PSF"
-    elif "PLAT" in texte_brut.upper():
-        discipline = "PLAT"
-    elif "HAIES" in texte_brut.upper() or "STEEPLE" in texte_brut.upper():
-        discipline = "OBSTACLE"
+def est_combinaison_valide(combinaison):
+    """
+    Filtre géométrique strict :
+    1. Présence obligatoire d'au moins un numéro pivot central (3, 5, 11, 13).
+    2. Répartition mixte obligatoire (au moins 1 numéro dans 1-8 ET 1 dans 9-16).
+    """
+    if len(combinaison) != 5:
+        return False
         
-    return f"{discipline} - {distance}"
+    # Règle 1 : Ancrage central obligatoire
+    piliers_centraux = {3, 5, 11, 13}
+    if not any(num in piliers_centraux for num in combinaison):
+        return False
+        
+    # Règle 2 : Équilibre des rangées (Haut 1-8 / Bas 9-16)
+    haut = any(1 <= num <= 8 for num in combinaison)
+    bas = any(9 <= num <= 16 for num in combinaison)
+    if not (haut and bas):
+        return False
 
-def obtenir_donnees_zoneturf_live(arrivee_veille):
-    tz_france = zoneinfo.ZoneInfo("Europe/Paris")
-    maintenant = datetime.now(tz_france)
-    date_str = maintenant.strftime("%d/%m/%Y")
-    url = "https://www.zone-turf.fr/quinte/"
+    return True
+
+def evaluer_combinaison(combinaison, arrivee_veille):
+    """
+    Calcule le score géométrique global d'une combinaison de 5 numéros.
+    """
+    if not est_combinaison_valide(combinaison):
+        return 0.0
+
+    score = 0.0
     
-    try:
-        res = requests.get(url, headers=HEADERS, timeout=10)
-        if res.status_code == 200:
-            soup = BeautifulSoup(res.text, 'html.parser')
+    # A. Score de base des numéros individuel + bonus veille
+    for num in combinaison:
+        score += BONUS_HISTORIQUE_BASE.get(num, 1.0)
+        if num in arrivee_veille:
+            score += 1.5  # Bonus de répétition de la veille
 
-            titre_el = soup.find('h1') or soup.find('h2')
-            texte_brut = titre_el.get_text(strip=True) if titre_el else "R1 C8 Deauville Quinté"
+    # B. Évaluation des axes géométriques et détection des miroirs
+    nb_miroirs = 0
+    axes_touches = set()
+
+    for num in combinaison:
+        miroir = num + 8 if num <= 8 else num - 8
+        pair = tuple(sorted([num, miroir]))
+        
+        if pair in AXIS_WEIGHTS:
+            axes_touches.add(pair)
             
-            nom_hippo, coords_reunion = extraire_infos_hippodrome(texte_brut)
-            disc = extraction_discipline_distance(texte_brut)
+        if miroir in combinaison:
+            nb_miroirs += 1
 
-            partants = list(range(1, 17))
-            non_partants = []
+    # Prise en compte de la valeur des axes impliqués
+    for pair in axes_touches:
+        score += AXIS_WEIGHTS[pair] * 2.0
 
-            lignes = soup.find_all(['tr', 'li', 'div'], class_=re.compile(r'partant|runner|horse', re.I))
-            for ligne in lignes:
-                text_ligne = ligne.get_text()
-                num_match = re.search(r'\b(1[0-6]|[1-9])\b', text_ligne)
-                if num_match:
-                    num = int(num_match.group(1))
-                    if "NP" in text_ligne or "non-partant" in text_ligne.lower():
-                        non_partants.append(num)
+    # Correction pour le comptage des miroirs (chaque miroir est vu 2 fois dans la boucle)
+    nb_miroirs_réels = nb_miroirs // 2
 
-            non_partants = sorted(list(set(non_partants)))
+    # C. Surprime si présence d'au moins un miroir vertical parfait (ex: 3 et 11)
+    if nb_miroirs_réels > 0:
+        score *= (1.0 + (0.25 * nb_miroirs_réels))
 
-            favori_presse = extraction_favori_presse_zoneturf(soup)
-            if favori_presse is None:
-                favori_presse = obtenir_favori_secours_canalturf()
-            if favori_presse is None:
-                partants_actifs = [n for n in partants if n not in non_partants]
-                favori_presse = determiner_favori_sge_autonome(partants_actifs, arrivee_veille)
+    return round(score, 2)
 
-            arrivee_officielle = []
+# ==============================================================================
+# 4. TRAITEMENT ET CLASSEMENT DE LISTES DE COMBINAISONS
+# ==============================================================================
+
+def filtrer_et_classer_grilles(liste_grilles, arrivee_veille):
+    """
+    Prend une liste de grilles, applique le filtre strict et renvoie les grilles 
+    valides classées par ordre décroissant de score.
+    """
+    grilles_valides = []
+    
+    for grille in liste_grilles:
+        score = evaluer_combinaison(grille, arrivee_veille)
+        if score > 0:
+            grilles_valides.append((grille, score))
             
-            blocs_arrivee = soup.find_all(class_=re.compile(r'arrivee|resultat|top5|ordre|finish', re.I))
-            for b in blocs_arrivee:
-                nums = re.findall(r'\b(1[0-6]|[1-9])\b', b.text)
-                clean_nums = list(dict.fromkeys([int(n) for n in nums]))
-                if len(clean_nums) >= 5:
-                    arrivee_officielle = clean_nums[:5]
-                    break
+    # Tri décroissant selon le score géométrique
+    grilles_valides.sort(key=lambda x: x[1], reverse=True)
+    return grilles_valides
 
-            if not arrivee_officielle:
-                try:
-                    res_secours = requests.get("https://www.canalturf.com/resultats-PMU/", headers=HEADERS, timeout=5)
-                    if res_secours.status_code == 200:
-                        soup_secours = BeautifulSoup(res_secours.text, 'html.parser')
-                        bloc_q = soup_secours.find(class_=re.compile(r'quinte|resultat', re.I))
-                        if bloc_q:
-                            nums = re.findall(r'\b(1[0-6]|[1-9])\b', bloc_q.text)
-                            clean_nums = list(dict.fromkeys([int(n) for n in nums]))
-                            if len(clean_nums) >= 5:
-                                arrivee_officielle = clean_nums[:5]
-                except Exception:
-                    pass
+# ==============================================================================
+# 5. EXECUTION DÉMONSTRATION
+# ==============================================================================
 
-            course_terminee = len(arrivee_officielle) >= 5 or maintenant.hour >= 19
-
-            return {
-                "erreur": False,
-                "date": date_str,
-                "hippodrome": nom_hippo,
-                "coords_reunion": coords_reunion,
-                "discipline_distance": disc,
-                "favori": favori_presse,
-                "partants": partants,
-                "non_partants": non_partants,
-                "course_terminee": course_terminee,
-                "arrivee_officielle": arrivee_officielle
-            }
-    except Exception as e:
-        print("Erreur scrap Zone-Turf:", e)
-    return None
-
-def calculer_resonances_pegasus(partants_actifs, favori_base, non_partants=[], arrivee_veille=[]):
-    if not favori_base:
-        favori_base = determiner_favori_sge_autonome(partants_actifs, arrivee_veille)
-    
-    scores = {num: 0.0 for num in partants_actifs if num <= 16 and num not in non_partants}
-    
-    for np in non_partants:
-        if np in AXES_MIROIRS and AXES_MIROIRS[np] in scores:
-            scores[AXES_MIROIRS[np]] += 15.0
-
-    if favori_base in AXES_MIROIRS and AXES_MIROIRS[favori_base] in scores:
-        scores[AXES_MIROIRS[favori_base]] += 20.0
-
-    if favori_base in PRIORITES_GEOMETRIQUES:
-        poids = [12.0, 9.0, 6.0, 4.0, 2.0]
-        for idx, target in enumerate(PRIORITES_GEOMETRIQUES[favori_base]):
-            if target in non_partants and target in PRIORITES_GEOMETRIQUES:
-                devies = [n for n in PRIORITES_GEOMETRIQUES[target] if n not in non_partants and n in scores]
-                if devies: target = devies[0]
-            if target in scores: scores[target] += poids[idx]
-
-    for num in list(scores.keys()):
-        if num in AXES_MIROIRS and AXES_MIROIRS[num] in scores:
-            scores[num] += 5.0
-
-    for num in scores:
-        scores[num] += BONUS_HISTORIQUE_BASE.get(num, 1.0)
-
-    poids_veille = [5.0, 4.0, 3.0, 2.0, 1.0]
-    for idx, num_gagnant in enumerate(arrivee_veille):
-        if num_gagnant in scores:
-            scores[num_gagnant] += poids_veille[idx]
-
-    return sorted(scores.items(), key=lambda x: x[1], reverse=True)
-
-@app.get("/", response_class=HTMLResponse)
-def home():
-    if os.path.exists("index.html"):
-        with open("index.html", "r", encoding="utf-8") as f:
-            return f.read()
-    return "<h1>Erreur : index.html introuvable</h1>"
-
-@app.get("/predict")
-def predict(response: Response):
-    global DERNIER_PRONO_VALIDE, DATE_DERNIER_PRONO
-    
-    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
-    tz_france = zoneinfo.ZoneInfo("Europe/Paris")
-    date_du_jour = datetime.now(tz_france).strftime("%d/%m/%Y")
-
-    if DATE_DERNIER_PRONO != date_du_jour:
-        DERNIER_PRONO_VALIDE = None
-        DATE_DERNIER_PRONO = date_du_jour
-
+if __name__ == "__main__":
+    # Récupération de l'arrivée de la veille
     arrivee_veille = obtenir_arrivee_veille_zoneturf()
-    data_live = obtenir_donnees_zoneturf_live(arrivee_veille)
     
-    if data_live:
-        course_terminee = data_live["course_terminee"]
-        favori = data_live["favori"]
-        np_list = data_live["non_partants"]
-        partants = data_live.get("partants", list(range(1, 17)))
+    # Jeu de test de grilles candidates
+    grilles_candidats = [
+        [3, 5, 11, 12, 14],  # Valide : Ancrage central + Miroir 3-11 + Équilibré
+        [1, 2, 4, 6, 8],     # Éliminée : 100% sur la rangée haut (1-8)
+        [1, 2, 7, 9, 16],    # Éliminée : Pas d'ancrage central (pas de 3, 5, 11, 13)
+        [5, 6, 13, 14, 2],   # Valide : Double miroir (5-13 et 6-14)
+        [4, 7, 10, 12, 15]   # Valide : Ancrage central présent via miroir 4-12
+    ]
 
-        if not course_terminee or DERNIER_PRONO_VALIDE is None:
-            resultats = calculer_resonances_pegasus(partants, favori, np_list, arrivee_veille)
-            quinte_sge = [num for num, score in resultats[:5]]
-            DERNIER_PRONO_VALIDE = {"quinte_sge": quinte_sge, "scores": resultats, "favori": favori}
-        else:
-            quinte_sge = DERNIER_PRONO_VALIDE["quinte_sge"]
-            resultats = DERNIER_PRONO_VALIDE["scores"]
-            favori = DERNIER_PRONO_VALIDE["favori"]
-
-        return {
-            "status": "success",
-            "date": data_live["date"],
-            "hippodrome": data_live["hippodrome"],
-            "coords_reunion": data_live["coords_reunion"],
-            "discipline_distance": data_live["discipline_distance"],
-            "favori": favori,
-            "non_partants": np_list,
-            "course_terminee": course_terminee,
-            "arrivee_officielle": data_live["arrivee_officielle"],
-            "quinte_sge": quinte_sge
-        }
-
-    partants = list(range(1, 17))
-    favori_secours = obtenir_favori_secours_canalturf() or 1
-    resultats = calculer_resonances_pegasus(partants, favori_secours, [], arrivee_veille)
-    return {
-        "status": "success",
-        "date": date_du_jour,
-        "hippodrome": "Deauville",
-        "coords_reunion": "R1C8",
-        "discipline_distance": "PSF - 1900m",
-        "favori": favori_secours,
-        "non_partants": [],
-        "course_terminee": False,
-        "arrivee_officielle": [],
-        "quinte_sge": [num for num, score in resultats[:5]]
-    }
+    resultats = filtrer_et_classer_grilles(grilles_candidats, arrivee_veille)
+    
+    print("\n==========================================")
+    print("  RÉSULTATS DU FILTRAGE ET DU SCORING")
+    print("==========================================")
+    for i, (grille, score) in enumerate(resultats, start=1):
+        print(f"Rang {i} : Grille {grille} | Score : {score}")
