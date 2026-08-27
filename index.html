@@ -1,273 +1,96 @@
-
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Système de Géométrie Électronique (SGE)</title>
-  <style>
-    :root {
-      --bg-color: #0f172a;
-      --card-bg: #1e293b;
-      --accent-color: #3b82f6;
-      --text-color: #f8fafc;
-      --text-muted: #94a3b8;
-      --border-color: #334155;
-      --status-green: #10b981;
-      --status-red: #ef4444;
-      --orange-ball: #f97316;
-    }
-
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background-color: var(--bg-color);
-      color: var(--text-color);
-      margin: 0;
-      padding: 20px;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
-    }
-
-    .container {
-      width: 100%;
-      max-width: 580px;
-      background-color: var(--card-bg);
-      border-radius: 16px;
-      padding: 24px;
-      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
-    }
-
-    /* Tableau des informations de la course */
-    .info-table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-bottom: 20px;
-      border-radius: 8px;
-      overflow: hidden;
-      border: 1px solid var(--border-color);
-      font-size: 0.9rem;
-    }
-
-    .info-table th, .info-table td {
-      padding: 10px 14px;
-      text-align: left;
-      border-bottom: 1px solid var(--border-color);
-    }
-
-    .info-table tr:last-child th, 
-    .info-table tr:last-child td {
-      border-bottom: none;
-    }
-
-    .info-table th {
-      background-color: rgba(255, 255, 255, 0.04);
-      color: var(--text-muted);
-      font-weight: 500;
-      width: 38%;
-    }
-
-    .info-table td {
-      color: var(--text-color);
-      font-weight: 600;
-    }
-
-    .badge-reunion {
-      background-color: #334155;
-      color: #38bdf8;
-      padding: 2px 6px;
-      border-radius: 4px;
-      font-weight: bold;
-      font-size: 0.85rem;
-      margin-left: 6px;
-    }
-
-    .status-badge {
-      display: block;
-      width: 100%;
-      text-align: center;
-      padding: 10px 0;
-      border-radius: 8px;
-      font-size: 0.85rem;
-      font-weight: bold;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      margin-bottom: 15px;
-      box-sizing: border-box;
-    }
-
-    .status-green {
-      background-color: rgba(16, 185, 129, 0.15);
-      border: 1px solid var(--status-green);
-      color: var(--status-green);
-    }
-
-    .status-red {
-      background-color: rgba(239, 68, 68, 0.15);
-      border: 1px solid var(--status-red);
-      color: var(--status-red);
-    }
-
-    .btn-actualiser {
-      width: 100%;
-      padding: 12px;
-      margin-bottom: 20px;
-      background-color: #10b981;
-      color: white;
-      border: none;
-      border-radius: 8px;
-      font-weight: bold;
-      font-size: 1rem;
-      cursor: pointer;
-      transition: background-color 0.2s;
-    }
-
-    .btn-actualiser:hover {
-      background-color: #059669;
-    }
-
-    .prono-section {
-      text-align: center;
-      margin-top: 15px;
-    }
-
-    .prono-title {
-      font-size: 0.85rem;
-      color: var(--text-muted);
-      letter-spacing: 1.5px;
-      margin-bottom: 15px;
-      font-weight: 600;
-    }
-
-    .chevaux-grid {
-      display: flex;
-      justify-content: center;
-      gap: 10px;
-      margin-bottom: 20px;
-    }
-
-    .cheval-ball {
-      width: 45px;
-      height: 45px;
-      background-color: var(--accent-color);
-      color: white;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: bold;
-      font-size: 1.2rem;
-      box-shadow: 0 4px 10px rgba(59, 130, 246, 0.4);
-    }
-
-    .cheval-ball-orange {
-      background-color: var(--orange-ball);
-      box-shadow: 0 4px 10px rgba(249, 115, 22, 0.4);
-    }
-  </style>
+    <meta charset="UTF-8">
+    <title>Analyseur Géométrique Quinté</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #121212; color: #fff; padding: 20px; text-align: center; }
+        h1 { color: #f39c12; }
+        .grid-container { display: grid; grid-template-columns: repeat(8, 50px); gap: 10px; justify-content: center; margin: 20px auto; }
+        .cell { width: 50px; height: 50px; background: #222; border: 2px solid #444; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: bold; cursor: pointer; user-select: none; }
+        .cell.selected { background: #e67e22; border-color: #f39c12; color: #fff; }
+        .cell.central-pillar { border-color: #3498db; }
+        .controls { margin: 20px 0; }
+        button { background: #27ae60; color: white; border: none; padding: 10px 20px; font-size: 16px; border-radius: 5px; cursor: pointer; }
+        button:hover { background: #2ec771; }
+        #result { margin-top: 20px; font-size: 18px; font-weight: bold; }
+        .status-valide { color: #2ecc71; }
+        .status-invalide { color: #e74c3c; }
+    </style>
 </head>
 <body>
 
-<div class="container">
+    <h1>Analyseur Géométrique Quinté (1–16)</h1>
+    <p>Sélectionne 5 numéros pour analyser l'ancrage et la géométrie via l'API Vercel.</p>
 
-  <!-- Tableau récapitulatif des informations de la course -->
-  <table class="info-table">
-    <tr>
-      <th>Date du jour</th>
-      <td id="date-course">--/--/----</td>
-    </tr>
-    <tr>
-      <th>Hippodrome</th>
-      <td id="hippodrome-course">-- <span id="reunion-badge" class="badge-reunion">(--)</span></td>
-    </tr>
-    <tr>
-      <th>Discipline & Distance</th>
-      <td id="disc-course">--</td>
-    </tr>
-    <tr>
-      <th>Favori de la presse</th>
-      <td id="favori-course">N° --</td>
-    </tr>
-    <tr>
-      <th>Non-partant(s)</th>
-      <td id="np-course">--</td>
-    </tr>
-  </table>
+    <div class="grid-container" id="grid"></div>
 
-  <!-- Bandeau vert/rouge de statut -->
-  <div id="status-badge" class="status-badge status-green">COURSE NON DÉBUTÉE</div>
+    <div class="controls">
+        <button onclick="reinitialiser()">Réinitialiser</button>
+    </div>
 
-  <!-- Bouton d'action -->
-  <button id="btn-action" class="btn-actualiser" onclick="chargerPronostic()">Actualiser le Pronostic</button>
-
-  <!-- Zone d'affichage du pronostic et de l'arrivée -->
-  <div id="zone-affichage"></div>
-
-</div>
+    <div id="result">Sélectionne 5 numéros</div>
 
 <script>
-  function chargerPronostic() {
-    const zoneAffichage = document.getElementById('zone-affichage');
-    const badgeStatus = document.getElementById('status-badge');
-    const btnAction = document.getElementById('btn-action');
+    const API_URL = "https://pegasus-backend-zku1.vercel.app/evaluate";
+    let selection = [];
 
-    const urlApi = window.location.origin + '/predict?t=' + new Date().getTime();
+    const gridEl = document.getElementById('grid');
+    for (let i = 1; i <= 16; i++) {
+        const cell = document.createElement('div');
+        cell.classList.add('cell');
+        if ([3, 5, 11, 13].includes(i)) cell.classList.add('central-pillar');
+        cell.innerText = i;
+        cell.onclick = () => basculerNumero(i, cell);
+        gridEl.appendChild(cell);
+    }
 
-    fetch(urlApi, { cache: 'no-store' })
-      .then(res => res.json())
-      .then(data => {
-        document.getElementById('date-course').textContent = data.date || '--/--/----';
-        document.getElementById('hippodrome-course').childNodes[0].nodeValue = (data.hippodrome || '--') + ' ';
-        document.getElementById('reunion-badge').textContent = data.coords_reunion ? `(${data.coords_reunion})` : '(--)';
-        document.getElementById('disc-course').textContent = data.discipline_distance || '--';
-        document.getElementById('favori-course').textContent = `N° ${data.favori || '--'}`;
-        
-        let nonPartantsText = data.non_partants && data.non_partants.length > 0 ? data.non_partants.join(', ') : 'Aucun';
-        document.getElementById('np-course').textContent = nonPartantsText;
-
-        const aUneArrivee = data.arrivee_officielle && data.arrivee_officielle.length > 0;
-        const estTerminee = data.course_terminee || aUneArrivee;
-
-        if (estTerminee) {
-          badgeStatus.textContent = "COURSE TERMINÉE";
-          badgeStatus.className = "status-badge status-red";
-          btnAction.textContent = "Actualiser l'Arrivée";
+    function basculerNumero(num, cell) {
+        if (selection.includes(num)) {
+            selection = selection.filter(n => n !== num);
+            cell.classList.remove('selected');
         } else {
-          badgeStatus.textContent = "COURSE NON DÉBUTÉE";
-          badgeStatus.className = "status-badge status-green";
-          btnAction.textContent = "Actualiser le Pronostic";
+            if (selection.length < 5) {
+                selection.push(num);
+                cell.classList.add('selected');
+            }
+        }
+        analyserGrille();
+    }
+
+    function reinitialiser() {
+        selection = [];
+        document.querySelectorAll('.cell').forEach(c => c.classList.remove('selected'));
+        document.getElementById('result').innerHTML = "Sélectionne 5 numéros";
+    }
+
+    async function analyserGrille() {
+        const resultEl = document.getElementById('result');
+        if (selection.length !== 5) {
+            resultEl.innerHTML = `Sélection : ${selection.length}/5 numéros`;
+            return;
         }
 
-        let htmlProno = data.quinte_sge.map(num => `<div class="cheval-ball">${num}</div>`).join('');
+        resultEl.innerHTML = "Calcul en cours via Vercel...";
 
-        let htmlArrivee = '';
-        if (aUneArrivee) {
-          let ballsArrivee = data.arrivee_officielle.map(num => `<div class="cheval-ball cheval-ball-orange">${num}</div>`).join('');
-          htmlArrivee = `
-            <div class="prono-section" style="margin-top: 25px;">
-              <div class="prono-title" style="color: var(--orange-ball);">ARRIVÉE OFFICIELLE DU QUINTÉ</div>
-              <div class="chevaux-grid">${ballsArrivee}</div>
-            </div>
-          `;
+        try {
+            const response = await fetch(API_URL, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ numbers: selection })
+            });
+
+            const data = await response.json();
+
+            if (!data.is_valid) {
+                resultEl.innerHTML = `<span class="status-invalide">ÉLIMINÉE : Absence d'ancrage central (3, 5, 11, 13) ou déséquilibre 1-8 / 9-16</span>`;
+            } else {
+                resultEl.innerHTML = `<span class="status-valide">GRILLE VALIDE</span><br>Score Géométrique : <strong>${data.score}</strong>`;
+            }
+        } catch (err) {
+            resultEl.innerHTML = `<span class="status-invalide">Erreur de connexion avec l'API Vercel</span>`;
         }
-
-        zoneAffichage.innerHTML = `
-          <div class="prono-section">
-            <div class="prono-title">PRONOSTIC DE RÉSONANCE SGE</div>
-            <div class="chevaux-grid">${htmlProno}</div>
-          </div>
-          ${htmlArrivee}
-        `;
-      })
-      .catch(err => {
-        console.error(err);
-        document.getElementById('date-course').textContent = "Erreur de chargement";
-      });
-  }
-
-  window.onload = chargerPronostic;
+    }
 </script>
-
 </body>
 </html>
