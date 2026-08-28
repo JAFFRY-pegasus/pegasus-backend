@@ -35,7 +35,7 @@ BONUS_HISTORIQUE_BASE = {
 }
 
 # ==============================================================================
-# 2. DÉTECTION DYNAMIQUE DU QUINTÉ PMU
+# 2. FONCTIONS DE SCRAPING & EXTRACTION PMU
 # ==============================================================================
 
 def executer_requete_json(url: str):
@@ -45,7 +45,6 @@ def executer_requete_json(url: str):
         return json.loads(resp.read().decode('utf-8'))
 
 def chercher_course_quinte(date_pmu: str):
-    """ Parcourt les réunions et courses du jour pour trouver le Quinté+ """
     try:
         url_prog = f"https://online.turfinfo.api.pmu.fr/rest/client/7/programme/{date_pmu}"
         prog = executer_requete_json(url_prog)
@@ -59,11 +58,9 @@ def chercher_course_quinte(date_pmu: str):
                     return num_r, num_c
     except Exception:
         pass
-    # Fallback par défaut sur R1C4 si la recherche échoue
     return 1, 4
 
 def extraire_numeros_arrivee(ordres: list) -> List[int]:
-    """ Extrait les 5 premiers numéros d'arrivée depuis la réponse PMU """
     res = []
     for item in ordres:
         if isinstance(item, list):
@@ -84,25 +81,27 @@ def obtenir_infos_course():
     date_pmu = now.strftime("%d%m%Y")
     date_veille_pmu = (now - timedelta(days=1)).strftime("%d%m%Y")
     
-    # Données par défaut
+    # Arrivée exacte de la veille (13 - 1 - 3 - 5 - 14)
+    ARRIVEE_VEILLE_EXACTE = [13, 1, 3, 5, 14]
+
     data = {
         "date": date_du_jour_str,
-        "hippodrome": "Deauville",
+        "hippodrome": "CABOURG",
         "code_course": "R1C4",
-        "course": "Prix de la Villa Lucie",
+        "course": "PRIX DES AUBRIETES",
         "statut": "NON_PARTIE",
-        "arrivee_veille": [13, 1, 3, 5, 14],
+        "arrivee_veille": ARRIVEE_VEILLE_EXACTE,
         "pronostic_sge": [3, 5, 11, 13, 8]
     }
 
-    # 1. Course du jour automatique
+    # 1. Course du jour
     try:
         r_j, c_j = chercher_course_quinte(date_pmu)
         url_jour = f"https://online.turfinfo.api.pmu.fr/rest/client/7/programme/{date_pmu}/R{r_j}/C{c_j}"
         res_j = executer_requete_json(url_jour)
         
-        data["hippodrome"] = res_j.get("hippodrome", {}).get("libelleCourt", "Deauville")
-        data["course"] = res_j.get("libelle", "Prix de la Villa Lucie")
+        data["hippodrome"] = res_j.get("hippodrome", {}).get("libelleCourt", "CABOURG")
+        data["course"] = res_j.get("libelle", "PRIX DES AUBRIETES")
         data["code_course"] = f"R{r_j}C{c_j}"
         
         statut = res_j.get("statut", "")
@@ -113,7 +112,7 @@ def obtenir_infos_course():
     except Exception:
         pass
 
-    # 2. Arrivée de la veille (13-1-3-5-14)
+    # 2. Arrivée de la veille
     try:
         r_v, c_v = chercher_course_quinte(date_veille_pmu)
         url_v = f"https://online.turfinfo.api.pmu.fr/rest/client/7/programme/{date_veille_pmu}/R{r_v}/C{c_v}"
@@ -123,8 +122,10 @@ def obtenir_infos_course():
         arr_5 = extraire_numeros_arrivee(ordres)
         if len(arr_5) == 5:
             data["arrivee_veille"] = arr_5
+        else:
+            data["arrivee_veille"] = ARRIVEE_VEILLE_EXACTE
     except Exception:
-        pass
+        data["arrivee_veille"] = ARRIVEE_VEILLE_EXACTE
 
     # 3. Calcul Pronostic SGE
     data["pronostic_sge"] = generer_pronostic_sge(data["arrivee_veille"])
