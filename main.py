@@ -1,4 +1,3 @@
-
 import os
 import urllib.request
 import json
@@ -38,19 +37,36 @@ def executer_requete_json(url: str):
         return json.loads(resp.read().decode('utf-8'))
 
 def trouver_quinte_du_jour(date_pmu: str):
-    """ Cherche automatiquement la réunion/course exacte qui supporte le Quinté+ """
-    url_prog = f"https://online.turfinfo.api.pmu.fr/rest/client/7/programme/{date_pmu}"
-    prog = executer_requete_json(url_prog)
-    
-    for reunion in prog.get("programme", {}).get("reunions", []):
-        num_r = reunion.get("numOfficiel", 1)
-        for course in reunion.get("courses", []):
-            num_c = course.get("numOrdre", 1)
-            # Vérification si la course supporte le Quinté+
-            paris = [p.get("family") for p in course.get("offresParis", [])]
-            if "QUINTO" in paris or course.get("quintePlus", False):
-                return num_r, num_c
-    return 1, 1  # Par défaut R1C1 si non trouvé
+    try:
+        url_prog = f"https://online.turfinfo.api.pmu.fr/rest/client/7/programme/{date_pmu}"
+        prog = executer_requete_json(url_prog)
+        
+        for reunion in prog.get("programme", {}).get("reunions", []):
+            num_r = reunion.get("numOfficiel", 1)
+            for course in reunion.get("courses", []):
+                num_c = course.get("numOrdre", 1)
+                paris = [p.get("family") for p in course.get("offresParis", [])]
+                if "QUINTO" in paris or course.get("quintePlus", False):
+                    return num_r, num_c
+    except Exception:
+        pass
+    return 1, 1
+
+def extraire_numeros_arrivee(ordres: list) -> List[int]:
+    """ Extrait proprement les 5 premiers numéros d'arrivée depuis le JSON PMU """
+    res = []
+    for item in ordres:
+        if isinstance(item, list):
+            for sub in item:
+                if isinstance(sub, dict) and "numProno" in sub:
+                    res.append(int(sub["numProno"]))
+                elif isinstance(sub, int):
+                    res.append(sub)
+        elif isinstance(item, dict) and "numProno" in item:
+            res.append(int(item["numProno"]))
+        elif isinstance(item, int):
+            res.append(item)
+    return res[:5]
 
 def obtenir_infos_course():
     now = datetime.now()
@@ -68,7 +84,7 @@ def obtenir_infos_course():
         "pronostic_sge": [3, 5, 11, 13, 8]
     }
 
-    # 1. Quinté du jour dynamique
+    # 1. Quinté du jour
     try:
         r_jour, c_jour = trouver_quinte_du_jour(date_pmu)
         url_quinte_jour = f"https://online.turfinfo.api.pmu.fr/rest/client/7/programme/{date_pmu}/R{r_jour}/C{c_jour}"
@@ -86,24 +102,20 @@ def obtenir_infos_course():
     except Exception:
         pass
 
-    # 2. Arrivée Quinté de la veille (capturée directement depuis les rapports PMU)
+    # 2. Arrivée de la veille
     try:
         r_v, c_v = trouver_quinte_du_jour(date_veille_pmu)
         url_quinte_veille = f"https://online.turfinfo.api.pmu.fr/rest/client/7/programme/{date_veille_pmu}/R{r_v}/C{c_v}"
         res_v = executer_requete_json(url_quinte_veille)
         
         ordres = res_v.get("ordreArrivee", [])
-        if ordres and len(ordres) >= 5:
-            arr_5 = [o[0] for o in ordres[:5] if isinstance(o, list) and len(o) > 0]
-            if len(arr_5) == 5:
-                data["arrivee_veille"] = arr_5
-        else:
-            # Fallback direct sur l'arrivée constatée (13-1-3-5-14)
-            data["arrivee_veille"] = [13, 1, 3, 5, 14]
+        arr_5 = extraire_numeros_arrivee(ordres)
+        if len(arr_5) == 5:
+            data["arrivee_veille"] = arr_5
     except Exception:
-        data["arrivee_veille"] = [13, 1, 3, 5, 14]
+        pass
 
-    # 3. Calcul Pronostic SGE
+    # 3. Pronostic SGE
     data["pronostic_sge"] = generer_pronostic_sge(data["arrivee_veille"])
 
     return data
