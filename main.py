@@ -35,7 +35,7 @@ BONUS_HISTORIQUE_BASE = {
 }
 
 # ==============================================================================
-# 2. FONCTIONS DE SCRAPING & EXTRACTION PMU
+# 2. LOGIQUE API & SCRAPING AUTOMATIQUE
 # ==============================================================================
 
 def executer_requete_json(url: str):
@@ -45,6 +45,7 @@ def executer_requete_json(url: str):
         return json.loads(resp.read().decode('utf-8'))
 
 def chercher_course_quinte(date_pmu: str):
+    """ Parcourt le programme PMU pour détecter automatiquement l'épreuve Quinté+ """
     try:
         url_prog = f"https://online.turfinfo.api.pmu.fr/rest/client/7/programme/{date_pmu}"
         prog = executer_requete_json(url_prog)
@@ -60,20 +61,38 @@ def chercher_course_quinte(date_pmu: str):
         pass
     return 1, 4
 
-def extraire_numeros_arrivee(ordres: list) -> List[int]:
-    res = []
-    for item in ordres:
-        if isinstance(item, list):
-            for sub in item:
-                if isinstance(sub, dict) and "numProno" in sub:
-                    res.append(int(sub["numProno"]))
-                elif isinstance(sub, int):
-                    res.append(sub)
-        elif isinstance(item, dict) and "numProno" in item:
-            res.append(int(item["numProno"]))
-        elif isinstance(item, int):
-            res.append(item)
-    return res[:5]
+def extraire_numeros_recursif(data) -> List[int]:
+    """ Extrait dynamiquement tous les numéros de chevaux peu importe la structure JSON """
+    nums = []
+    if isinstance(data, dict):
+        if "numProno" in data:
+            nums.append(int(data["numProno"]))
+        elif "numCheval" in data:
+            nums.append(int(data["numCheval"]))
+        else:
+            for v in data.values():
+                nums.extend(extraire_numeros_recursif(v))
+    elif isinstance(data, list):
+        for elem in data:
+            nums.extend(extraire_numeros_recursif(elem))
+    elif isinstance(data, int):
+        nums.append(data)
+    elif isinstance(data, str) and data.isdigit():
+        nums.append(int(data))
+    return nums
+
+def extraire_arrivee_quinte(res_json: dict) -> List[int]:
+    """ Extrait les 5 premiers numéros d'arrivée à partir des clés 'ordreArrivee' ou 'arrivee' """
+    raw = res_json.get("ordreArrivee", []) or res_json.get("arrivee", [])
+    extracted = extraire_numeros_recursif(raw)
+    
+    # Conservation de l'ordre sans doublons
+    resultat = []
+    for num in extracted:
+        if num not in resultat and 1 <= num <= 16:
+            resultat.append(num)
+            
+    return resultat[:5]
 
 def obtenir_infos_course():
     now = datetime.now()
@@ -81,8 +100,7 @@ def obtenir_infos_course():
     date_pmu = now.strftime("%d%m%Y")
     date_veille_pmu = (now - timedelta(days=1)).strftime("%d%m%Y")
     
-    # Arrivée exacte de la veille (13 - 1 - 3 - 5 - 14)
-    ARRIVEE_VEILLE_EXACTE = [13, 1, 3, 5, 14]
+    ARRIVEE_PAR_DEFAUT = [13, 1, 3, 5, 14]
 
     data = {
         "date": date_du_jour_str,
@@ -90,11 +108,11 @@ def obtenir_infos_course():
         "code_course": "R1C4",
         "course": "PRIX DES AUBRIETES",
         "statut": "NON_PARTIE",
-        "arrivee_veille": ARRIVEE_VEILLE_EXACTE,
-        "pronostic_sge": [3, 5, 11, 13, 8]
+        "arrivee_veille": ARRIVEE_PAR_DEFAUT,
+        "pronostic_sge": []
     }
 
-    # 1. Course du jour
+    # 1. Quinté du jour automatique
     try:
         r_j, c_j = chercher_course_quinte(date_pmu)
         url_jour = f"https://online.turfinfo.api.pmu.fr/rest/client/7/programme/{date_pmu}/R{r_j}/C{c_j}"
@@ -112,22 +130,21 @@ def obtenir_infos_course():
     except Exception:
         pass
 
-    # 2. Arrivée de la veille
+    # 2. Arrivée de la veille récupérée automatiquement
     try:
         r_v, c_v = chercher_course_quinte(date_veille_pmu)
         url_v = f"https://online.turfinfo.api.pmu.fr/rest/client/7/programme/{date_veille_pmu}/R{r_v}/C{c_v}"
         res_v = executer_requete_json(url_v)
         
-        ordres = res_v.get("ordreArrivee", [])
-        arr_5 = extraire_numeros_arrivee(ordres)
+        arr_5 = extraire_arrivee_quinte(res_v)
         if len(arr_5) == 5:
             data["arrivee_veille"] = arr_5
         else:
-            data["arrivee_veille"] = ARRIVEE_VEILLE_EXACTE
+            data["arrivee_veille"] = ARRIVEE_PAR_DEFAUT
     except Exception:
-        data["arrivee_veille"] = ARRIVEE_VEILLE_EXACTE
+        data["arrivee_veille"] = ARRIVEE_PAR_DEFAUT
 
-    # 3. Calcul Pronostic SGE
+    # 3. Calcul du Pronostic SGE
     data["pronostic_sge"] = generer_pronostic_sge(data["arrivee_veille"])
 
     return data
