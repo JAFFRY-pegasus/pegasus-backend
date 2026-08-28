@@ -3,29 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pegasus Quinté — Pronostics et Analyse Géométrique</title>
+    <title>PEGASUS QUINTÉ</title>
     <style>
-        :root {
-            --bg-color: #121212;
-            --card-bg: #1e1e1e;
-            --accent-gold: #f39c12;
-            --accent-blue: #3498db;
-            --accent-green: #2ecc71;
-            --accent-red: #e74c3c;
-            --text-main: #ffffff;
-            --text-sub: #b0b0b0;
-            --border-color: #333333;
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-main);
-            margin: 0;
-            padding: 20px;
+            background-color: #121212;
+            color: #e0e0e0;
             display: flex;
-            flex-direction: column;
-            align-items: center;
+            justify-content: center;
+            padding: 20px;
         }
 
         .container {
@@ -33,339 +25,309 @@
             max-width: 650px;
         }
 
-        header {
-            text-align: center;
-            margin-bottom: 25px;
-        }
-
         h1 {
-            color: var(--accent-gold);
-            margin: 0 0 8px 0;
-            font-size: 26px;
-            letter-spacing: 0.5px;
+            color: #ff9800;
+            text-align: center;
+            font-size: 24px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 4px;
         }
 
         .subtitle {
-            color: var(--text-sub);
-            font-size: 14px;
-            margin: 0;
+            text-align: center;
+            color: #888;
+            font-size: 13px;
+            margin-bottom: 20px;
         }
 
         .card {
-            background: var(--card-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 10px;
-            padding: 18px 22px;
-            margin-bottom: 25px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            background-color: #1e1e1e;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 18px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
         }
 
         .card-title {
-            color: var(--accent-gold);
-            font-size: 16px;
+            color: #ff9800;
+            font-size: 14px;
             font-weight: bold;
             text-transform: uppercase;
-            letter-spacing: 1px;
+            letter-spacing: 0.5px;
             margin-bottom: 12px;
-            border-bottom: 1px solid var(--border-color);
+            border-bottom: 1px solid #333;
             padding-bottom: 6px;
         }
 
         .info-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 10px;
-            font-size: 14px;
-        }
-
-        .info-item {
-            margin-bottom: 6px;
-        }
-
-        .info-label {
-            color: var(--text-sub);
-            font-weight: 600;
-        }
-
-        .badge {
-            display: inline-block;
-            background: #2c3e50;
-            color: #f1c40f;
-            padding: 4px 10px;
-            border-radius: 6px;
-            font-weight: bold;
+            grid-template-columns: 1fr 1fr;
+            row-gap: 8px;
+            column-gap: 12px;
             font-size: 13px;
-            letter-spacing: 1px;
         }
 
-        .badge-sge {
-            background: #e67e22;
-            color: #ffffff;
+        .info-item span.label {
+            color: #aaa;
         }
 
-        /* BADGES DE STATUT COURSE */
+        .info-item span.value {
+            font-weight: bold;
+            color: #fff;
+        }
+
         .status-badge {
             display: inline-block;
-            padding: 4px 12px;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: bold;
+            background-color: #1b4332;
+            color: #2ec4b6;
+            border: 1px solid #2ec4b6;
+        }
+
+        .badge-list {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+            margin-top: 4px;
+        }
+
+        .num-badge {
+            background-color: #ff9800;
+            color: #121212;
+            font-weight: bold;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 13px;
+        }
+
+        .num-badge-ref {
+            background-color: #2b3a4a;
+            color: #64dfdf;
+            font-weight: bold;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 13px;
+            border: 1px solid #3a506b;
+        }
+
+        .grid-selector {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            gap: 8px;
+            margin: 15px 0;
+        }
+
+        .grid-btn {
+            background-color: #2a2a2a;
+            border: 1px solid #444;
+            color: #fff;
+            padding: 10px 0;
             border-radius: 6px;
+            font-weight: bold;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .grid-btn:hover {
+            border-color: #ff9800;
+        }
+
+        .grid-btn.selected {
+            background-color: #0077b6;
+            border-color: #90e0ef;
+            color: #fff;
+            box-shadow: 0 0 8px rgba(0, 119, 182, 0.6);
+        }
+
+        .action-btn {
+            width: 100%;
+            padding: 10px;
+            background-color: #2a9d8f;
+            border: none;
+            border-radius: 6px;
+            color: white;
             font-weight: bold;
             font-size: 13px;
-            letter-spacing: 0.5px;
-            text-transform: uppercase;
+            cursor: pointer;
+            margin-top: 10px;
         }
 
-        .status-green {
-            background: rgba(46, 204, 113, 0.2);
-            color: #2ecc71;
-            border: 1px solid #2ecc71;
+        .action-btn:hover {
+            background-color: #264653;
         }
 
-        .status-red {
-            background: rgba(231, 76, 60, 0.2);
-            color: #e74c3c;
-            border: 1px solid #e74c3c;
-        }
-
-        /* ANALYSEUR GÉOMÉTRIQUE */
-        .analyzer-section {
-            background: var(--card-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 10px;
-            padding: 20px;
+        .instruction {
             text-align: center;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            color: #aaa;
+            font-size: 12px;
+            margin-top: 10px;
+            font-style: italic;
         }
-
-        .grid-container {
-            display: grid;
-            grid-template-columns: repeat(8, 48px);
-            gap: 8px;
-            justify-content: center;
-            margin: 20px auto;
-        }
-
-        @media (max-width: 480px) {
-            .grid-container {
-                grid-template-columns: repeat(8, 36px);
-                gap: 5px;
-            }
-            .cell {
-                height: 36px !important;
-                font-size: 12px !important;
-            }
-        }
-
-        .cell {
-            height: 48px;
-            background: #262626;
-            border: 2px solid #444;
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            font-size: 15px;
-            cursor: pointer;
-            user-select: none;
-            transition: all 0.2s ease;
-        }
-
-        .cell:hover {
-            border-color: var(--accent-gold);
-        }
-
-        .cell.selected {
-            background: #e67e22;
-            border-color: var(--accent-gold);
-            color: #fff;
-            box-shadow: 0 0 8px rgba(230, 126, 34, 0.6);
-        }
-
-        .cell.central-pillar {
-            border-color: var(--accent-blue);
-        }
-
-        .controls {
-            margin: 15px 0 10px 0;
-        }
-
-        button {
-            background: #27ae60;
-            color: white;
-            border: none;
-            padding: 10px 22px;
-            font-size: 14px;
-            font-weight: bold;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: background 0.2s;
-        }
-
-        button:hover {
-            background: #2ec771;
-        }
-
-        #result {
-            margin-top: 15px;
-            font-size: 16px;
-            font-weight: bold;
-            min-height: 45px;
-        }
-
-        .status-valide { color: var(--accent-green); }
-        .status-invalide { color: var(--accent-red); }
     </style>
 </head>
 <body>
 
-    <div class="container">
-        
-        <header>
-            <h1>PEGASUS QUINTÉ</h1>
-            <p class="subtitle">Espace Visiteur — Synthèse & Analyseur d'Axes</p>
-        </header>
+<div class="container">
+    <h1>PEGASUS QUINTÉ</h1>
+    <div class="subtitle">Espace Visiteur — Synthèse & Analyseur d'Axes</div>
 
-        <!-- SEC. 1 : INFORMATIONS DE LA COURSE, PRONOSTIC ET ARRIVÉE DE LA VEILLE -->
-        <div class="card">
-            <div class="card-title">Informations de la Course</div>
-            <div class="info-grid">
-                <div class="info-item">
-                    <span class="info-label">Date :</span> <span id="race-date">—</span>
-                </div>
-                <div class="info-item">
-                    <span class="info-label">Hippodrome :</span> <span id="race-hip">—</span>
-                </div>
-                <div class="info-item" style="grid-column: 1 / -1;">
-                    <span class="info-label">Course :</span> <span id="race-name">—</span>
-                </div>
-                <div class="info-item" style="grid-column: 1 / -1;">
-                    <span class="info-label">Statut :</span> 
-                    <span id="race-status" class="status-badge status-green">Course non partie</span>
-                </div>
-                <div class="info-item" style="grid-column: 1 / -1; margin-top: 5px;">
-                    <span class="info-label">Pronostic SGE :</span> 
-                    <span id="race-prono" class="badge badge-sge">—</span>
-                </div>
-                <div class="info-item" style="grid-column: 1 / -1; margin-top: 2px;">
-                    <span class="info-label">Arrivée Réf. Veille :</span> 
-                    <span id="race-ref" class="badge">—</span>
-                </div>
+    <!-- BLOC INFORMATIONS DE LA COURSE -->
+    <div class="card">
+        <div class="card-title">INFORMATIONS DE LA COURSE</div>
+        <div class="info-grid">
+            <div class="info-item">
+                <span class="label">Date : </span>
+                <span class="value" id="race-date">--/--/----</span>
+            </div>
+            <div class="info-item">
+                <span class="label">Hippodrome : </span>
+                <span class="value" id="race-hippo">--</span>
+            </div>
+            <div class="info-item" style="grid-column: span 2;">
+                <span class="label">Course : </span>
+                <span class="value" id="race-name">--</span>
+            </div>
+            <div class="info-item">
+                <span class="label">Type / Dist. : </span>
+                <span class="value" id="race-details">--</span>
+            </div>
+            <div class="info-item">
+                <span class="label">Non-partant(s) : </span>
+                <span class="value" id="race-nps" style="color:#e63946;">Aucun</span>
+            </div>
+            <div class="info-item" style="grid-column: span 2; margin-top: 4px;">
+                <span class="label">Statut : </span>
+                <span class="status-badge" id="race-status">COURSE NON PARTIE</span>
             </div>
         </div>
 
-        <!-- SEC. 2 : ANALYSEUR GÉOMÉTRIQUE INTERACTIF -->
-        <div class="analyzer-section">
-            <div class="card-title" style="border:none; margin:0;">Analyseur Géométrique (1–16)</div>
-            <p class="subtitle" style="margin-top: 4px;">Sélectionne 5 numéros pour analyser la grille</p>
-
-            <div class="grid-container" id="grid"></div>
-
-            <div class="controls">
-                <button onclick="reinitialiser()">Réinitialiser la sélection</button>
+        <div style="margin-top: 15px;">
+            <div class="info-item" style="margin-bottom: 8px;">
+                <span class="label">Pronostic SGE : </span>
+                <div class="badge-list" id="prono-sge">
+                    <span class="num-badge">-</span>
+                </div>
             </div>
-
-            <div id="result">Sélectionne 5 numéros pour démarrer l'analyse</div>
+            <div class="info-item">
+                <span class="label">Arrivée Réf. Veille : </span>
+                <div class="badge-list" id="arrivee-veille">
+                    <span class="num-badge-ref">-</span>
+                </div>
+            </div>
         </div>
-
     </div>
 
-<script>
-    let selection = [];
+    <!-- BLOC ANALYSEUR GÉOMÉTRIQUE -->
+    <div class="card">
+        <div class="card-title" style="text-align: center;">ANALYSEUR GÉOMÉTRIQUE (1–16)</div>
+        <div class="instruction">Sélectionne 5 numéros pour analyser la grille</div>
 
-    async function chargerInfosCourse() {
+        <div class="grid-selector" id="grid-container">
+            <!-- Boutons générés en JS -->
+        </div>
+
+        <button class="action-btn" onclick="resetSelection()">Réinitialiser la sélection</button>
+        <div class="instruction" id="analysis-result" style="margin-top: 12px; font-weight: bold; color: #ff9800;">
+            Sélectionne 5 numéros pour démarrer l'analyse
+        </div>
+    </div>
+</div>
+
+<script>
+    let selectedNumbers = [];
+
+    // Initialisation des 16 boutons
+    const container = document.getElementById('grid-container');
+    for (let i = 1; i <= 16; i++) {
+        const btn = document.createElement('button');
+        btn.className = 'grid-btn';
+        btn.innerText = i;
+        btn.onclick = () => toggleNumber(i, btn);
+        container.appendChild(btn);
+    }
+
+    function toggleNumber(num, btn) {
+        if (selectedNumbers.includes(num)) {
+            selectedNumbers = selectedNumbers.filter(n => n !== num);
+            btn.classList.remove('selected');
+        } else {
+            if (selectedNumbers.length < 5) {
+                selectedNumbers.push(num);
+                btn.classList.add('selected');
+            }
+        }
+        evaluateGrid();
+    }
+
+    function resetSelection() {
+        selectedNumbers = [];
+        document.querySelectorAll('.grid-btn').forEach(btn => btn.classList.remove('selected'));
+        document.getElementById('analysis-result').innerText = "Sélectionne 5 numéros pour démarrer l'analyse";
+    }
+
+    async function loadRaceInfo() {
         try {
             const res = await fetch('/race-info');
-            if (!res.ok) throw new Error("Erreur réseau");
             const data = await res.json();
-            
-            document.getElementById('race-date').innerText = data.date || "N/C";
-            document.getElementById('race-hip').innerText = data.hippodrome || "N/C";
-            
-            // Formatage de la ligne Course avec code R1C1
-            const code = data.code_course ? `[${data.code_course}] ` : "";
-            document.getElementById('race-name').innerText = code + (data.course || "N/C");
-            
-            // Gestion dynamique de la ligne de Statut (Vert / Rouge)
-            const statusEl = document.getElementById('race-status');
+
+            document.getElementById('race-date').innerText = data.date;
+            document.getElementById('race-hippo').innerText = data.hippodrome;
+            document.getElementById('race-name').innerText = data.course;
+            document.getElementById('race-details').innerText = `${data.discipline} (${data.distance})`;
+            document.getElementById('race-nps').innerText = data.non_partants;
+
             if (data.statut === "TERMINEE") {
-                statusEl.innerText = "Course terminée";
-                statusEl.className = "status-badge status-red";
+                document.getElementById('race-status').innerText = "COURSE TERMINÉE";
             } else {
-                statusEl.innerText = "Course non partie";
-                statusEl.className = "status-badge status-green";
+                document.getElementById('race-status').innerText = "COURSE NON PARTIE";
             }
 
-            if (data.pronostic_sge && data.pronostic_sge.length > 0) {
-                document.getElementById('race-prono').innerText = data.pronostic_sge.join(' - ');
-            }
+            // Pronostic SGE
+            const sgeContainer = document.getElementById('prono-sge');
+            sgeContainer.innerHTML = data.pronostic_sge.map(n => `<span class="num-badge">${n}</span>`).join('');
 
-            if (data.arrivee_veille && data.arrivee_veille.length > 0) {
-                document.getElementById('race-ref').innerText = data.arrivee_veille.join(' - ');
-            }
+            // Arrivée Veille
+            const veilleContainer = document.getElementById('arrivee-veille');
+            veilleContainer.innerHTML = data.arrivee_veille.map(n => `<span class="num-badge-ref">${n}</span>`).join('');
+
         } catch (e) {
-            console.error("Impossible de récupérer les infos de la course :", e);
+            console.error("Erreur de chargement des infos de course", e);
         }
     }
 
-    // Construction de la grille 2x8
-    const gridEl = document.getElementById('grid');
-    for (let i = 1; i <= 16; i++) {
-        const cell = document.createElement('div');
-        cell.classList.add('cell');
-        if ([3, 5, 11, 13].includes(i)) cell.classList.add('central-pillar');
-        cell.innerText = i;
-        cell.onclick = () => basculerNumero(i, cell);
-        gridEl.appendChild(cell);
-    }
-
-    function basculerNumero(num, cell) {
-        if (selection.includes(num)) {
-            selection = selection.filter(n => n !== num);
-            cell.classList.remove('selected');
-        } else {
-            if (selection.length < 5) {
-                selection.push(num);
-                cell.classList.add('selected');
-            }
-        }
-        analyserGrille();
-    }
-
-    function reinitialiser() {
-        selection = [];
-        document.querySelectorAll('.cell').forEach(c => c.classList.remove('selected'));
-        document.getElementById('result').innerHTML = "Sélectionne 5 numéros pour démarrer l'analyse";
-    }
-
-    async function analyserGrille() {
-        const resultEl = document.getElementById('result');
-        if (selection.length !== 5) {
-            resultEl.innerHTML = `Sélection : ${selection.length}/5 numéros`;
+    async function evaluateGrid() {
+        if (selectedNumbers.length !== 5) {
+            document.getElementById('analysis-result').innerText = `Sélectionnés : ${selectedNumbers.length}/5 numéros`;
             return;
         }
 
-        resultEl.innerHTML = "Calcul géométrique en cours…";
-
         try {
-            const response = await fetch('/evaluate', {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ numbers: selection })
+            const res = await fetch('/evaluate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ numbers: selectedNumbers })
             });
+            const data = await res.json();
 
-            const data = await response.json();
-
-            if (!data.is_valid) {
-                resultEl.innerHTML = `<span class="status-invalide">ÉLIMINÉE : Absence d'ancrage central (3, 5, 11, 13) ou déséquilibre 1–8 / 9–16</span>`;
+            if (data.is_valid) {
+                document.getElementById('analysis-result').innerText = `Combinaison Valide | Score Géométrique : ${data.score}`;
             } else {
-                resultEl.innerHTML = `<span class="status-valide">GRILLE VALIDE</span><br>Score Géométrique : <strong>${data.score}</strong>`;
+                document.getElementById('analysis-result').innerText = `Combinaison Non Valide (Respectez la règle des piliers/équilibres)`;
             }
-        } catch (err) {
-            resultEl.innerHTML = `<span class="status-invalide">Erreur de connexion avec le serveur</span>`;
+        } catch (e) {
+            console.error("Erreur lors de l'évaluation", e);
         }
     }
 
-    chargerInfosCourse();
+    // Chargement automatique au lancement
+    loadRaceInfo();
 </script>
+
 </body>
 </html>
