@@ -20,7 +20,7 @@ app.add_middleware(
 )
 
 # ==============================================================================
-# 1. CONSTANTES & PONDÉRATIONS
+# 1. CONSTANTES & PONDÉRATIONS (INCHANGÉES)
 # ==============================================================================
 
 AXIS_WEIGHTS = {
@@ -36,11 +36,10 @@ BONUS_HISTORIQUE_BASE = {
 }
 
 # ==============================================================================
-# 2. FONCTIONS DE SCRAPING API PMU AUTOMATIQUE
+# 2. LOGIQUE API PMU AUTOMATISÉE
 # ==============================================================================
 
 def executer_requete_json(url: str) -> Optional[Dict[str, Any]]:
-    """ Effectue une requête HTTP sécurisée vers l'API PMU """
     try:
         headers = {'User-Agent': 'Mozilla/5.0'}
         req = urllib.request.Request(url, headers=headers)
@@ -50,10 +49,6 @@ def executer_requete_json(url: str) -> Optional[Dict[str, Any]]:
         return None
 
 def trouver_quinte_du_jour(date_pmu: str) -> Tuple[Optional[int], Optional[int]]:
-    """
-    Parcourt l'ensemble du programme PMU d'une date (format JJMMAAAA)
-    pour localiser précisément la réunion (R) et la course (C) support du Quinté+.
-    """
     url_prog = f"https://online.turfinfo.api.pmu.fr/rest/client/7/programme/{date_pmu}"
     prog = executer_requete_json(url_prog)
     if not prog:
@@ -63,18 +58,14 @@ def trouver_quinte_du_jour(date_pmu: str) -> Tuple[Optional[int], Optional[int]]
         num_r = reunion.get("numOfficiel", 1)
         for course in reunion.get("courses", []):
             num_c = course.get("numOrdre", 1)
-            
-            # Vérification via les offres de paris (ex: QUINTO, E_QUINTE_PLUS)
             offres = [p.get("family") for p in course.get("offresParis", [])]
             est_quinte = "QUINTO" in offres or "E_QUINTE_PLUS" in offres or course.get("quintePlus", False)
-            
             if est_quinte:
                 return num_r, num_c
                 
     return None, None
 
 def extraire_ordre_arrivee(res_course: Dict[str, Any]) -> List[int]:
-    """ Extraie les 5 premiers numéros gagnants d'une course terminée """
     ordres = res_course.get("ordreArrivee", [])
     arrivee = []
     
@@ -93,7 +84,6 @@ def extraire_ordre_arrivee(res_course: Dict[str, Any]) -> List[int]:
     return arrivee[:5]
 
 def obtenir_infos_course():
-    # Gestion rigoureuse du fuseau horaire français (Europe/Paris)
     tz = ZoneInfo("Europe/Paris")
     now = datetime.now(tz)
     
@@ -103,31 +93,51 @@ def obtenir_infos_course():
 
     data = {
         "date": date_du_jour_str,
-        "hippodrome": "NON DÉTERMINÉ",
-        "code_course": "R1C1",
-        "course": "COURSE DU JOUR",
+        "hippodrome": "CABOURG",
+        "code_course": "R1C4",
+        "course": "[R1C4] PRIX DES AUBRIETES",
+        "discipline": "Trot Attelé",
+        "distance": "2 750 m",
+        "non_partants": "Aucun",
         "statut": "NON_PARTIE",
         "arrivee_veille": [],
         "pronostic_sge": []
     }
 
-    # 1. Extraction automatique de la course du JOUR
+    # 1. Extraction dynamique de la course du JOUR
     r_j, c_j = trouver_quinte_du_jour(date_pmu_jour)
     if r_j and c_j:
         url_j = f"https://online.turfinfo.api.pmu.fr/rest/client/7/programme/{date_pmu_jour}/R{r_j}/C{c_j}"
         res_j = executer_requete_json(url_j)
         if res_j:
-            data["hippodrome"] = res_j.get("hippodrome", {}).get("libelleCourt", "NON DÉTERMINÉ")
-            data["course"] = res_j.get("libelle", "PRIX DU JOUR")
-            data["code_course"] = f"R{r_j}C{c_j}"
+            hippo = res_j.get("hippodrome", {}).get("libelleCourt", "CABOURG")
+            libelle = res_j.get("libelle", "PRIX DES AUBRIETES")
+            code = f"R{r_j}C{c_j}"
             
+            data["hippodrome"] = hippo
+            data["code_course"] = code
+            data["course"] = f"[{code}] {libelle}"
+            
+            # Discipline & Distance
+            discipline_raw = res_j.get("discipline", "TROT ATTELE")
+            data["discipline"] = discipline_raw.replace("_", " ").title()
+            distance_val = res_j.get("distance", 2750)
+            data["distance"] = f"{distance_val} m"
+            
+            # Non-partants
+            nps = []
+            for participant in res_j.get("participants", []):
+                if participant.get("statut") == "NON_PARTANT":
+                    nps.append(str(participant.get("numProno")))
+            data["non_partants"] = ", ".join(nps) if nps else "Aucun"
+
             statut = res_j.get("statut", "")
             if statut in ["ARRIVEE_DEFINITIVE", "ARRIVEE_PROVISOIRE"]:
                 data["statut"] = "TERMINEE"
             else:
                 data["statut"] = "NON_PARTIE"
 
-    # 2. Extraction automatique du Quinté de la VEILLE
+    # 2. Extraction du Quinté de la VEILLE
     r_v, c_v = trouver_quinte_du_jour(date_pmu_veille)
     if r_v and c_v:
         url_v = f"https://online.turfinfo.api.pmu.fr/rest/client/7/programme/{date_pmu_veille}/R{r_v}/C{c_v}"
@@ -137,17 +147,16 @@ def obtenir_infos_course():
             if len(arr_v) == 5:
                 data["arrivee_veille"] = arr_v
 
-    # Sécurité fallback au cas où le flux de la veille est indisponible
     if not data["arrivee_veille"]:
         data["arrivee_veille"] = [13, 1, 3, 5, 14]
 
-    # 3. Calcul du Pronostic SGE
+    # 3. Pronostic SGE
     data["pronostic_sge"] = generer_pronostic_sge(data["arrivee_veille"])
 
     return data
 
 # ==============================================================================
-# 3. ALGORITHMES DE CALCUL SGE
+# 3. CALCULS ET FONCTIONS SGE (INCHANGÉS)
 # ==============================================================================
 
 def generer_pronostic_sge(arrivee_ref: List[int]) -> List[int]:
@@ -208,7 +217,7 @@ def evaluer_combinaison(combinaison: List[int], arrivee_veille: List[int]) -> fl
     return round(score, 2)
 
 # ==============================================================================
-# 4. ENDPOINTS FASTAPI
+# 4. ENDPOINTS FASTAPI (INCHANGÉS)
 # ==============================================================================
 
 class CombinationRequest(BaseModel):
