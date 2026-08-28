@@ -18,6 +18,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ==============================================================================
+# 1. CONSTANTES & PONDÉRATIONS
+# ==============================================================================
+
 AXIS_WEIGHTS = {
     (3, 11): 1.00, (5, 13): 0.98, (4, 12): 0.85, (6, 14): 0.82,
     (7, 15): 0.75, (2, 10): 0.68, (1, 9):  0.62, (8, 16): 0.60
@@ -30,13 +34,18 @@ BONUS_HISTORIQUE_BASE = {
     13: 4.7, 14: 3.8, 15: 3.6, 16: 3.0
 }
 
+# ==============================================================================
+# 2. DÉTECTION DYNAMIQUE DU QUINTÉ PMU
+# ==============================================================================
+
 def executer_requete_json(url: str):
     headers = {'User-Agent': 'Mozilla/5.0'}
     req = urllib.request.Request(url, headers=headers)
     with urllib.request.urlopen(req, timeout=5) as resp:
         return json.loads(resp.read().decode('utf-8'))
 
-def trouver_quinte_du_jour(date_pmu: str):
+def chercher_course_quinte(date_pmu: str):
+    """ Parcourt les réunions et courses du jour pour trouver le Quinté+ """
     try:
         url_prog = f"https://online.turfinfo.api.pmu.fr/rest/client/7/programme/{date_pmu}"
         prog = executer_requete_json(url_prog)
@@ -50,10 +59,11 @@ def trouver_quinte_du_jour(date_pmu: str):
                     return num_r, num_c
     except Exception:
         pass
-    return 1, 1
+    # Fallback par défaut sur R1C4 si la recherche échoue
+    return 1, 4
 
 def extraire_numeros_arrivee(ordres: list) -> List[int]:
-    """ Extrait proprement les 5 premiers numéros d'arrivée depuis le JSON PMU """
+    """ Extrait les 5 premiers numéros d'arrivée depuis la réponse PMU """
     res = []
     for item in ordres:
         if isinstance(item, list):
@@ -74,6 +84,7 @@ def obtenir_infos_course():
     date_pmu = now.strftime("%d%m%Y")
     date_veille_pmu = (now - timedelta(days=1)).strftime("%d%m%Y")
     
+    # Données par défaut
     data = {
         "date": date_du_jour_str,
         "hippodrome": "Deauville",
@@ -84,29 +95,29 @@ def obtenir_infos_course():
         "pronostic_sge": [3, 5, 11, 13, 8]
     }
 
-    # 1. Quinté du jour
+    # 1. Course du jour automatique
     try:
-        r_jour, c_jour = trouver_quinte_du_jour(date_pmu)
-        url_quinte_jour = f"https://online.turfinfo.api.pmu.fr/rest/client/7/programme/{date_pmu}/R{r_jour}/C{c_jour}"
-        res = executer_requete_json(url_quinte_jour)
+        r_j, c_j = chercher_course_quinte(date_pmu)
+        url_jour = f"https://online.turfinfo.api.pmu.fr/rest/client/7/programme/{date_pmu}/R{r_j}/C{c_j}"
+        res_j = executer_requete_json(url_jour)
         
-        data["hippodrome"] = res.get("hippodrome", {}).get("libelleCourt", "Hippodrome")
-        data["course"] = res.get("libelle", "Prix du Jour")
-        data["code_course"] = f"R{r_jour}C{c_jour}"
+        data["hippodrome"] = res_j.get("hippodrome", {}).get("libelleCourt", "Deauville")
+        data["course"] = res_j.get("libelle", "Prix de la Villa Lucie")
+        data["code_course"] = f"R{r_j}C{c_j}"
         
-        statut_pmu = res.get("statut", "")
-        if statut_pmu in ["ARRIVEE_DEFINITIVE", "ARRIVEE_PROVISOIRE"]:
+        statut = res_j.get("statut", "")
+        if statut in ["ARRIVEE_DEFINITIVE", "ARRIVEE_PROVISOIRE"]:
             data["statut"] = "TERMINEE"
         else:
             data["statut"] = "NON_PARTIE"
     except Exception:
         pass
 
-    # 2. Arrivée de la veille
+    # 2. Arrivée de la veille (13-1-3-5-14)
     try:
-        r_v, c_v = trouver_quinte_du_jour(date_veille_pmu)
-        url_quinte_veille = f"https://online.turfinfo.api.pmu.fr/rest/client/7/programme/{date_veille_pmu}/R{r_v}/C{c_v}"
-        res_v = executer_requete_json(url_quinte_veille)
+        r_v, c_v = chercher_course_quinte(date_veille_pmu)
+        url_v = f"https://online.turfinfo.api.pmu.fr/rest/client/7/programme/{date_veille_pmu}/R{r_v}/C{c_v}"
+        res_v = executer_requete_json(url_v)
         
         ordres = res_v.get("ordreArrivee", [])
         arr_5 = extraire_numeros_arrivee(ordres)
@@ -115,7 +126,7 @@ def obtenir_infos_course():
     except Exception:
         pass
 
-    # 3. Pronostic SGE
+    # 3. Calcul Pronostic SGE
     data["pronostic_sge"] = generer_pronostic_sge(data["arrivee_veille"])
 
     return data
