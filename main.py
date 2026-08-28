@@ -2,7 +2,8 @@ import os
 import urllib.request
 import json
 from datetime import datetime, timedelta
-from typing import List, Optional
+from zoneinfo import ZoneInfo
+from typing import List, Optional, Tuple, Dict, Any
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -35,119 +36,119 @@ BONUS_HISTORIQUE_BASE = {
 }
 
 # ==============================================================================
-# 2. LOGIQUE API & SCRAPING AUTOMATIQUE
+# 2. FONCTIONS DE SCRAPING API PMU AUTOMATIQUE
 # ==============================================================================
 
-def executer_requete_json(url: str):
-    headers = {'User-Agent': 'Mozilla/5.0'}
-    req = urllib.request.Request(url, headers=headers)
-    with urllib.request.urlopen(req, timeout=5) as resp:
-        return json.loads(resp.read().decode('utf-8'))
-
-def chercher_course_quinte(date_pmu: str):
-    """ Parcourt le programme PMU pour détecter automatiquement l'épreuve Quinté+ """
+def executer_requete_json(url: str) -> Optional[Dict[str, Any]]:
+    """ Effectue une requête HTTP sécurisée vers l'API PMU """
     try:
-        url_prog = f"https://online.turfinfo.api.pmu.fr/rest/client/7/programme/{date_pmu}"
-        prog = executer_requete_json(url_prog)
-        
-        for reunion in prog.get("programme", {}).get("reunions", []):
-            num_r = reunion.get("numOfficiel", 1)
-            for course in reunion.get("courses", []):
-                num_c = course.get("numOrdre", 1)
-                paris = [p.get("family") for p in course.get("offresParis", [])]
-                if "QUINTO" in paris or course.get("quintePlus", False):
-                    return num_r, num_c
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        req = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            return json.loads(resp.read().decode('utf-8'))
     except Exception:
-        pass
-    return 1, 4
+        return None
 
-def extraire_numeros_recursif(data) -> List[int]:
-    """ Extrait dynamiquement tous les numéros de chevaux peu importe la structure JSON """
-    nums = []
-    if isinstance(data, dict):
-        if "numProno" in data:
-            nums.append(int(data["numProno"]))
-        elif "numCheval" in data:
-            nums.append(int(data["numCheval"]))
-        else:
-            for v in data.values():
-                nums.extend(extraire_numeros_recursif(v))
-    elif isinstance(data, list):
-        for elem in data:
-            nums.extend(extraire_numeros_recursif(elem))
-    elif isinstance(data, int):
-        nums.append(data)
-    elif isinstance(data, str) and data.isdigit():
-        nums.append(int(data))
-    return nums
+def trouver_quinte_du_jour(date_pmu: str) -> Tuple[Optional[int], Optional[int]]:
+    """
+    Parcourt l'ensemble du programme PMU d'une date (format JJMMAAAA)
+    pour localiser précisément la réunion (R) et la course (C) support du Quinté+.
+    """
+    url_prog = f"https://online.turfinfo.api.pmu.fr/rest/client/7/programme/{date_pmu}"
+    prog = executer_requete_json(url_prog)
+    if not prog:
+        return None, None
 
-def extraire_arrivee_quinte(res_json: dict) -> List[int]:
-    """ Extrait les 5 premiers numéros d'arrivée à partir des clés 'ordreArrivee' ou 'arrivee' """
-    raw = res_json.get("ordreArrivee", []) or res_json.get("arrivee", [])
-    extracted = extraire_numeros_recursif(raw)
-    
-    # Conservation de l'ordre sans doublons
-    resultat = []
-    for num in extracted:
-        if num not in resultat and 1 <= num <= 16:
-            resultat.append(num)
+    for reunion in prog.get("programme", {}).get("reunions", []):
+        num_r = reunion.get("numOfficiel", 1)
+        for course in reunion.get("courses", []):
+            num_c = course.get("numOrdre", 1)
             
-    return resultat[:5]
+            # Vérification via les offres de paris (ex: QUINTO, E_QUINTE_PLUS)
+            offres = [p.get("family") for p in course.get("offresParis", [])]
+            est_quinte = "QUINTO" in offres or "E_QUINTE_PLUS" in offres or course.get("quintePlus", False)
+            
+            if est_quinte:
+                return num_r, num_c
+                
+    return None, None
+
+def extraire_ordre_arrivee(res_course: Dict[str, Any]) -> List[int]:
+    """ Extraie les 5 premiers numéros gagnants d'une course terminée """
+    ordres = res_course.get("ordreArrivee", [])
+    arrivee = []
+    
+    for groupe in ordres:
+        if isinstance(groupe, list):
+            for cheval in groupe:
+                if isinstance(cheval, dict) and "numProno" in cheval:
+                    arrivee.append(int(cheval["numProno"]))
+                elif isinstance(cheval, int):
+                    arrivee.append(cheval)
+        elif isinstance(groupe, dict) and "numProno" in groupe:
+            arrivee.append(int(groupe["numProno"]))
+        elif isinstance(groupe, int):
+            arrivee.append(groupe)
+            
+    return arrivee[:5]
 
 def obtenir_infos_course():
-    now = datetime.now()
-    date_du_jour_str = now.strftime("%d/%m/%Y")
-    date_pmu = now.strftime("%d%m%Y")
-    date_veille_pmu = (now - timedelta(days=1)).strftime("%d%m%Y")
+    # Gestion rigoureuse du fuseau horaire français (Europe/Paris)
+    tz = ZoneInfo("Europe/Paris")
+    now = datetime.now(tz)
     
-    ARRIVEE_PAR_DEFAUT = [13, 1, 3, 5, 14]
+    date_du_jour_str = now.strftime("%d/%m/%Y")
+    date_pmu_jour = now.strftime("%d%m%Y")
+    date_pmu_veille = (now - timedelta(days=1)).strftime("%d%m%Y")
 
     data = {
         "date": date_du_jour_str,
-        "hippodrome": "CABOURG",
-        "code_course": "R1C4",
-        "course": "PRIX DES AUBRIETES",
+        "hippodrome": "NON DÉTERMINÉ",
+        "code_course": "R1C1",
+        "course": "COURSE DU JOUR",
         "statut": "NON_PARTIE",
-        "arrivee_veille": ARRIVEE_PAR_DEFAUT,
+        "arrivee_veille": [],
         "pronostic_sge": []
     }
 
-    # 1. Quinté du jour automatique
-    try:
-        r_j, c_j = chercher_course_quinte(date_pmu)
-        url_jour = f"https://online.turfinfo.api.pmu.fr/rest/client/7/programme/{date_pmu}/R{r_j}/C{c_j}"
-        res_j = executer_requete_json(url_jour)
-        
-        data["hippodrome"] = res_j.get("hippodrome", {}).get("libelleCourt", "CABOURG")
-        data["course"] = res_j.get("libelle", "PRIX DES AUBRIETES")
-        data["code_course"] = f"R{r_j}C{c_j}"
-        
-        statut = res_j.get("statut", "")
-        if statut in ["ARRIVEE_DEFINITIVE", "ARRIVEE_PROVISOIRE"]:
-            data["statut"] = "TERMINEE"
-        else:
-            data["statut"] = "NON_PARTIE"
-    except Exception:
-        pass
+    # 1. Extraction automatique de la course du JOUR
+    r_j, c_j = trouver_quinte_du_jour(date_pmu_jour)
+    if r_j and c_j:
+        url_j = f"https://online.turfinfo.api.pmu.fr/rest/client/7/programme/{date_pmu_jour}/R{r_j}/C{c_j}"
+        res_j = executer_requete_json(url_j)
+        if res_j:
+            data["hippodrome"] = res_j.get("hippodrome", {}).get("libelleCourt", "NON DÉTERMINÉ")
+            data["course"] = res_j.get("libelle", "PRIX DU JOUR")
+            data["code_course"] = f"R{r_j}C{c_j}"
+            
+            statut = res_j.get("statut", "")
+            if statut in ["ARRIVEE_DEFINITIVE", "ARRIVEE_PROVISOIRE"]:
+                data["statut"] = "TERMINEE"
+            else:
+                data["statut"] = "NON_PARTIE"
 
-    # 2. Arrivée de la veille récupérée automatiquement
-    try:
-        r_v, c_v = chercher_course_quinte(date_veille_pmu)
-        url_v = f"https://online.turfinfo.api.pmu.fr/rest/client/7/programme/{date_veille_pmu}/R{r_v}/C{c_v}"
+    # 2. Extraction automatique du Quinté de la VEILLE
+    r_v, c_v = trouver_quinte_du_jour(date_pmu_veille)
+    if r_v and c_v:
+        url_v = f"https://online.turfinfo.api.pmu.fr/rest/client/7/programme/{date_pmu_veille}/R{r_v}/C{c_v}"
         res_v = executer_requete_json(url_v)
-        
-        arr_5 = extraire_arrivee_quinte(res_v)
-        if len(arr_5) == 5:
-            data["arrivee_veille"] = arr_5
-        else:
-            data["arrivee_veille"] = ARRIVEE_PAR_DEFAUT
-    except Exception:
-        data["arrivee_veille"] = ARRIVEE_PAR_DEFAUT
+        if res_v:
+            arr_v = extraire_ordre_arrivee(res_v)
+            if len(arr_v) == 5:
+                data["arrivee_veille"] = arr_v
+
+    # Sécurité fallback au cas où le flux de la veille est indisponible
+    if not data["arrivee_veille"]:
+        data["arrivee_veille"] = [13, 1, 3, 5, 14]
 
     # 3. Calcul du Pronostic SGE
     data["pronostic_sge"] = generer_pronostic_sge(data["arrivee_veille"])
 
     return data
+
+# ==============================================================================
+# 3. ALGORITHMES DE CALCUL SGE
+# ==============================================================================
 
 def generer_pronostic_sge(arrivee_ref: List[int]) -> List[int]:
     scores = {}
@@ -205,6 +206,10 @@ def evaluer_combinaison(combinaison: List[int], arrivee_veille: List[int]) -> fl
         score *= (1.0 + (0.25 * nb_miroirs_reels))
 
     return round(score, 2)
+
+# ==============================================================================
+# 4. ENDPOINTS FASTAPI
+# ==============================================================================
 
 class CombinationRequest(BaseModel):
     numbers: List[int]
