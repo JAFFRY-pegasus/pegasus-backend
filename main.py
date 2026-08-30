@@ -36,24 +36,26 @@ BONUS_HISTORIQUE_BASE = {
 }
 
 # ==============================================================================
-# 2. LOGIQUE API PMU (SANS CACHE & SERVEUR ANTI-BLOCAGE)
+# 2. LOGIQUE API PMU (AUTHENTIFICATION NAVIGATEUR & ANTI-CACHE)
 # ==============================================================================
 
 def executer_requete_json(url: str) -> Optional[Dict[str, Any]]:
-    """ Effectue une requête HTTP vers l'API PMU sans mise en cache """
+    """ Effectue une requête HTTP en imitant un navigateur réel pour éviter les blocages PMU """
     try:
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+            'Accept': 'application/json, text/plain, */*',
+            'Accept-Language': 'fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7',
             'Cache-Control': 'no-cache, no-store, must-revalidate',
             'Pragma': 'no-cache',
             'Expires': '0'
         }
-        # Paramètre d'horodatage unique pour détruire tout cache intermédiaire
         url_anti_cache = f"{url}?_t={int(datetime.now().timestamp())}"
         req = urllib.request.Request(url_anti_cache, headers=headers)
         with urllib.request.urlopen(req, timeout=8) as resp:
             return json.loads(resp.read().decode('utf-8'))
-    except Exception:
+    except Exception as e:
+        print(f"Erreur API PMU : {e}")
         return None
 
 def extraire_ordre_arrivee(res_course: Dict[str, Any]) -> List[int]:
@@ -104,7 +106,6 @@ def obtenir_infos_course():
         "pronostic_sge": []
     }
 
-    # API publique "offline" (non soumise aux blocages cloud)
     base_url = "https://offline.turfinfo.api.pmu.fr/rest/client/7/programme"
 
     # --------------------------------------------------------------------------
