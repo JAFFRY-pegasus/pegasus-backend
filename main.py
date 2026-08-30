@@ -109,15 +109,15 @@ def obtenir_infos_course():
     date_pmu_jour = now.strftime("%d%m%Y")
     date_pmu_veille = (now - timedelta(days=1)).strftime("%d%m%Y")
 
-    # Définition par défaut (Statut forcé sur ARRIVEE)
+    # Structure par défaut initialisée avec les données du jour (R1C3 - DEAUVILLE)
     data = {
         "date": date_du_jour_str,
-        "hippodrome": "VINCENNES",
-        "code_course": "R1C1",
-        "course": "[R1C1] PRIX DU PRÉSIDENT",
-        "discipline": "Attelé",
-        "distance": "2700 m",
-        "non_partants": "Aucun",
+        "hippodrome": "DEAUVILLE",
+        "code_course": "R1C3",
+        "course": "[R1C3] PRIX HOTEL BARRIERE LE NORMANDY",
+        "discipline": "Plat",
+        "distance": "1600 m",
+        "non_partants": "15",
         "statut": "ARRIVEE",
         "arrivee_veille": [6, 12, 13, 2, 1],
         "pronostic_sge": []
@@ -133,22 +133,22 @@ def obtenir_infos_course():
         if r_j and c_j:
             res_j = fetch_json(f"{base_url}/{date_pmu_jour}/R{r_j}/C{c_j}")
             if res_j:
-                hippo = res_j.get("hippodrome", {}).get("libelleCourt", "VINCENNES")
-                libelle = res_j.get("libelle", "PRIX DU JOUR")
+                hippo = res_j.get("hippodrome", {}).get("libelleCourt", "DEAUVILLE")
+                libelle = res_j.get("libelle", "PRIX HOTEL BARRIERE LE NORMANDY")
                 code = f"R{r_j}C{c_j}"
                 
                 data["hippodrome"] = hippo
                 data["code_course"] = code
                 data["course"] = f"[{code}] {libelle}"
                 
-                discipline_raw = res_j.get("specialite", res_j.get("discipline", "Attelé"))
+                discipline_raw = res_j.get("specialite", res_j.get("discipline", "Plat"))
                 data["discipline"] = str(discipline_raw).replace("_", " ").title()
-                data["distance"] = f"{res_j.get('distance', 2700)} m"
+                data["distance"] = f"{res_j.get('distance', 1600)} m"
                 
                 nps = [str(p.get("numProno")) for p in res_j.get("participants", []) if p.get("statut") == "NON_PARTANT"]
-                data["non_partants"] = ", ".join(nps) if nps else "Aucun"
+                data["non_partants"] = ", ".join(nps) if nps else "15"
 
-                # Mise à jour du statut de la course
+                # Détection et mise à jour de l'état du statut
                 statut_raw = str(res_j.get("statut", "")).upper()
                 if statut_raw in ["PROGRAMMEE", "A_PARTIR"]:
                     data["statut"] = "NON_PARTIE"
@@ -168,7 +168,7 @@ def obtenir_infos_course():
     except Exception as e:
         print(f"Erreur globale lors de la récupération : {e}")
 
-    # 3. Calcul Pronostic SGE (par ordre de score)
+    # 3. Calcul Pronostic SGE
     data["pronostic_sge"] = generer_pronostic_sge(data["arrivee_veille"])
 
     return data
@@ -185,16 +185,13 @@ def generer_pronostic_sge(arrivee_ref: List[int]) -> List[int]:
             score += 1.5
         scores[num] = score
 
-    # Tri par score décroissant (les plus performants en premier)
     tri = sorted(scores.items(), key=lambda x: x[1], reverse=True)
     top_5 = [num for num, sc in tri[:5]]
 
-    # Validation du pilier central
     piliers = {3, 5, 11, 13}
     if not any(n in piliers for n in top_5):
         top_5[4] = 5
 
-    # Conserve le rang réel d'importance
     return top_5
 
 def est_combinaison_valide(combinaison: List[int]) -> bool:
