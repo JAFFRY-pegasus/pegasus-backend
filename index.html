@@ -5,181 +5,200 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PEGASUS QUINTÉ</title>
     <style>
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        :root {
+            --bg-color: #121212;
+            --card-bg: #1e1e1e;
+            --accent-orange: #ff9800;
+            --accent-teal: #26a69a;
+            --text-main: #e0e0e0;
+            --text-muted: #a0a0a0;
+            --border-color: #333333;
         }
 
         body {
-            background-color: #121212;
-            color: #e0e0e0;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
             display: flex;
             justify-content: center;
-            padding: 20px;
         }
 
         .container {
             width: 100%;
-            max-width: 650px;
+            max-width: 800px;
         }
 
-        h1 {
-            color: #ff9800;
+        header {
             text-align: center;
-            font-size: 24px;
-            text-transform: uppercase;
+            margin-bottom: 25px;
+        }
+
+        header h1 {
+            color: var(--accent-orange);
+            margin: 0;
+            font-size: 1.8rem;
             letter-spacing: 1px;
-            margin-bottom: 4px;
         }
 
-        .subtitle {
-            text-align: center;
-            color: #888;
-            font-size: 13px;
-            margin-bottom: 20px;
+        header p {
+            color: var(--text-muted);
+            margin-top: 5px;
+            font-size: 0.9rem;
         }
 
         .card {
-            background-color: #1e1e1e;
-            border: 1px solid #333;
+            background-color: var(--card-bg);
             border-radius: 8px;
-            padding: 18px;
+            padding: 20px;
             margin-bottom: 20px;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--border-color);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
         }
 
         .card-title {
-            color: #ff9800;
-            font-size: 14px;
+            color: var(--accent-orange);
+            font-size: 1.1rem;
             font-weight: bold;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 8px;
+            margin-bottom: 15px;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 12px;
-            border-bottom: 1px solid #333;
-            padding-bottom: 6px;
         }
 
         .info-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            row-gap: 8px;
-            column-gap: 12px;
-            font-size: 13px;
+            gap: 10px;
+            font-size: 0.95rem;
+            margin-bottom: 15px;
         }
 
         .info-item span.label {
-            color: #aaa;
+            color: var(--text-muted);
         }
 
         .info-item span.value {
             font-weight: bold;
-            color: #fff;
         }
 
-        .status-badge {
+        .badge {
             display: inline-block;
             padding: 3px 8px;
             border-radius: 4px;
-            font-size: 11px;
+            font-size: 0.8rem;
             font-weight: bold;
-            background-color: #1b4332;
-            color: #2ec4b6;
-            border: 1px solid #2ec4b6;
         }
 
-        .badge-list {
+        .badge-status {
+            background-color: rgba(38, 166, 154, 0.2);
+            color: var(--accent-teal);
+            border: 1px solid var(--accent-teal);
+        }
+
+        .balls-container {
             display: flex;
-            gap: 6px;
+            gap: 10px;
+            margin-top: 8px;
+        }
+
+        .ball {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
             align-items: center;
-            margin-top: 4px;
-        }
-
-        .num-badge {
-            background-color: #ff9800;
-            color: #121212;
+            justify-content: center;
             font-weight: bold;
-            padding: 2px 8px;
-            border-radius: 12px;
-            font-size: 13px;
+            font-size: 0.95rem;
+            color: #fff;
         }
 
-        .num-badge-ref {
-            background-color: #2b3a4a;
-            color: #64dfdf;
-            font-weight: bold;
-            padding: 2px 8px;
-            border-radius: 12px;
-            font-size: 13px;
-            border: 1px solid #3a506b;
-        }
+        .ball.orange { background-color: var(--accent-orange); color: #000; }
+        .ball.gray { background-color: #37474f; color: #fff; }
+        .ball.selected { background-color: #0288d1; color: #fff; }
 
-        .grid-selector {
+        .grid-16 {
             display: grid;
             grid-template-columns: repeat(8, 1fr);
-            gap: 8px;
-            margin: 15px 0;
+            gap: 10px;
+            margin-bottom: 20px;
         }
 
         .grid-btn {
             background-color: #2a2a2a;
-            border: 1px solid #444;
-            color: #fff;
-            padding: 10px 0;
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            padding: 12px 0;
             border-radius: 6px;
+            font-size: 1.1rem;
             font-weight: bold;
-            font-size: 14px;
             cursor: pointer;
             transition: all 0.2s;
+            text-align: center;
         }
 
         .grid-btn:hover {
-            border-color: #ff9800;
+            border-color: var(--accent-teal);
         }
 
-        .grid-btn.selected {
-            background-color: #0077b6;
-            border-color: #90e0ef;
-            color: #fff;
-            box-shadow: 0 0 8px rgba(0, 119, 182, 0.6);
+        .grid-btn.active {
+            background-color: #0288d1;
+            color: #ffffff;
+            border-color: #81d4fa;
+            box-shadow: 0 0 8px rgba(2, 136, 209, 0.6);
         }
 
         .action-btn {
             width: 100%;
-            padding: 10px;
-            background-color: #2a9d8f;
+            background-color: var(--accent-teal);
+            color: #ffffff;
             border: none;
+            padding: 12px;
             border-radius: 6px;
-            color: white;
+            font-size: 1rem;
             font-weight: bold;
-            font-size: 13px;
             cursor: pointer;
-            margin-top: 10px;
+            transition: background 0.2s;
         }
 
         .action-btn:hover {
-            background-color: #264653;
+            background-color: #00897b;
         }
 
-        .instruction {
+        .result-box {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 6px;
             text-align: center;
-            color: #aaa;
-            font-size: 12px;
-            margin-top: 10px;
-            font-style: italic;
+            font-weight: bold;
+            font-size: 0.95rem;
+        }
+
+        .result-box.valid {
+            background-color: rgba(38, 166, 154, 0.15);
+            color: var(--accent-teal);
+        }
+
+        .result-box.invalid {
+            background-color: rgba(244, 67, 54, 0.15);
+            color: #e57373;
         }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>PEGASUS QUINTÉ</h1>
-    <div class="subtitle">Espace Visiteur — Synthèse & Analyseur d'Axes</div>
+    <header>
+        <h1>PEGASUS QUINTÉ</h1>
+        <p>Espace Visiteur — Synthèse & Analyseur d'Axes</p>
+    </header>
 
-    <!-- BLOC INFORMATIONS DE LA COURSE -->
+    <!-- CARD 1: INFORMATIONS DE LA COURSE -->
     <div class="card">
-        <div class="card-title">INFORMATIONS DE LA COURSE</div>
+        <div class="card-title">Informations de la Course</div>
+        
         <div class="info-grid">
             <div class="info-item">
                 <span class="label">Date : </span>
@@ -187,147 +206,249 @@
             </div>
             <div class="info-item">
                 <span class="label">Hippodrome : </span>
-                <span class="value" id="race-hippo">--</span>
-            </div>
-            <div class="info-item" style="grid-column: span 2;">
-                <span class="label">Course : </span>
-                <span class="value" id="race-name">--</span>
+                <span class="value" id="race-hippo">EN ATTENTE</span>
             </div>
             <div class="info-item">
-                <span class="label">Type / Dist. : </span>
-                <span class="value" id="race-details">--</span>
+                <span class="label">Course : </span>
+                <span class="value" id="race-name">CHARGEMENT DES DONNÉES...</span>
             </div>
             <div class="info-item">
                 <span class="label">Non-partant(s) : </span>
-                <span class="value" id="race-nps" style="color:#e63946;">Aucun</span>
+                <span class="value" style="color: #e57373;" id="race-nps">Aucun</span>
             </div>
-            <div class="info-item" style="grid-column: span 2; margin-top: 4px;">
-                <span class="label">Statut : </span>
-                <span class="status-badge" id="race-status">COURSE NON PARTIE</span>
+            <div class="info-item">
+                <span class="label">Type / Dist. : </span>
+                <span class="value" id="race-details">-- (-- m)</span>
             </div>
         </div>
 
-        <div style="margin-top: 15px;">
-            <div class="info-item" style="margin-bottom: 8px;">
-                <span class="label">Pronostic SGE : </span>
-                <div class="badge-list" id="prono-sge">
-                    <span class="num-badge">-</span>
-                </div>
+        <div style="margin-bottom: 15px;">
+            <span class="label" style="font-size: 0.9rem;">Statut : </span>
+            <span class="badge badge-status" id="race-status">COURSE NON PARTIE</span>
+        </div>
+
+        <div style="margin-bottom: 15px;">
+            <div class="label" style="font-size: 0.9rem; margin-bottom: 5px;">Pronostic SGE :</div>
+            <div class="balls-container" id="pronostic-sge-container">
+                <span class="ball orange">-</span>
             </div>
-            <div class="info-item">
-                <span class="label">Arrivée Réf. Veille : </span>
-                <div class="badge-list" id="arrivee-veille">
-                    <span class="num-badge-ref">-</span>
-                </div>
+        </div>
+
+        <div>
+            <div class="label" style="font-size: 0.9rem; margin-bottom: 5px;">Arrivée Réf. Veille :</div>
+            <div class="balls-container" id="arrivee-veille-container">
+                <span class="ball gray">-</span>
             </div>
         </div>
     </div>
 
-    <!-- BLOC ANALYSEUR GÉOMÉTRIQUE -->
+    <!-- CARD 2: ANALYSEUR GÉOMÉTRIQUE -->
     <div class="card">
-        <div class="card-title" style="text-align: center;">ANALYSEUR GÉOMÉTRIQUE (1–16)</div>
-        <div class="instruction">Sélectionne 5 numéros pour analyser la grille</div>
+        <div class="card-title" style="text-align: center;">Analyseur Géométrique (1–16)</div>
+        <p style="text-align: center; color: var(--text-muted); font-size: 0.85rem; margin-top: -10px; margin-bottom: 15px;">
+            Sélectionne 5 numéros pour analyser la grille
+        </p>
 
-        <div class="grid-selector" id="grid-container">
-            <!-- Boutons générés en JS -->
+        <div class="grid-16" id="grid-buttons">
+            <!-- Boutons générés automatiquement -->
         </div>
 
         <button class="action-btn" onclick="resetSelection()">Réinitialiser la sélection</button>
-        <div class="instruction" id="analysis-result" style="margin-top: 12px; font-weight: bold; color: #ff9800;">
-            Sélectionne 5 numéros pour démarrer l'analyse
-        </div>
+
+        <div id="evaluation-result" class="result-box" style="display: none;"></div>
     </div>
 </div>
 
 <script>
     let selectedNumbers = [];
+    let currentArriveeVeille = [6, 12, 13, 2, 1];
 
-    // Initialisation des 16 boutons
-    const container = document.getElementById('grid-container');
-    for (let i = 1; i <= 16; i++) {
-        const btn = document.createElement('button');
-        btn.className = 'grid-btn';
-        btn.innerText = i;
-        btn.onclick = () => toggleNumber(i, btn);
-        container.appendChild(btn);
+    function renderGrid() {
+        const container = document.getElementById("grid-buttons");
+        container.innerHTML = "";
+        for (let i = 1; i <= 16; i++) {
+            const btn = document.createElement("button");
+            btn.className = "grid-btn" + (selectedNumbers.includes(i) ? " active" : "");
+            btn.innerText = i;
+            btn.onclick = () => toggleNumber(i);
+            container.appendChild(btn);
+        }
     }
 
-    function toggleNumber(num, btn) {
+    function toggleNumber(num) {
         if (selectedNumbers.includes(num)) {
             selectedNumbers = selectedNumbers.filter(n => n !== num);
-            btn.classList.remove('selected');
         } else {
             if (selectedNumbers.length < 5) {
                 selectedNumbers.push(num);
-                btn.classList.add('selected');
             }
         }
+        renderGrid();
         evaluateGrid();
     }
 
     function resetSelection() {
         selectedNumbers = [];
-        document.querySelectorAll('.grid-btn').forEach(btn => btn.classList.remove('selected'));
-        document.getElementById('analysis-result').innerText = "Sélectionne 5 numéros pour démarrer l'analyse";
+        renderGrid();
+        document.getElementById("evaluation-result").style.display = "none";
+    }
+
+    async function evaluateGrid() {
+        const resultDiv = document.getElementById("evaluation-result");
+        if (selectedNumbers.length !== 5) {
+            resultDiv.style.display = "block";
+            resultDiv.className = "result-box invalid";
+            resultDiv.innerText = "Sélectionne 5 numéros pour démarrer l'analyse";
+            return;
+        }
+
+        try {
+            const response = await fetch('/evaluate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ numbers: selectedNumbers, arrivee_veille: currentArriveeVeille })
+            });
+            const data = await response.json();
+
+            resultDiv.style.display = "block";
+            if (data.is_valid) {
+                resultDiv.className = "result-box valid";
+                resultDiv.innerText = `Combinaison Valide | Score Géométrique : ${data.score}`;
+            } else {
+                resultDiv.className = "result-box invalid";
+                resultDiv.innerText = "Combinaison Invalide (Piliers centraux ou répartition haut/bas manquant)";
+            }
+        } catch (e) {
+            console.error("Erreur d'évaluation", e);
+        }
+    }
+
+    function formatDatePMU(date) {
+        const d = String(date.getDate()).padStart(2, '0');
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const y = date.getFullYear();
+        return `${d}${m}${y}`;
+    }
+
+    async function chargerInfosDirectNavigateur() {
+        try {
+            const today = new Date();
+            const yesterday = new Date(today);
+            yesterday.setDate(yesterday.getDate() - 1);
+
+            const dateJour = formatDatePMU(today);
+            const dateVeille = formatDatePMU(yesterday);
+
+            const resProg = await fetch(`https://offline.turfinfo.api.pmu.fr/rest/client/7/programme/${dateJour}?_t=${Date.now()}`);
+            if (resProg.ok) {
+                const dataProg = await resProg.json();
+                let rJ, cJ;
+                for (const r of dataProg.programme.reunions || []) {
+                    for (const c of r.courses || []) {
+                        const offres = (c.offresParis || []).map(o => String(o.family).toUpperCase());
+                        if (offres.includes("QUINTO") || offres.includes("E_QUINTE_PLUS") || c.quintePlus === true) {
+                            rJ = r.numOfficiel;
+                            cJ = c.numOrdre;
+                            break;
+                        }
+                    }
+                }
+
+                if (rJ && cJ) {
+                    const resCourse = await fetch(`https://offline.turfinfo.api.pmu.fr/rest/client/7/programme/${dateJour}/R${rJ}/C${cJ}?_t=${Date.now()}`);
+                    if (resCourse.ok) {
+                        const courseData = await resCourse.json();
+                        document.getElementById("race-hippo").innerText = courseData.hippodrome?.libelleCourt || "INCONNU";
+                        document.getElementById("race-name").innerText = `[R${rJ}C${cJ}] ${courseData.libelle || 'PRIX DU JOUR'}`;
+                        document.getElementById("race-details").innerText = `${(courseData.discipline || '').replace(/_/g, ' ')} (${courseData.distance || 0} m)`;
+                        
+                        const nps = (courseData.participants || []).filter(p => p.statut === "NON_PARTANT").map(p => p.numProno);
+                        document.getElementById("race-nps").innerText = nps.length > 0 ? nps.join(", ") : "Aucun";
+                        
+                        const statut = courseData.statut === "ARRIVEE_DEFINITIVE" || courseData.statut === "ARRIVEE_PROVISOIRE" ? "COURSE TERMINÉE" : "COURSE NON PARTIE";
+                        document.getElementById("race-status").innerText = statut;
+                    }
+                }
+            }
+
+            const resVeilleProg = await fetch(`https://offline.turfinfo.api.pmu.fr/rest/client/7/programme/${dateVeille}?_t=${Date.now()}`);
+            if (resVeilleProg.ok) {
+                const dataVeilleProg = await resVeilleProg.json();
+                let rV, cV;
+                for (const r of dataVeilleProg.programme.reunions || []) {
+                    for (const c of r.courses || []) {
+                        const offres = (c.offresParis || []).map(o => String(o.family).toUpperCase());
+                        if (offres.includes("QUINTO") || offres.includes("E_QUINTE_PLUS") || c.quintePlus === true) {
+                            rV = r.numOfficiel;
+                            cV = c.numOrdre;
+                            break;
+                        }
+                    }
+                }
+                if (rV && cV) {
+                    const resVeilleCourse = await fetch(`https://offline.turfinfo.api.pmu.fr/rest/client/7/programme/${dateVeille}/R${rV}/C${cV}?_t=${Date.now()}`);
+                    if (resVeilleCourse.ok) {
+                        const vData = await resVeilleCourse.json();
+                        let arr = [];
+                        (vData.ordreArrivee || []).forEach(g => {
+                            if (Array.isArray(g)) g.forEach(c => arr.push(c.numProno || c));
+                            else arr.push(g.numProno || g);
+                        });
+                        if (arr.length >= 5) {
+                            currentArriveeVeille = arr.slice(0, 5).map(Number);
+                            afficherArriveeVeille(currentArriveeVeille);
+                        }
+                    }
+                }
+            }
+        } catch (e) {
+            console.log("Repli serveur");
+        }
+    }
+
+    function afficherArriveeVeille(arr) {
+        const container = document.getElementById("arrivee-veille-container");
+        if (container && arr.length >= 5) {
+            container.innerHTML = arr.map(n => `<span class="ball gray">${n}</span>`).join('');
+        }
     }
 
     async function loadRaceInfo() {
         try {
             const res = await fetch('/race-info');
             const data = await res.json();
-
-            document.getElementById('race-date').innerText = data.date;
-            document.getElementById('race-hippo').innerText = data.hippodrome;
-            document.getElementById('race-name').innerText = data.course;
-            document.getElementById('race-details').innerText = `${data.discipline} (${data.distance})`;
-            document.getElementById('race-nps').innerText = data.non_partants;
-
-            if (data.statut === "TERMINEE") {
-                document.getElementById('race-status').innerText = "COURSE TERMINÉE";
-            } else {
-                document.getElementById('race-status').innerText = "COURSE NON PARTIE";
+            
+            document.getElementById("race-date").innerText = data.date;
+            if (data.hippodrome !== "EN ATTENTE") {
+                document.getElementById("race-hippo").innerText = data.hippodrome;
+                document.getElementById("race-name").innerText = data.course;
+                document.getElementById("race-details").innerText = `${data.discipline} (${data.distance})`;
+                document.getElementById("race-nps").innerText = data.non_partants;
+                document.getElementById("race-status").innerText = data.statut === "TERMINEE" ? "COURSE TERMINÉE" : "COURSE NON PARTIE";
             }
 
-            // Pronostic SGE
-            const sgeContainer = document.getElementById('prono-sge');
-            sgeContainer.innerHTML = data.pronostic_sge.map(n => `<span class="num-badge">${n}</span>`).join('');
+            if (data.arrivee_veille && data.arrivee_veille.length >= 5) {
+                currentArriveeVeille = data.arrivee_veille;
+                afficherArriveeVeille(currentArriveeVeille);
+            }
 
-            // Arrivée Veille
-            const veilleContainer = document.getElementById('arrivee-veille');
-            veilleContainer.innerHTML = data.arrivee_veille.map(n => `<span class="num-badge-ref">${n}</span>`).join('');
-
-        } catch (e) {
-            console.error("Erreur de chargement des infos de course", e);
-        }
-    }
-
-    async function evaluateGrid() {
-        if (selectedNumbers.length !== 5) {
-            document.getElementById('analysis-result').innerText = `Sélectionnés : ${selectedNumbers.length}/5 numéros`;
-            return;
-        }
-
-        try {
-            const res = await fetch('/evaluate', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ numbers: selectedNumbers })
-            });
-            const data = await res.json();
-
-            if (data.is_valid) {
-                document.getElementById('analysis-result').innerText = `Combinaison Valide | Score Géométrique : ${data.score}`;
-            } else {
-                document.getElementById('analysis-result').innerText = `Combinaison Non Valide (Respectez la règle des piliers/équilibres)`;
+            if (data.pronostic_sge && data.pronostic_sge.length >= 5) {
+                const sgeContainer = document.getElementById("pronostic-sge-container");
+                if (sgeContainer) {
+                    sgeContainer.innerHTML = data.pronostic_sge.map(n => `<span class="ball orange">${n}</span>`).join('');
+                }
             }
         } catch (e) {
-            console.error("Erreur lors de l'évaluation", e);
+            console.error("Erreur serveur API", e);
         }
+        
+        await chargerInfosDirectNavigateur();
     }
 
-    // Chargement automatique au lancement
-    loadRaceInfo();
+    document.addEventListener("DOMContentLoaded", () => {
+        renderGrid();
+        loadRaceInfo();
+    });
 </script>
-
 </body>
 </html>
