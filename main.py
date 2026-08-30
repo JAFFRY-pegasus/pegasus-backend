@@ -36,10 +36,11 @@ BONUS_HISTORIQUE_BASE = {
 }
 
 # ==============================================================================
-# 2. LOGIQUE API PMU NATIVE
+# 2. LOGIQUE API PMU NATIVE (SERVERLESS / VERCEL COMPATIBLE)
 # ==============================================================================
 
 def fetch_json(url: str) -> Optional[Dict[str, Any]]:
+    """ Effectue une requête HTTP native via urllib sans dépendance système """
     try:
         req = urllib.request.Request(
             url,
@@ -108,6 +109,7 @@ def obtenir_infos_course():
     date_pmu_jour = now.strftime("%d%m%Y")
     date_pmu_veille = (now - timedelta(days=1)).strftime("%d%m%Y")
 
+    # Définition par défaut (Statut forcé sur ARRIVEE)
     data = {
         "date": date_du_jour_str,
         "hippodrome": "VINCENNES",
@@ -116,7 +118,7 @@ def obtenir_infos_course():
         "discipline": "Attelé",
         "distance": "2700 m",
         "non_partants": "Aucun",
-        "statut": "NON_PARTIE",
+        "statut": "ARRIVEE",
         "arrivee_veille": [6, 12, 13, 2, 1],
         "pronostic_sge": []
     }
@@ -146,12 +148,12 @@ def obtenir_infos_course():
                 nps = [str(p.get("numProno")) for p in res_j.get("participants", []) if p.get("statut") == "NON_PARTANT"]
                 data["non_partants"] = ", ".join(nps) if nps else "Aucun"
 
-                # Détection de l'état d'arrivée de la course
+                # Mise à jour du statut de la course
                 statut_raw = str(res_j.get("statut", "")).upper()
-                if statut_raw in ["ARRIVEE_DEFINITIVE", "ARRIVEE_PROVISOIRE", "ARRIVEE"]:
-                    data["statut"] = "ARRIVEE"
-                else:
+                if statut_raw in ["PROGRAMMEE", "A_PARTIR"]:
                     data["statut"] = "NON_PARTIE"
+                else:
+                    data["statut"] = "ARRIVEE"
 
         # 2. Arrivée de la veille
         prog_v = fetch_json(f"{base_url}/{date_pmu_veille}")
@@ -166,7 +168,7 @@ def obtenir_infos_course():
     except Exception as e:
         print(f"Erreur globale lors de la récupération : {e}")
 
-    # 3. Calcul Pronostic SGE
+    # 3. Calcul Pronostic SGE (par ordre de score)
     data["pronostic_sge"] = generer_pronostic_sge(data["arrivee_veille"])
 
     return data
@@ -183,13 +185,16 @@ def generer_pronostic_sge(arrivee_ref: List[int]) -> List[int]:
             score += 1.5
         scores[num] = score
 
+    # Tri par score décroissant (les plus performants en premier)
     tri = sorted(scores.items(), key=lambda x: x[1], reverse=True)
     top_5 = [num for num, sc in tri[:5]]
 
+    # Validation du pilier central
     piliers = {3, 5, 11, 13}
     if not any(n in piliers for n in top_5):
         top_5[4] = 5
 
+    # Conserve le rang réel d'importance
     return top_5
 
 def est_combinaison_valide(combinaison: List[int]) -> bool:
@@ -272,3 +277,4 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 10000))
     uvicorn.run(app, host="0.0.0.0", port=port)
+
