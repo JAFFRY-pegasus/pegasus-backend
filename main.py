@@ -36,11 +36,11 @@ BONUS_HISTORIQUE_BASE = {
 }
 
 # ==============================================================================
-# 2. LOGIQUE API PMU NATIVE (COMPATIBLE VERCEL)
+# 2. LOGIQUE API PMU NATIVE (COMPATIBLE VERCEL & SERVERLESS)
 # ==============================================================================
 
 def fetch_json(url: str) -> Optional[Dict[str, Any]]:
-    """ Utilise urllib natif compatible avec l'environnement Vercel """
+    """ Effectue une requête HTTP native via urllib sans dépendance système """
     try:
         req = urllib.request.Request(
             url,
@@ -125,7 +125,7 @@ def obtenir_infos_course():
     base_url = "https://offline.turfinfo.api.pmu.fr/rest/client/7/programme"
 
     try:
-        # 1. Course du jour
+        # 1. Quinté du jour
         prog_j = fetch_json(f"{base_url}/{date_pmu_jour}")
         r_j, c_j = trouver_quinte_dans_programme(prog_j)
 
@@ -150,7 +150,7 @@ def obtenir_infos_course():
                 statut = res_j.get("statut", "")
                 data["statut"] = "TERMINEE" if statut in ["ARRIVEE_DEFINITIVE", "ARRIVEE_PROVISOIRE"] else "NON_PARTIE"
 
-        # 2. Arrivée Veille
+        # 2. Arrivée de la veille
         prog_v = fetch_json(f"{base_url}/{date_pmu_veille}")
         r_v, c_v = trouver_quinte_dans_programme(prog_v)
 
@@ -163,13 +163,13 @@ def obtenir_infos_course():
     except Exception as e:
         print(f"Erreur globale lors de la récupération : {e}")
 
-    # 3. Calcul Pronostic SGE
+    # 3. Calcul Pronostic SGE (par ordre de score)
     data["pronostic_sge"] = generer_pronostic_sge(data["arrivee_veille"])
 
     return data
 
 # ==============================================================================
-# 3. ALGORITHMES SGE & ENDPOINTS FASTAPI
+# 3. ALGORITHMES SGE (MODIFIÉ : ORDRE DE SCORE CONSERVÉ)
 # ==============================================================================
 
 def generer_pronostic_sge(arrivee_ref: List[int]) -> List[int]:
@@ -180,14 +180,17 @@ def generer_pronostic_sge(arrivee_ref: List[int]) -> List[int]:
             score += 1.5
         scores[num] = score
 
+    # Tri par score décroissant (les plus performants en premier)
     tri = sorted(scores.items(), key=lambda x: x[1], reverse=True)
     top_5 = [num for num, sc in tri[:5]]
 
+    # Validation du pilier central
     piliers = {3, 5, 11, 13}
     if not any(n in piliers for n in top_5):
         top_5[4] = 5
 
-    return sorted(top_5)
+    # Conservation du rang réel de préférence
+    return top_5
 
 def est_combinaison_valide(combinaison: List[int]) -> bool:
     if len(combinaison) != 5:
@@ -228,6 +231,10 @@ def evaluer_combinaison(combinaison: List[int], arrivee_veille: List[int]) -> fl
         score *= (1.0 + (0.25 * nb_miroirs_reels))
 
     return round(score, 2)
+
+# ==============================================================================
+# 4. ENDPOINTS FASTAPI & MODÈLES
+# ==============================================================================
 
 class CombinationRequest(BaseModel):
     numbers: List[int]
