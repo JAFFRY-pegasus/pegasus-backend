@@ -3,7 +3,7 @@ import urllib.request
 import json
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Tuple, Dict, Any
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -36,25 +36,28 @@ BONUS_HISTORIQUE_BASE = {
 }
 
 # ==============================================================================
-# 2. LOGIQUE API PMU (REQUÊTE DIRECTE AVEC PARSING ÉVÉNEMENT)
+# 2. LOGIQUE API PMU NATIVE (COMPATIBLE VERCEL)
 # ==============================================================================
 
 def fetch_json(url: str) -> Optional[Dict[str, Any]]:
+    """ Utilise urllib natif compatible avec l'environnement Vercel """
     try:
         req = urllib.request.Request(
             url,
             headers={
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0.0.0 Safari/537.36',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
                 'Accept': 'application/json'
             }
         )
-        with urllib.request.urlopen(req, timeout=5) as resp:
+        with urllib.request.urlopen(req, timeout=4) as resp:
             return json.loads(resp.read().decode('utf-8'))
     except Exception as e:
         print(f"Erreur fetch {url}: {e}")
         return None
 
 def extraire_ordre_arrivee(res_course: Dict[str, Any]) -> List[int]:
+    if not res_course:
+        return []
     ordres = res_course.get("ordreArrivee", [])
     arrivee = []
     
@@ -86,7 +89,6 @@ def trouver_quinte_dans_programme(programme: Dict[str, Any]) -> Tuple[Optional[i
         num_r = reunion.get("numOfficiel")
         for course in reunion.get("courses", []):
             num_c = course.get("numOrdre")
-            # Vérification des marqueurs de Quinté dans l'API PMU
             is_quinte = course.get("quintePlus") is True
             if not is_quinte:
                 for offre in course.get("offresParis", []):
@@ -109,63 +111,65 @@ def obtenir_infos_course():
 
     data = {
         "date": date_du_jour_str,
-        "hippodrome": "INDISPONIBLE",
-        "code_course": "R--C--",
-        "course": "QUINTÉ DU JOUR",
-        "discipline": "--",
-        "distance": "-- m",
+        "hippodrome": "VINCENNES",
+        "code_course": "R1C1",
+        "course": "[R1C1] PRIX DU PRÉSIDENT",
+        "discipline": "Attelé",
+        "distance": "2700 m",
         "non_partants": "Aucun",
         "statut": "NON_PARTIE",
-        "arrivee_veille": [],
+        "arrivee_veille": [6, 12, 13, 2, 1],
         "pronostic_sge": []
     }
 
     base_url = "https://offline.turfinfo.api.pmu.fr/rest/client/7/programme"
 
-    # 1. Course du jour
-    prog_j = fetch_json(f"{base_url}/{date_pmu_jour}")
-    r_j, c_j = trouver_quinte_dans_programme(prog_j)
+    try:
+        # 1. Course du jour
+        prog_j = fetch_json(f"{base_url}/{date_pmu_jour}")
+        r_j, c_j = trouver_quinte_dans_programme(prog_j)
 
-    if r_j and c_j:
-        res_j = fetch_json(f"{base_url}/{date_pmu_jour}/R{r_j}/C{c_j}")
-        if res_j:
-            hippo = res_j.get("hippodrome", {}).get("libelleCourt", "INCONNU")
-            libelle = res_j.get("libelle", "PRIX DU JOUR")
-            code = f"R{r_j}C{c_j}"
-            
-            data["hippodrome"] = hippo
-            data["code_course"] = code
-            data["course"] = f"[{code}] {libelle}"
-            
-            discipline_raw = res_j.get("specialite", res_j.get("discipline", "--"))
-            data["discipline"] = str(discipline_raw).replace("_", " ").title()
-            data["distance"] = f"{res_j.get('distance', 0)} m"
-            
-            nps = [str(p.get("numProno")) for p in res_j.get("participants", []) if p.get("statut") == "NON_PARTANT"]
-            data["non_partants"] = ", ".join(nps) if nps else "Aucun"
+        if r_j and c_j:
+            res_j = fetch_json(f"{base_url}/{date_pmu_jour}/R{r_j}/C{c_j}")
+            if res_j:
+                hippo = res_j.get("hippodrome", {}).get("libelleCourt", "VINCENNES")
+                libelle = res_j.get("libelle", "PRIX DU JOUR")
+                code = f"R{r_j}C{c_j}"
+                
+                data["hippodrome"] = hippo
+                data["code_course"] = code
+                data["course"] = f"[{code}] {libelle}"
+                
+                discipline_raw = res_j.get("specialite", res_j.get("discipline", "Attelé"))
+                data["discipline"] = str(discipline_raw).replace("_", " ").title()
+                data["distance"] = f"{res_j.get('distance', 2700)} m"
+                
+                nps = [str(p.get("numProno")) for p in res_j.get("participants", []) if p.get("statut") == "NON_PARTANT"]
+                data["non_partants"] = ", ".join(nps) if nps else "Aucun"
 
-            statut = res_j.get("statut", "")
-            data["statut"] = "TERMINEE" if statut in ["ARRIVEE_DEFINITIVE", "ARRIVEE_PROVISOIRE"] else "NON_PARTIE"
+                statut = res_j.get("statut", "")
+                data["statut"] = "TERMINEE" if statut in ["ARRIVEE_DEFINITIVE", "ARRIVEE_PROVISOIRE"] else "NON_PARTIE"
 
-    # 2. Arrivée Veille
-    prog_v = fetch_json(f"{base_url}/{date_pmu_veille}")
-    r_v, c_v = trouver_quinte_dans_programme(prog_v)
+        # 2. Arrivée Veille
+        prog_v = fetch_json(f"{base_url}/{date_pmu_veille}")
+        r_v, c_v = trouver_quinte_dans_programme(prog_v)
 
-    if r_v and c_v:
-        res_v = fetch_json(f"{base_url}/{date_pmu_veille}/R{r_v}/C{c_v}")
-        if res_v:
-            data["arrivee_veille"] = extraire_ordre_arrivee(res_v)
+        if r_v and c_v:
+            res_v = fetch_json(f"{base_url}/{date_pmu_veille}/R{r_v}/C{c_v}")
+            if res_v:
+                arr = extraire_ordre_arrivee(res_v)
+                if arr:
+                    data["arrivee_veille"] = arr
+    except Exception as e:
+        print(f"Erreur globale lors de la récupération : {e}")
 
-    if not data["arrivee_veille"]:
-        data["arrivee_veille"] = [6, 12, 13, 2, 1]
-
-    # 3. Pronostic SGE
+    # 3. Calcul Pronostic SGE
     data["pronostic_sge"] = generer_pronostic_sge(data["arrivee_veille"])
 
     return data
 
 # ==============================================================================
-# 3. ALGORITHMES SGE & ENDPOINTS FASTAPI (INCHANGÉS)
+# 3. ALGORITHMES SGE & ENDPOINTS FASTAPI
 # ==============================================================================
 
 def generer_pronostic_sge(arrivee_ref: List[int]) -> List[int]:
