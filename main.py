@@ -36,11 +36,10 @@ BONUS_HISTORIQUE_BASE = {
 }
 
 # ==============================================================================
-# 2. LOGIQUE API PMU NATIVE (COMPATIBLE VERCEL & SERVERLESS)
+# 2. LOGIQUE API PMU NATIVE
 # ==============================================================================
 
 def fetch_json(url: str) -> Optional[Dict[str, Any]]:
-    """ Effectue une requête HTTP native via urllib sans dépendance système """
     try:
         req = urllib.request.Request(
             url,
@@ -147,8 +146,12 @@ def obtenir_infos_course():
                 nps = [str(p.get("numProno")) for p in res_j.get("participants", []) if p.get("statut") == "NON_PARTANT"]
                 data["non_partants"] = ", ".join(nps) if nps else "Aucun"
 
-                statut = res_j.get("statut", "")
-                data["statut"] = "TERMINEE" if statut in ["ARRIVEE_DEFINITIVE", "ARRIVEE_PROVISOIRE"] else "NON_PARTIE"
+                # Détection de l'état d'arrivée de la course
+                statut_raw = str(res_j.get("statut", "")).upper()
+                if statut_raw in ["ARRIVEE_DEFINITIVE", "ARRIVEE_PROVISOIRE", "ARRIVEE"]:
+                    data["statut"] = "ARRIVEE"
+                else:
+                    data["statut"] = "NON_PARTIE"
 
         # 2. Arrivée de la veille
         prog_v = fetch_json(f"{base_url}/{date_pmu_veille}")
@@ -163,13 +166,13 @@ def obtenir_infos_course():
     except Exception as e:
         print(f"Erreur globale lors de la récupération : {e}")
 
-    # 3. Calcul Pronostic SGE (par ordre de score)
+    # 3. Calcul Pronostic SGE
     data["pronostic_sge"] = generer_pronostic_sge(data["arrivee_veille"])
 
     return data
 
 # ==============================================================================
-# 3. ALGORITHMES SGE (MODIFIÉ : ORDRE DE SCORE CONSERVÉ)
+# 3. ALGORITHMES SGE
 # ==============================================================================
 
 def generer_pronostic_sge(arrivee_ref: List[int]) -> List[int]:
@@ -180,16 +183,13 @@ def generer_pronostic_sge(arrivee_ref: List[int]) -> List[int]:
             score += 1.5
         scores[num] = score
 
-    # Tri par score décroissant (les plus performants en premier)
     tri = sorted(scores.items(), key=lambda x: x[1], reverse=True)
     top_5 = [num for num, sc in tri[:5]]
 
-    # Validation du pilier central
     piliers = {3, 5, 11, 13}
     if not any(n in piliers for n in top_5):
         top_5[4] = 5
 
-    # Conservation du rang réel de préférence
     return top_5
 
 def est_combinaison_valide(combinaison: List[int]) -> bool:
@@ -233,7 +233,7 @@ def evaluer_combinaison(combinaison: List[int], arrivee_veille: List[int]) -> fl
     return round(score, 2)
 
 # ==============================================================================
-# 4. ENDPOINTS FASTAPI & MODÈLES
+# 4. ENDPOINTS FASTAPI
 # ==============================================================================
 
 class CombinationRequest(BaseModel):
