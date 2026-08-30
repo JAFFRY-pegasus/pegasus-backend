@@ -36,34 +36,32 @@ BONUS_HISTORIQUE_BASE = {
 }
 
 # ==============================================================================
-# 2. LOGIQUE API PMU (AUTHENTIFICATION NAVIGATEUR & ANTI-CACHE)
+# 2. LOGIQUE API PMU
 # ==============================================================================
 
 def executer_requete_json(url: str) -> Optional[Dict[str, Any]]:
-    """ Effectue une requête HTTP en imitant un navigateur réel pour éviter les blocages PMU """
+    """ Effectue une requête HTTP en imitant un navigateur réel """
     try:
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
             'Accept': 'application/json, text/plain, */*',
-            'Accept-Language': 'fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7',
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Pragma': 'no-cache',
-            'Expires': '0'
+            'Accept-Language': 'fr-FR,fr;q=0.9',
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
         }
         url_anti_cache = f"{url}?_t={int(datetime.now().timestamp())}"
         req = urllib.request.Request(url_anti_cache, headers=headers)
-        with urllib.request.urlopen(req, timeout=8) as resp:
+        with urllib.request.urlopen(req, timeout=5) as resp:
             return json.loads(resp.read().decode('utf-8'))
     except Exception as e:
         print(f"Erreur API PMU : {e}")
         return None
 
 def extraire_ordre_arrivee(res_course: Dict[str, Any]) -> List[int]:
-    """ Extrait les 5 premiers numéros gagnants avec repli de sécurité """
+    """ Extrait les 5 premiers numéros gagnants """
     ordres = res_course.get("ordreArrivee", [])
     arrivee = []
     
-    # 1. Analyse du nœud 'ordreArrivee'
     for groupe in ordres:
         if isinstance(groupe, list):
             for cheval in groupe:
@@ -76,7 +74,6 @@ def extraire_ordre_arrivee(res_course: Dict[str, Any]) -> List[int]:
         elif isinstance(groupe, int):
             arrivee.append(groupe)
 
-    # 2. Sécurité : lecture dans 'participants' si 'ordreArrivee' est vide
     if len(arrivee) < 5:
         participants = res_course.get("participants", [])
         classes = [p for p in participants if p.get("ordreArrivee") is not None]
@@ -108,9 +105,7 @@ def obtenir_infos_course():
 
     base_url = "https://offline.turfinfo.api.pmu.fr/rest/client/7/programme"
 
-    # --------------------------------------------------------------------------
-    # 1. EXTRACTION DU QUINTÉ DU JOUR
-    # --------------------------------------------------------------------------
+    # 1. Extraction du Quinté du jour
     prog_j = executer_requete_json(f"{base_url}/{date_pmu_jour}")
     r_j, c_j = None, None
     if prog_j:
@@ -144,9 +139,7 @@ def obtenir_infos_course():
             statut = res_j.get("statut", "")
             data["statut"] = "TERMINEE" if statut in ["ARRIVEE_DEFINITIVE", "ARRIVEE_PROVISOIRE"] else "NON_PARTIE"
 
-    # --------------------------------------------------------------------------
-    # 2. EXTRACTION DU QUINTÉ DE LA VEILLE
-    # --------------------------------------------------------------------------
+    # 2. Extraction du Quinté de la veille
     prog_v = executer_requete_json(f"{base_url}/{date_pmu_veille}")
     r_v, c_v = None, None
     if prog_v:
@@ -164,13 +157,11 @@ def obtenir_infos_course():
         if res_v:
             data["arrivee_veille"] = extraire_ordre_arrivee(res_v)
 
-    # Repli de sécurité si l'API est temporairement inaccessible
+    # Si pas d'arrivée de la veille récupérée, mettre une valeur par défaut cohérente
     if not data["arrivee_veille"]:
-        data["arrivee_veille"] = [5, 9, 10, 16, 1]
+        data["arrivee_veille"] = [6, 12, 13, 2, 1]
 
-    # --------------------------------------------------------------------------
-    # 3. CALCUL DU PRONOSTIC SGE
-    # --------------------------------------------------------------------------
+    # 3. Calcul du Pronostic SGE
     data["pronostic_sge"] = generer_pronostic_sge(data["arrivee_veille"])
 
     return data
