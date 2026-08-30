@@ -1,9 +1,9 @@
 import os
-import urllib.request
+import subprocess
 import json
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
-from typing import List, Optional, Tuple, Dict, Any
+from typing import List, Optional, Dict, Any
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -20,7 +20,7 @@ app.add_middleware(
 )
 
 # ==============================================================================
-# 1. CONSTANTES & PONDÉRATIONS (INCHANGÉES)
+# 1. CONSTANTES & PONDÉRATIONS
 # ==============================================================================
 
 AXIS_WEIGHTS = {
@@ -36,29 +36,26 @@ BONUS_HISTORIQUE_BASE = {
 }
 
 # ==============================================================================
-# 2. LOGIQUE API PMU
+# 2. LOGIQUE API PMU VIA CURL (CONTOURNE LE BLOCAGE IP & CORS)
 # ==============================================================================
 
-def executer_requete_json(url: str) -> Optional[Dict[str, Any]]:
-    """ Effectue une requête HTTP en imitant un navigateur réel """
+def executer_requete_curl(url: str) -> Optional[Dict[str, Any]]:
+    """ Utilise curl système pour bypass le filtrage anti-bot du PMU """
+    cmd = [
+        "curl", "-s", "-L",
+        "-H", "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "-H", "Accept: application/json, text/plain, */*",
+        url
+    ]
     try:
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-            'Accept': 'application/json, text/plain, */*',
-            'Accept-Language': 'fr-FR,fr;q=0.9',
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache'
-        }
-        url_anti_cache = f"{url}?_t={int(datetime.now().timestamp())}"
-        req = urllib.request.Request(url_anti_cache, headers=headers)
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            return json.loads(resp.read().decode('utf-8'))
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+        if result.returncode == 0 and result.stdout:
+            return json.loads(result.stdout)
     except Exception as e:
-        print(f"Erreur API PMU : {e}")
-        return None
+        print(f"Erreur curl sur {url} : {e}")
+    return None
 
 def extraire_ordre_arrivee(res_course: Dict[str, Any]) -> List[int]:
-    """ Extrait les 5 premiers numéros gagnants """
     ordres = res_course.get("ordreArrivee", [])
     arrivee = []
     
@@ -92,9 +89,9 @@ def obtenir_infos_course():
 
     data = {
         "date": date_du_jour_str,
-        "hippodrome": "EN ATTENTE",
+        "hippodrome": "NON DISPONIBLE",
         "code_course": "R--C--",
-        "course": "CHARGEMENT DES DONNÉES...",
+        "course": "QUINTÉ DU JOUR",
         "discipline": "--",
         "distance": "-- m",
         "non_partants": "Aucun",
@@ -105,8 +102,8 @@ def obtenir_infos_course():
 
     base_url = "https://offline.turfinfo.api.pmu.fr/rest/client/7/programme"
 
-    # 1. Extraction du Quinté du jour
-    prog_j = executer_requete_json(f"{base_url}/{date_pmu_jour}")
+    # 1. Quinté du jour
+    prog_j = executer_requete_curl(f"{base_url}/{date_pmu_jour}")
     r_j, c_j = None, None
     if prog_j:
         for reunion in prog_j.get("programme", {}).get("reunions", []):
@@ -119,7 +116,7 @@ def obtenir_infos_course():
                     break
 
     if r_j and c_j:
-        res_j = executer_requete_json(f"{base_url}/{date_pmu_jour}/R{r_j}/C{c_j}")
+        res_j = executer_requete_curl(f"{base_url}/{date_pmu_jour}/R{r_j}/C{c_j}")
         if res_j:
             hippo = res_j.get("hippodrome", {}).get("libelleCourt", "INCONNU")
             libelle = res_j.get("libelle", "PRIX DU JOUR")
@@ -129,8 +126,8 @@ def obtenir_infos_course():
             data["code_course"] = code
             data["course"] = f"[{code}] {libelle}"
             
-            discipline_raw = res_j.get("discipline", "INCONNU")
-            data["discipline"] = discipline_raw.replace("_", " ").title()
+            discipline_raw = res_j.get("specialite", res_j.get("discipline", "INCONNU"))
+            data["discipline"] = str(discipline_raw).replace("_", " ").title()
             data["distance"] = f"{res_j.get('distance', 0)} m"
             
             nps = [str(p.get("numProno")) for p in res_j.get("participants", []) if p.get("statut") == "NON_PARTANT"]
@@ -139,8 +136,8 @@ def obtenir_infos_course():
             statut = res_j.get("statut", "")
             data["statut"] = "TERMINEE" if statut in ["ARRIVEE_DEFINITIVE", "ARRIVEE_PROVISOIRE"] else "NON_PARTIE"
 
-    # 2. Extraction du Quinté de la veille
-    prog_v = executer_requete_json(f"{base_url}/{date_pmu_veille}")
+    # 2. Quinté de la veille
+    prog_v = executer_requete_curl(f"{base_url}/{date_pmu_veille}")
     r_v, c_v = None, None
     if prog_v:
         for reunion in prog_v.get("programme", {}).get("reunions", []):
@@ -153,21 +150,20 @@ def obtenir_infos_course():
                     break
 
     if r_v and c_v:
-        res_v = executer_requete_json(f"{base_url}/{date_pmu_veille}/R{r_v}/C{c_v}")
+        res_v = executer_requete_curl(f"{base_url}/{date_pmu_veille}/R{r_v}/C{c_v}")
         if res_v:
             data["arrivee_veille"] = extraire_ordre_arrivee(res_v)
 
-    # Si pas d'arrivée de la veille récupérée, mettre une valeur par défaut cohérente
     if not data["arrivee_veille"]:
         data["arrivee_veille"] = [6, 12, 13, 2, 1]
 
-    # 3. Calcul du Pronostic SGE
+    # 3. Calcul Pronostic SGE
     data["pronostic_sge"] = generer_pronostic_sge(data["arrivee_veille"])
 
     return data
 
 # ==============================================================================
-# 3. ALGORITHMES SGE (INCHANGÉS)
+# 3. ALGORITHMES SGE
 # ==============================================================================
 
 def generer_pronostic_sge(arrivee_ref: List[int]) -> List[int]:
@@ -228,7 +224,7 @@ def evaluer_combinaison(combinaison: List[int], arrivee_veille: List[int]) -> fl
     return round(score, 2)
 
 # ==============================================================================
-# 4. ENDPOINTS FASTAPI (INCHANGÉS)
+# 4. ENDPOINTS FASTAPI
 # ==============================================================================
 
 class CombinationRequest(BaseModel):
