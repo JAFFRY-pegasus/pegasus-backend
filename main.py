@@ -109,41 +109,41 @@ def obtenir_infos_course():
     date_pmu_jour = now.strftime("%d%m%Y")
     date_pmu_veille = (now - timedelta(days=1)).strftime("%d%m%Y")
 
-    # Structure avec valeurs génériques nettoyées
+    # Initialisation neutre : aucune donnée fictive en dur
     data = {
         "date": date_du_jour_str,
-        "hippodrome": "SAINT CLOUD",
-        "code_course": "R1C1",
-        "course": "[R1C1] PRIX DE SAINT-PAIR-DU-MONT",
-        "discipline": "Plat",
-        "distance": "2400 m",
+        "hippodrome": "",
+        "code_course": "",
+        "course": "",
+        "discipline": "",
+        "distance": "",
         "non_partants": "Aucun",
         "statut": "NON_PARTIE",
-        "arrivee_veille": [6, 12, 13, 2, 1],
+        "arrivee_veille": [],  # Dépend strictement de la réponse de l'API PMU
         "pronostic_sge": []
     }
 
     base_url = "https://offline.turfinfo.api.pmu.fr/rest/client/7/programme"
 
     try:
-        # 1. Quinté du jour
+        # 1. Quinté du jour depuis l'API PMU
         prog_j = fetch_json(f"{base_url}/{date_pmu_jour}")
         r_j, c_j = trouver_quinte_dans_programme(prog_j)
 
         if r_j is not None and c_j is not None:
             res_j = fetch_json(f"{base_url}/{date_pmu_jour}/R{r_j}/C{c_j}")
             if res_j:
-                hippo = res_j.get("hippodrome", {}).get("libelleCourt", "SAINT CLOUD")
-                libelle = res_j.get("libelle", "PRIX DU JOUR")
+                hippo = res_j.get("hippodrome", {}).get("libelleCourt", "")
+                libelle = res_j.get("libelle", "")
                 code = f"R{r_j}C{c_j}"
                 
                 data["hippodrome"] = hippo
                 data["code_course"] = code
                 data["course"] = f"[{code}] {libelle}"
                 
-                discipline_raw = res_j.get("specialite", res_j.get("discipline", "Plat"))
+                discipline_raw = res_j.get("specialite", res_j.get("discipline", ""))
                 data["discipline"] = str(discipline_raw).replace("_", " ").title()
-                data["distance"] = f"{res_j.get('distance', 2400)} m"
+                data["distance"] = f"{res_j.get('distance', '')} m" if res_j.get('distance') else ""
                 
                 nps = [str(p.get("numProno")) for p in res_j.get("participants", []) if p.get("statut") == "NON_PARTANT"]
                 data["non_partants"] = ", ".join(nps) if nps else "Aucun"
@@ -155,7 +155,7 @@ def obtenir_infos_course():
                 else:
                     data["statut"] = "NON_PARTIE"
 
-        # 2. Arrivée de la veille
+        # 2. Arrivée de la veille depuis l'API PMU
         prog_v = fetch_json(f"{base_url}/{date_pmu_veille}")
         r_v, c_v = trouver_quinte_dans_programme(prog_v)
 
@@ -166,10 +166,11 @@ def obtenir_infos_course():
                 if arr:
                     data["arrivee_veille"] = arr
     except Exception as e:
-        print(f"Erreur globale lors de la récupération : {e}")
+        print(f"Erreur API PMU : {e}")
 
-    # 3. Calcul Pronostic SGE
-    data["pronostic_sge"] = generer_pronostic_sge(data["arrivee_veille"])
+    # 3. Calcul du Pronostic SGE si l'arrivée de la veille est disponible
+    if data["arrivee_veille"]:
+        data["pronostic_sge"] = generer_pronostic_sge(data["arrivee_veille"])
 
     return data
 
