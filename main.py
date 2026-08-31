@@ -109,16 +109,16 @@ def obtenir_infos_course():
     date_pmu_jour = now.strftime("%d%m%Y")
     date_pmu_veille = (now - timedelta(days=1)).strftime("%d%m%Y")
 
-    # Structure par défaut initialisée avec les données du jour (R1C3 - DEAUVILLE)
+    # Structure avec valeurs génériques nettoyées
     data = {
         "date": date_du_jour_str,
-        "hippodrome": "DEAUVILLE",
-        "code_course": "R1C3",
-        "course": "[R1C3] PRIX HOTEL BARRIERE LE NORMANDY",
+        "hippodrome": "SAINT CLOUD",
+        "code_course": "R1C1",
+        "course": "[R1C1] PRIX DE SAINT-PAIR-DU-MONT",
         "discipline": "Plat",
-        "distance": "1600 m",
-        "non_partants": "15",
-        "statut": "ARRIVEE",
+        "distance": "2400 m",
+        "non_partants": "Aucun",
+        "statut": "NON_PARTIE",
         "arrivee_veille": [6, 12, 13, 2, 1],
         "pronostic_sge": []
     }
@@ -130,11 +130,11 @@ def obtenir_infos_course():
         prog_j = fetch_json(f"{base_url}/{date_pmu_jour}")
         r_j, c_j = trouver_quinte_dans_programme(prog_j)
 
-        if r_j and c_j:
+        if r_j is not None and c_j is not None:
             res_j = fetch_json(f"{base_url}/{date_pmu_jour}/R{r_j}/C{c_j}")
             if res_j:
-                hippo = res_j.get("hippodrome", {}).get("libelleCourt", "DEAUVILLE")
-                libelle = res_j.get("libelle", "PRIX HOTEL BARRIERE LE NORMANDY")
+                hippo = res_j.get("hippodrome", {}).get("libelleCourt", "SAINT CLOUD")
+                libelle = res_j.get("libelle", "PRIX DU JOUR")
                 code = f"R{r_j}C{c_j}"
                 
                 data["hippodrome"] = hippo
@@ -143,23 +143,23 @@ def obtenir_infos_course():
                 
                 discipline_raw = res_j.get("specialite", res_j.get("discipline", "Plat"))
                 data["discipline"] = str(discipline_raw).replace("_", " ").title()
-                data["distance"] = f"{res_j.get('distance', 1600)} m"
+                data["distance"] = f"{res_j.get('distance', 2400)} m"
                 
                 nps = [str(p.get("numProno")) for p in res_j.get("participants", []) if p.get("statut") == "NON_PARTANT"]
-                data["non_partants"] = ", ".join(nps) if nps else "15"
+                data["non_partants"] = ", ".join(nps) if nps else "Aucun"
 
-                # Détection et mise à jour de l'état du statut
+                # Détection dynamique du statut de la course
                 statut_raw = str(res_j.get("statut", "")).upper()
-                if statut_raw in ["PROGRAMMEE", "A_PARTIR"]:
-                    data["statut"] = "NON_PARTIE"
-                else:
+                if any(k in statut_raw for k in ["ARRIVEE", "FIN", "TERMINE", "CLOTURE"]):
                     data["statut"] = "ARRIVEE"
+                else:
+                    data["statut"] = "NON_PARTIE"
 
         # 2. Arrivée de la veille
         prog_v = fetch_json(f"{base_url}/{date_pmu_veille}")
         r_v, c_v = trouver_quinte_dans_programme(prog_v)
 
-        if r_v and c_v:
+        if r_v is not None and c_v is not None:
             res_v = fetch_json(f"{base_url}/{date_pmu_veille}/R{r_v}/C{c_v}")
             if res_v:
                 arr = extraire_ordre_arrivee(res_v)
