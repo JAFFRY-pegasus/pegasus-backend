@@ -36,7 +36,7 @@ BONUS_HISTORIQUE_BASE = {
 }
 
 # ==============================================================================
-# 2. LOGIQUE API PMU NATIVE (SERVERLESS / VERCEL COMPATIBLE)
+# 2. LOGIQUE API PMU NATIVE
 # ==============================================================================
 
 def fetch_json(url: str) -> Optional[Dict[str, Any]]:
@@ -109,7 +109,7 @@ def obtenir_infos_course():
     date_pmu_jour = now.strftime("%d%m%Y")
     date_pmu_veille = (now - timedelta(days=1)).strftime("%d%m%Y")
 
-    # Valeurs par défaut si l'API PMU ne répond pas
+    # Valeurs de secours si l'API du PMU est temporairement inaccessible
     data = {
         "date": date_du_jour_str,
         "hippodrome": "SAINT CLOUD",
@@ -126,7 +126,7 @@ def obtenir_infos_course():
     base_url = "https://offline.turfinfo.api.pmu.fr/rest/client/7/programme"
 
     try:
-        # 1. Tentative d'actualisation dynamique : Quinté du jour
+        # 1. Quinté du jour depuis l'API PMU
         prog_j = fetch_json(f"{base_url}/{date_pmu_jour}")
         r_j, c_j = trouver_quinte_dans_programme(prog_j)
 
@@ -134,7 +134,7 @@ def obtenir_infos_course():
             res_j = fetch_json(f"{base_url}/{date_pmu_jour}/R{r_j}/C{c_j}")
             if res_j:
                 hippo = res_j.get("hippodrome", {}).get("libelleCourt", "SAINT CLOUD")
-                libelle = res_j.get("libelle", "PRIX DE SAINT-PAIR-DU-MONT")
+                libelle = res_j.get("libelle", "PRIX DU JOUR")
                 code = f"R{r_j}C{c_j}"
                 
                 data["hippodrome"] = hippo
@@ -154,7 +154,7 @@ def obtenir_infos_course():
                 else:
                     data["statut"] = "NON_PARTIE"
 
-        # 2. Tentative d'actualisation dynamique : Arrivée de la veille
+        # 2. Arrivée de la veille depuis l'API PMU
         prog_v = fetch_json(f"{base_url}/{date_pmu_veille}")
         r_v, c_v = trouver_quinte_dans_programme(prog_v)
 
@@ -165,7 +165,7 @@ def obtenir_infos_course():
                 if arr:
                     data["arrivee_veille"] = arr
     except Exception as e:
-        print(f"Erreur API PMU : {e}")
+        print(f"Erreur globale lors de la récupération PMU : {e}")
 
     # 3. Calcul Pronostic SGE
     data["pronostic_sge"] = generer_pronostic_sge(data["arrivee_veille"])
@@ -273,4 +273,3 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 10000))
     uvicorn.run(app, host="0.0.0.0", port=port)
-
