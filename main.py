@@ -1,4 +1,5 @@
 import os
+import asyncio
 import urllib.request
 import json
 from datetime import datetime, timedelta
@@ -18,6 +19,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ==============================================================================
+# 0. CONFIGURATION DU RAFRAICHISSEMENT AUTOMATIQUE
+# ==============================================================================
+
+REFRESH_INTERVAL_DEFAULT = 90
+REFRESH_INTERVAL_LIVE = 20  # utilisé si le départ est imminent (< 10 min)
+
+_cache: Dict[str, Any] = {"data": None, "last_updated": None}
+_cache_lock = asyncio.Lock()
 
 # ==============================================================================
 # 1. CONSTANTES & PONDÉRATIONS
@@ -60,7 +71,7 @@ def extraire_ordre_arrivee(res_course: Dict[str, Any]) -> List[int]:
         return []
     ordres = res_course.get("ordreArrivee", [])
     arrivee = []
-    
+
     for groupe in ordres:
         if isinstance(groupe, list):
             for cheval in groupe:
@@ -84,7 +95,7 @@ def extraire_ordre_arrivee(res_course: Dict[str, Any]) -> List[int]:
 def trouver_quinte_dans_programme(programme: Dict[str, Any]) -> Tuple[Optional[int], Optional[int]]:
     if not programme or "programme" not in programme:
         return None, None
-        
+
     for reunion in programme.get("programme", {}).get("reunions", []):
         num_r = reunion.get("numOfficiel")
         for course in reunion.get("courses", []):
@@ -101,15 +112,26 @@ def trouver_quinte_dans_programme(programme: Dict[str, Any]) -> Tuple[Optional[i
                 return num_r, num_c
     return None, None
 
-def obtenir_infos_course():
+def _heure_depart(res_course: Dict[str, Any]) -> Optional[datetime]:
+    """ Tente d'extraire l'heure de départ officielle pour ajuster le statut/l'intervalle """
+    ts = res_course.get("heureDepart")
+    if not ts:
+        return None
+    try:
+        return datetime.fromtimestamp(ts / 1000, tz=ZoneInfo("Europe/Paris"))
+    except Exception:
+        return None
+
+def obtenir_infos_course_sync() -> Dict[str, Any]:
+    """ Appel bloquant réel vers l'API PMU. N'est appelé QUE par la tâche de fond,
+    jamais directement par une requête visiteur. """
     tz = ZoneInfo("Europe/Paris")
     now = datetime.now(tz)
-    
+
     date_du_jour_str = now.strftime("%d/%m/%Y")
     date_pmu_jour = now.strftime("%d%m%Y")
     date_pmu_veille = (now - timedelta(days=1)).strftime("%d%m%Y")
 
-    # Valeurs de secours si l'API du PMU est temporairement inaccessible
     data = {
         "date": date_du_jour_str,
         "hippodrome": "SAINT CLOUD",
@@ -120,13 +142,13 @@ def obtenir_infos_course():
         "non_partants": "Aucun",
         "statut": "NON_PARTIE",
         "arrivee_veille": [4, 11, 8, 9, 7],
-        "pronostic_sge": []
+        "pronostic_sge": [],
+        "heure_depart_estimee": None,
     }
 
     base_url = "https://offline.turfinfo.api.pmu.fr/rest/client/7/programme"
 
     try:
-        # 1. Quinté du jour depuis l'API PMU
         prog_j = fetch_json(f"{base_url}/{date_pmu_jour}")
         r_j, c_j = trouver_quinte_dans_programme(prog_j)
 
@@ -136,25 +158,30 @@ def obtenir_infos_course():
                 hippo = res_j.get("hippodrome", {}).get("libelleCourt", "SAINT CLOUD")
                 libelle = res_j.get("libelle", "PRIX DU JOUR")
                 code = f"R{r_j}C{c_j}"
-                
+
                 data["hippodrome"] = hippo
                 data["code_course"] = code
                 data["course"] = f"[{code}] {libelle}"
-                
+
                 discipline_raw = res_j.get("specialite", res_j.get("discipline", "Plat"))
                 data["discipline"] = str(discipline_raw).replace("_", " ").title()
                 data["distance"] = f"{res_j.get('distance', 2400)} m"
-                
+
                 nps = [str(p.get("numProno")) for p in res_j.get("participants", []) if p.get("statut") == "NON_PARTANT"]
                 data["non_partants"] = ", ".join(nps) if nps else "Aucun"
 
                 statut_raw = str(res_j.get("statut", "")).upper()
                 if any(k in statut_raw for k in ["ARRIVEE", "FIN", "TERMINE", "CLOTURE"]):
                     data["statut"] = "ARRIVEE"
+                elif any(k in statut_raw for k in ["COURSE_EN_COURS", "PARTIS", "DEPART_EFFECTUE"]):
+                    data["statut"] = "EN_COURS"
                 else:
                     data["statut"] = "NON_PARTIE"
 
-        # 2. Arrivée de la veille depuis l'API PMU
+                depart = _heure_depart(res_j)
+                if depart:
+                    data["heure_depart_estimee"] = depart.isoformat()
+
         prog_v = fetch_json(f"{base_url}/{date_pmu_veille}")
         r_v, c_v = trouver_quinte_dans_programme(prog_v)
 
@@ -167,9 +194,7 @@ def obtenir_infos_course():
     except Exception as e:
         print(f"Erreur globale lors de la récupération PMU : {e}")
 
-    # 3. Calcul Pronostic SGE
     data["pronostic_sge"] = generer_pronostic_sge(data["arrivee_veille"])
-
     return data
 
 # ==============================================================================
@@ -188,7 +213,7 @@ def generer_pronostic_sge(arrivee_ref: List[int]) -> List[int]:
     top_5 = [num for num, sc in tri[:5]]
 
     piliers = {3, 5, 11, 13}
-    if not any(n in piliers for n in top_5):
+    if not any(n in piliers for n in top_5) and 5 not in top_5:
         top_5[4] = 5
 
     return top_5
@@ -234,7 +259,44 @@ def evaluer_combinaison(combinaison: List[int], arrivee_veille: List[int]) -> fl
     return round(score, 2)
 
 # ==============================================================================
-# 4. ENDPOINTS FASTAPI
+# 4. TACHE DE FOND : RAFRAICHISSEMENT AUTOMATIQUE DU CACHE
+# ==============================================================================
+
+async def refresh_loop():
+    """ Boucle infinie lancée au démarrage du serveur : interroge le PMU,
+    met à jour le cache, attend, recommence. C'est CE thread qui appelle
+    le PMU — jamais les requêtes des visiteurs. """
+    while True:
+        try:
+            loop = asyncio.get_event_loop()
+            data = await loop.run_in_executor(None, obtenir_infos_course_sync)
+
+            async with _cache_lock:
+                _cache["data"] = data
+                _cache["last_updated"] = datetime.now(ZoneInfo("Europe/Paris")).isoformat()
+
+            interval = REFRESH_INTERVAL_DEFAULT
+            depart_str = data.get("heure_depart_estimee")
+            if depart_str:
+                try:
+                    depart = datetime.fromisoformat(depart_str)
+                    delta = (depart - datetime.now(ZoneInfo("Europe/Paris"))).total_seconds()
+                    if 0 <= delta <= 600:
+                        interval = REFRESH_INTERVAL_LIVE
+                except Exception:
+                    pass
+        except Exception as e:
+            print(f"Erreur dans refresh_loop: {e}")
+            interval = REFRESH_INTERVAL_DEFAULT
+
+        await asyncio.sleep(interval)
+
+@app.on_event("startup")
+async def start_background_refresh():
+    asyncio.create_task(refresh_loop())
+
+# ==============================================================================
+# 5. ENDPOINTS FASTAPI
 # ==============================================================================
 
 class CombinationRequest(BaseModel):
@@ -249,16 +311,38 @@ def read_root():
     return {"status": "ok", "message": "Fichier index.html introuvable"}
 
 @app.get("/race-info")
-def get_race_info():
-    return obtenir_infos_course()
+async def get_race_info():
+    """ Ne fait plus AUCUN appel PMU : lit uniquement le cache mis à jour
+    par la tâche de fond. Réponse instantanée pour tous les visiteurs. """
+    async with _cache_lock:
+        if _cache["data"] is None:
+            loop = asyncio.get_event_loop()
+            data = await loop.run_in_executor(None, obtenir_infos_course_sync)
+            _cache["data"] = data
+            _cache["last_updated"] = datetime.now(ZoneInfo("Europe/Paris")).isoformat()
+        return {
+            **_cache["data"],
+            "cache_last_updated": _cache["last_updated"],
+        }
 
 @app.post("/evaluate")
-def evaluate(payload: CombinationRequest):
+async def evaluate(payload: CombinationRequest):
     grid = payload.numbers
     if len(grid) != 5:
         raise HTTPException(status_code=400, detail="5 numéros requis.")
 
-    infos = obtenir_infos_course()
+    async with _cache_lock:
+        infos = _cache["data"]
+
+    if infos is None:
+        # Cas limite : cache pas encore rempli au tout premier appel.
+        # run_in_executor pour ne pas bloquer l'event loop.
+        loop = asyncio.get_event_loop()
+        infos = await loop.run_in_executor(None, obtenir_infos_course_sync)
+        async with _cache_lock:
+            _cache["data"] = infos
+            _cache["last_updated"] = datetime.now(ZoneInfo("Europe/Paris")).isoformat()
+
     valide = est_combinaison_valide(grid)
     score = evaluer_combinaison(grid, infos["arrivee_veille"]) if valide else 0.0
 
