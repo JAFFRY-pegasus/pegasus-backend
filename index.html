@@ -323,89 +323,6 @@
         }
     }
 
-    function formatDatePMU(date) {
-        const d = String(date.getDate()).padStart(2, '0');
-        const m = String(date.getMonth() + 1).padStart(2, '0');
-        const y = date.getFullYear();
-        return `${d}${m}${y}`;
-    }
-
-    async function chargerInfosDirectNavigateur() {
-        try {
-            const today = new Date();
-            const yesterday = new Date(today);
-            yesterday.setDate(yesterday.getDate() - 1);
-
-            const dateJour = formatDatePMU(today);
-            const dateVeille = formatDatePMU(yesterday);
-
-            const resProg = await fetch(`https://offline.turfinfo.api.pmu.fr/rest/client/7/programme/${dateJour}?_t=${Date.now()}`);
-            if (resProg.ok) {
-                const dataProg = await resProg.json();
-                let rJ, cJ;
-                for (const r of dataProg.programme.reunions || []) {
-                    for (const c of r.courses || []) {
-                        const offres = (c.offresParis || []).map(o => String(o.family).toUpperCase());
-                        if (offres.includes("QUINTO") || offres.includes("E_QUINTE_PLUS") || c.quintePlus === true) {
-                            rJ = r.numOfficiel;
-                            cJ = c.numOrdre;
-                            break;
-                        }
-                    }
-                }
-
-                if (rJ && cJ) {
-                    const resCourse = await fetch(`https://offline.turfinfo.api.pmu.fr/rest/client/7/programme/${dateJour}/R${rJ}/C${cJ}?_t=${Date.now()}`);
-                    if (resCourse.ok) {
-                        const courseData = await resCourse.json();
-                        document.getElementById("race-hippo").innerText = courseData.hippodrome?.libelleCourt || "INCONNU";
-                        document.getElementById("race-name").innerText = `[R${rJ}C${cJ}] ${courseData.libelle || 'PRIX DU JOUR'}`;
-                        document.getElementById("race-details").innerText = `${(courseData.discipline || '').replace(/_/g, ' ')} (${courseData.distance || 0} m)`;
-                        
-                        const nps = (courseData.participants || []).filter(p => p.statut === "NON_PARTANT").map(p => p.numProno);
-                        document.getElementById("race-nps").innerText = nps.length > 0 ? nps.join(", ") : "Aucun";
-                        
-                        const statut = courseData.statut === "ARRIVEE_DEFINITIVE" || courseData.statut === "ARRIVEE_PROVISOIRE" ? "COURSE TERMINÉE" : "COURSE NON PARTIE";
-                        document.getElementById("race-status").innerText = statut;
-                    }
-                }
-            }
-
-            const resVeilleProg = await fetch(`https://offline.turfinfo.api.pmu.fr/rest/client/7/programme/${dateVeille}?_t=${Date.now()}`);
-            if (resVeilleProg.ok) {
-                const dataVeilleProg = await resVeilleProg.json();
-                let rV, cV;
-                for (const r of dataVeilleProg.programme.reunions || []) {
-                    for (const c of r.courses || []) {
-                        const offres = (c.offresParis || []).map(o => String(o.family).toUpperCase());
-                        if (offres.includes("QUINTO") || offres.includes("E_QUINTE_PLUS") || c.quintePlus === true) {
-                            rV = r.numOfficiel;
-                            cV = c.numOrdre;
-                            break;
-                        }
-                    }
-                }
-                if (rV && cV) {
-                    const resVeilleCourse = await fetch(`https://offline.turfinfo.api.pmu.fr/rest/client/7/programme/${dateVeille}/R${rV}/C${cV}?_t=${Date.now()}`);
-                    if (resVeilleCourse.ok) {
-                        const vData = await resVeilleCourse.json();
-                        let arr = [];
-                        (vData.ordreArrivee || []).forEach(g => {
-                            if (Array.isArray(g)) g.forEach(c => arr.push(c.numProno || c));
-                            else arr.push(g.numProno || g);
-                        });
-                        if (arr.length >= 5) {
-                            currentArriveeVeille = arr.slice(0, 5).map(Number);
-                            afficherArriveeVeille(currentArriveeVeille);
-                        }
-                    }
-                }
-            }
-        } catch (e) {
-            console.log("Repli serveur");
-        }
-    }
-
     function afficherArriveeVeille(arr) {
         const container = document.getElementById("arrivee-veille-container");
         if (container && arr.length >= 5) {
@@ -441,13 +358,12 @@
         } catch (e) {
             console.error("Erreur serveur API", e);
         }
-        
-        await chargerInfosDirectNavigateur();
     }
 
     document.addEventListener("DOMContentLoaded", () => {
         renderGrid();
         loadRaceInfo();
+        setInterval(loadRaceInfo, 30000);
     });
 </script>
 </body>
