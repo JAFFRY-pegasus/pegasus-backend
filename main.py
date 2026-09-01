@@ -1,11 +1,11 @@
-import json
-import os
-import tkinter as tk
-from tkinter import ttk
+from fastapi import FastAPI, Form
+from fastapi.responses import HTMLResponse
 from collections import Counter
 
+app = FastAPI()
+
 # ==============================================================================
-# 1. BASE DE DONNÉES HISTORIQUE (244 COURSES)
+# 1. BASE HISTORIQUE COMPLÈTE (244 QUINTÉS)
 # ==============================================================================
 HISTORIQUE_SGE_DATA = [
   {"id": "1", "arrivee": [11, 4, 15, 6, 12]}, {"id": "2", "arrivee": [8, 14, 5, 13, 2]},
@@ -120,179 +120,180 @@ HISTORIQUE_SGE_DATA = [
   {"id": "243", "arrivee": [5, 16, 9, 12, 10]}, {"id": "244", "arrivee": [13, 4, 14, 6, 11]}
 ]
 
-FICHIER_JSON = "historique_complet.json"
-
-def charger_base_donnees():
-    """Génère le fichier JSON s'il est absent, puis charge les données."""
-    if not os.path.exists(FICHIER_JSON):
-        with open(FICHIER_JSON, "w", encoding="utf-8") as f:
-            json.dump(HISTORIQUE_SGE_DATA, f, indent=2, ensure_ascii=False)
-        return HISTORIQUE_SGE_DATA
-    with open(FICHIER_JSON, "r", encoding="utf-8") as f:
-        return json.load(f)
-
 # ==============================================================================
-# 2. MOTEUR GEOMÉTRIQUE SGE (AXES & RÉSONANCE PONDÉRÉE)
+# 2. MOTEUR SGE (AXES, RÉSONANCE & PONDÉRATION)
 # ==============================================================================
 OPPOSITIONS_VERTICALES = {
     1: 9, 2: 10, 3: 11, 4: 12, 5: 13, 6: 14, 7: 15, 8: 16,
     9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 6, 15: 7, 16: 8
 }
 
-COEFFICIENTS_RESONANCE = {
-    0: 0.5,  # Faible résonance
-    1: 1.0,  # Résonance standard
-    2: 1.5,  # Forte résonance (alignement double)
-    3: 2.0   # Résonance maximale
-}
+COEFFICIENTS_RESONANCE = {0: 0.5, 1: 1.0, 2: 1.5, 3: 2.0}
 
-def calculer_poids_axes(historique):
-    """Calcule la fréquence brute des axes verticaux."""
+def calculer_poids_axes():
+    """Calcule la fréquence des axes verticaux sur l'ensemble de l'historique."""
     frequence_axes = Counter()
-    for course in historique:
-        arrivee = course["arrivee"]
-        for num in arrivee:
+    for course in HISTORIQUE_SGE_DATA:
+        arr = course["arrivee"]
+        for num in arr:
             oppose = OPPOSITIONS_VERTICALES[num]
-            if oppose in arrivee:
+            if oppose in arr:
                 axe = tuple(sorted([num, oppose]))
                 frequence_axes[axe] += 1
-    for axe in frequence_axes:
-        frequence_axes[axe] //= 2
-    return frequence_axes
+    # Division par 2 pour éliminer les doublons de paires
+    return {axe: freq // 2 for axe, freq in frequence_axes.items()}
 
-def calculer_score_avec_resonance(combinaison, poids_axes):
-    """
-    Calcule le score de la sélection en combinant :
-    1. La somme des poids bruts des axes.
-    2. Le facteur de Résonance Géométrique (multiplicateur fondé sur le nombre d'axes actifs).
-    """
+POIDS_AXES_HISTORIQUE = calculer_poids_axes()
+
+def calculer_score_sge(combinaison):
+    """Calcule le score pondéré avec le facteur de résonance géométrique."""
     score_brut = 0
     axes_touches = set()
-
-    # Détection des axes présents dans la grille de 5 chevaux
     for i in range(len(combinaison)):
         for j in range(i + 1, len(combinaison)):
             a, b = combinaison[i], combinaison[j]
             if OPPOSITIONS_VERTICALES[a] == b:
                 axe = tuple(sorted([a, b]))
                 axes_touches.add(axe)
-                if axe in poids_axes:
-                    score_brut += poids_axes[axe]
+                if axe in POIDS_AXES_HISTORIQUE:
+                    score_brut += POIDS_AXES_HISTORIQUE[axe]
 
-    # Détermination du niveau de résonance
     nombre_axes = len(axes_touches)
-    ponderation_resonance = COEFFICIENTS_RESONANCE.get(nombre_axes, 2.0)
-
-    # Application de la pondération
-    score_final = int(score_brut * ponderation_resonance) if score_brut > 0 else 0
-    return score_final
+    ponderation = COEFFICIENTS_RESONANCE.get(nombre_axes, 2.0)
+    return int(score_brut * ponderation)
 
 # ==============================================================================
-# 3. INTERFACE GRAPHIQUE (TKINTER DARK MODE)
+# 3. ÉTAT INITIAL ET ROUTES API
 # ==============================================================================
-class PegasusApp(tk.Tk):
-    def __init__(self):
-        super().__init__()
-        self.title("PEGASUS QUINTÉ — Analyseur d'Axes")
-        self.geometry("620x680")
-        self.configure(bg="#1e1e1e")
+course_info = {
+    "date": "01/09/2026",
+    "lieu": "Saint-Cloud",
+    "nom_course": "PRIX DE SAINT-PAIR-DU-MONT",
+    "numero_course": "R1C1",
+    "favoris": "11 - 4 - 7 - 5 - 9",
+    "prono_sge": "11 - 4 - 12 - 7 - 15",
+    "combinaison": "4 - 11 - 8 - 9 - 7"
+}
 
-        self.base_historique = charger_base_donnees()
-        self.poids_axes = calculer_poids_axes(self.base_historique)
-        self.selection = []
-        self.boutons_grille = {}
+@app.get("/", response_class=HTMLResponse)
+def page_visiteur():
+    return generer_html()
 
-        self.creer_widgets()
+@app.post("/update", response_class=HTMLResponse)
+def mettre_a_jour(
+    date: str = Form(...),
+    lieu: str = Form(...),
+    nom_course: str = Form(...),
+    numero_course: str = Form(...),
+    favoris: str = Form(...),
+    prono_sge: str = Form(...),
+    combinaison: str = Form(...)
+):
+    course_info["date"] = date
+    course_info["lieu"] = lieu
+    course_info["nom_course"] = nom_course
+    course_info["numero_course"] = numero_course
+    course_info["favoris"] = favoris
+    course_info["prono_sge"] = prono_sge
+    course_info["combinaison"] = combinaison
+    return generer_html()
 
-    def creer_widgets(self):
-        # En-tête
-        lbl_titre = tk.Label(self, text="PEGASUS QUINTÉ", font=("Helvetica", 22, "bold"), fg="#e67e22", bg="#1e1e1e")
-        lbl_titre.pack(pady=(15, 2))
+def generer_html():
+    # Extraction et calcul du score SGE pour le pronostic SGE
+    nums_prono = [int(n.strip()) for n in course_info["prono_sge"].split("-") if n.strip().isdigit()]
+    score_prono = calculer_score_sge(nums_prono) if len(nums_prono) == 5 else 0
 
-        lbl_sous_titre = tk.Label(self, text="Analyseur d'Axes SGE", font=("Helvetica", 12), fg="#aaaaaa", bg="#1e1e1e")
-        lbl_sous_titre.pack(pady=(0, 15))
+    # Extraction et calcul du score SGE pour la combinaison jouée
+    nums_combi = [int(n.strip()) for n in course_info["combinaison"].split("-") if n.strip().isdigit()]
+    score_combi = calculer_score_sge(nums_combi) if len(nums_combi) == 5 else 0
 
-        # Zone d'informations
-        frame_info = tk.Frame(self, bg="#2d2d2d", bd=1, relief="solid")
-        frame_info.pack(fill="x", padx=20, pady=5)
+    return f"""
+    <!DOCTYPE html>
+    <html lang="fr">
+    <head>
+        <meta charset="UTF-8">
+        <title>PEGASUS QUINTÉ — Analyseur SGE</title>
+        <style>
+            body {{ font-family: Arial, sans-serif; background-color: #1e1e1e; color: #ffffff; margin: 0; padding: 20px; }}
+            .container {{ max-width: 650px; margin: 0 auto; background: #2d2d2d; padding: 25px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }}
+            h1 {{ color: #e67e22; text-align: center; margin-bottom: 5px; }}
+            h3 {{ color: #aaaaaa; text-align: center; margin-top: 0; font-weight: normal; }}
+            .card {{ background: #1e1e1e; padding: 15px; border-radius: 6px; margin-bottom: 20px; border-left: 4px solid #e67e22; }}
+            .badge {{ display: inline-block; background: #e67e22; color: white; padding: 4px 8px; border-radius: 4px; font-weight: bold; margin-right: 3px; }}
+            .badge-prono {{ background: #1abc9c; }}
+            .badge-ref {{ background: #555555; }}
+            .score-box {{ display: flex; justify: space-between; gap: 10px; margin-top: 15px; }}
+            .score-card {{ flex: 1; text-align: center; padding: 10px; background: #1e1e1e; border-radius: 6px; border: 1px solid #444; }}
+            form {{ background: #242424; padding: 15px; border-radius: 6px; margin-top: 20px; }}
+            label {{ font-size: 0.9em; color: #cccccc; display: block; margin-top: 10px; }}
+            input {{ width: 100%; padding: 8px; margin-top: 4px; background: #333333; border: 1px solid #444444; color: white; border-radius: 4px; box-sizing: border-box; }}
+            button {{ width: 100%; background: #1abc9c; color: white; border: none; padding: 10px; margin-top: 15px; font-weight: bold; border-radius: 4px; cursor: pointer; }}
+            button:hover {{ background: #16a085; }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>PEGASUS QUINTÉ</h1>
+            <h3>Analyseur Géométrique SGE ({len(HISTORIQUE_SGE_DATA)} courses en base)</h3>
 
-        lbl_course = tk.Label(frame_info, text="[R1C1] PRIX DE SAINT-PAIR-DU-MONT — Saint-Cloud", font=("Helvetica", 10, "bold"), fg="#ffffff", bg="#2d2d2d")
-        lbl_course.pack(anchor="w", padx=10, pady=(8, 2))
+            <!-- INFORMATIONS COURSE -->
+            <div class="card">
+                <h2 style="margin-top:0; font-size: 1.1em;">[{course_info['numero_course']}] {course_info['nom_course']} — {course_info['lieu']} ({course_info['date']})</h2>
+                <p><strong>Favoris presse :</strong> 
+                    {' '.join([f'<span class="badge">{n.strip()}</span>' for n in course_info['favoris'].split('-')])}
+                </p>
+                <p><strong>Pronostic SGE :</strong> 
+                    {' '.join([f'<span class="badge badge-prono">{n.strip()}</span>' for n in course_info['prono_sge'].split('-')])}
+                </p>
+                <p><strong>Combinaison de la course :</strong> 
+                    {' '.join([f'<span class="badge badge-ref">{n.strip()}</span>' for n in course_info['combinaison'].split('-')])}
+                </p>
+            </div>
 
-        # Badges SGE du jour
-        frame_prono = tk.Frame(frame_info, bg="#2d2d2d")
-        frame_prono.pack(anchor="w", padx=10, pady=2)
-        tk.Label(frame_prono, text="Pronostic SGE : ", font=("Helvetica", 9), fg="#cccccc", bg="#2d2d2d").pack(side="left")
-        for num in [11, 4, 7, 5, 9]:
-            lbl_b = tk.Label(frame_prono, text=f" {num} ", font=("Helvetica", 9, "bold"), fg="#ffffff", bg="#e67e22", bd=0)
-            lbl_b.pack(side="left", padx=2)
+            <!-- TABLEAU DES SCORES GEOMETRIQUES -->
+            <div class="score-box">
+                <div class="score-card">
+                    <div style="font-size:0.85em; color:#aaa;">Pondération Pronostic SGE</div>
+                    <div style="font-size:1.3em; font-weight:bold; color:#1abc9c;">{score_prono} pts</div>
+                </div>
+                <div class="score-card">
+                    <div style="font-size:0.85em; color:#aaa;">Pondération Arrivée/Combinaison</div>
+                    <div style="font-size:1.3em; font-weight:bold; color:#e67e22;">{score_combi} pts</div>
+                </div>
+            </div>
 
-        # Badges Arrivée de référence
-        frame_ref = tk.Frame(frame_info, bg="#2d2d2d")
-        frame_ref.pack(anchor="w", padx=10, pady=(2, 8))
-        tk.Label(frame_ref, text="Arrivée référence : ", font=("Helvetica", 9), fg="#cccccc", bg="#2d2d2d").pack(side="left")
-        for num in [4, 11, 8, 9, 7]:
-            lbl_b = tk.Label(frame_ref, text=f" {num} ", font=("Helvetica", 9, "bold"), fg="#ffffff", bg="#555555", bd=0)
-            lbl_b.pack(side="left", padx=2)
+            <!-- FORMULAIRE D'ÉDITION DES INFOS -->
+            <form action="/update" method="post">
+                <h4 style="margin: 0; color: #e67e22;">Saisir / Éditer les informations de la course</h4>
+                <div style="display: flex; gap: 10px;">
+                    <div style="flex: 1;">
+                        <label>Date :</label>
+                        <input type="text" name="date" value="{course_info['date']}">
+                    </div>
+                    <div style="flex: 1;">
+                        <label>N° Course :</label>
+                        <input type="text" name="numero_course" value="{course_info['numero_course']}">
+                    </div>
+                </div>
 
-        # Grille interactive (1 à 16)
-        lbl_instruction = tk.Label(self, text="Sélectionnez 5 numéros à analyser :", font=("Helvetica", 11), fg="#ffffff", bg="#1e1e1e")
-        lbl_instruction.pack(pady=(20, 10))
+                <label>Lieu :</label>
+                <input type="text" name="lieu" value="{course_info['lieu']}">
 
-        frame_grille = tk.Frame(self, bg="#1e1e1e")
-        frame_grille.pack()
+                <label>Nom de la course :</label>
+                <input type="text" name="nom_course" value="{course_info['nom_course']}">
 
-        # Rangée 1 : 1-8
-        frame_r1 = tk.Frame(frame_grille, bg="#1e1e1e")
-        frame_r1.pack(pady=4)
-        for i in range(1, 9):
-            btn = tk.Button(frame_r1, text=str(i), width=4, height=2, font=("Helvetica", 11, "bold"),
-                            bg="#333333", fg="#ffffff", activebackground="#e67e22", relief="flat",
-                            command=lambda n=i: self.togglenumero(n))
-            btn.pack(side="left", padx=3)
-            self.boutons_grille[i] = btn
+                <label>Favoris de la presse (séparés par un tiret) :</label>
+                <input type="text" name="favoris" value="{course_info['favoris']}">
 
-        # Rangée 2 : 9-16
-        frame_r2 = tk.Frame(frame_grille, bg="#1e1e1e")
-        frame_r2.pack(pady=4)
-        for i in range(9, 17):
-            btn = tk.Button(frame_r2, text=str(i), width=4, height=2, font=("Helvetica", 11, "bold"),
-                            bg="#333333", fg="#ffffff", activebackground="#e67e22", relief="flat",
-                            command=lambda n=i: self.togglenumero(n))
-            btn.pack(side="left", padx=3)
-            self.boutons_grille[i] = btn
+                <label>Pronostic SGE (séparés par un tiret) :</label>
+                <input type="text" name="prono_sge" value="{course_info['prono_sge']}">
 
-        # Zone Statut et Bouton Reset
-        self.lbl_statut = tk.Label(self, text="0 / 5 numéros sélectionnés", font=("Helvetica", 11, "bold"), fg="#1abc9c", bg="#1e1e1e")
-        self.lbl_statut.pack(pady=(15, 5))
+                <label>Combinaison jouée / Arrivée (séparés par un tiret) :</label>
+                <input type="text" name="combinaison" value="{course_info['combinaison']}">
 
-        btn_reset = tk.Button(self, text="Réinitialiser la sélection", font=("Helvetica", 10, "bold"),
-                              bg="#1abc9c", fg="#ffffff", activebackground="#16a085", relief="flat", padx=15, pady=5,
-                              command=self.reinitialiser)
-        btn_reset.pack(pady=5)
-
-    def togglenumero(self, num):
-        if num in self.selection:
-            self.selection.remove(num)
-            self.boutons_grille[num].configure(bg="#333333", fg="#ffffff")
-        else:
-            if len(self.selection) < 5:
-                self.selection.append(num)
-                self.boutons_grille[num].configure(bg="#e67e22", fg="#ffffff")
-
-        count = len(self.selection)
-        if count == 5:
-            score = calculer_score_avec_resonance(self.selection, self.poids_axes)
-            self.lbl_statut.configure(text=f"Combinaison complète | Score SGE : {score} pts", fg="#e67e22")
-        else:
-            self.lbl_statut.configure(text=f"{count} / 5 numéros sélectionnés", fg="#1abc9c")
-
-    def reinitialiser(self):
-        self.selection.clear()
-        for btn in self.boutons_grille.values():
-            btn.configure(bg="#333333", fg="#ffffff")
-        self.lbl_statut.configure(text="0 / 5 numéros sélectionnés", fg="#1abc9c")
-
-if __name__ == "__main__":
-    app = PegasusApp()
-    app.mainloop()
+                <button type="submit">Mettre à jour la page</button>
+            </form>
+        </div>
+    </body>
+    </html>
+    """
