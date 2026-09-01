@@ -131,7 +131,6 @@ OPPOSITIONS_VERTICALES = {
 COEFFICIENTS_RESONANCE = {0: 0.5, 1: 1.0, 2: 1.5, 3: 2.0}
 
 def calculer_poids_axes():
-    """Calcule la fréquence des axes verticaux sur l'ensemble de l'historique."""
     frequence_axes = Counter()
     for course in HISTORIQUE_SGE_DATA:
         arr = course["arrivee"]
@@ -140,13 +139,11 @@ def calculer_poids_axes():
             if oppose in arr:
                 axe = tuple(sorted([num, oppose]))
                 frequence_axes[axe] += 1
-    # Division par 2 pour éliminer les doublons de paires
     return {axe: freq // 2 for axe, freq in frequence_axes.items()}
 
 POIDS_AXES_HISTORIQUE = calculer_poids_axes()
 
 def calculer_score_sge(combinaison):
-    """Calcule le score pondéré avec le facteur de résonance géométrique."""
     score_brut = 0
     axes_touches = set()
     for i in range(len(combinaison)):
@@ -167,11 +164,12 @@ def calculer_score_sge(combinaison):
 # ==============================================================================
 course_info = {
     "date": "01/09/2026",
-    "lieu": "Saint-Cloud",
+    "lieu": "SAINT CLOUD",
     "nom_course": "PRIX DE SAINT-PAIR-DU-MONT",
     "numero_course": "R1C1",
-    "favoris": "11 - 4 - 7 - 5 - 9",
-    "prono_sge": "11 - 4 - 12 - 7 - 15",
+    "type_dist": "Plat (2400 m)",
+    "non_partants": "Aucun",
+    "prono_sge": "11 - 4 - 7 - 5 - 9",
     "combinaison": "4 - 11 - 8 - 9 - 7"
 }
 
@@ -185,7 +183,8 @@ def mettre_a_jour(
     lieu: str = Form(...),
     nom_course: str = Form(...),
     numero_course: str = Form(...),
-    favoris: str = Form(...),
+    type_dist: str = Form(...),
+    non_partants: str = Form(...),
     prono_sge: str = Form(...),
     combinaison: str = Form(...)
 ):
@@ -193,17 +192,16 @@ def mettre_a_jour(
     course_info["lieu"] = lieu
     course_info["nom_course"] = nom_course
     course_info["numero_course"] = numero_course
-    course_info["favoris"] = favoris
+    course_info["type_dist"] = type_dist
+    course_info["non_partants"] = non_partants
     course_info["prono_sge"] = prono_sge
     course_info["combinaison"] = combinaison
     return generer_html()
 
 def generer_html():
-    # Extraction et calcul du score SGE pour le pronostic SGE
     nums_prono = [int(n.strip()) for n in course_info["prono_sge"].split("-") if n.strip().isdigit()]
     score_prono = calculer_score_sge(nums_prono) if len(nums_prono) == 5 else 0
 
-    # Extraction et calcul du score SGE pour la combinaison jouée
     nums_combi = [int(n.strip()) for n in course_info["combinaison"].split("-") if n.strip().isdigit()]
     score_combi = calculer_score_sge(nums_combi) if len(nums_combi) == 5 else 0
 
@@ -212,59 +210,103 @@ def generer_html():
     <html lang="fr">
     <head>
         <meta charset="UTF-8">
-        <title>PEGASUS QUINTÉ — Analyseur SGE</title>
+        <title>PEGASUS QUINTÉ — Analyseur d'Axes</title>
         <style>
-            body {{ font-family: Arial, sans-serif; background-color: #1e1e1e; color: #ffffff; margin: 0; padding: 20px; }}
-            .container {{ max-width: 650px; margin: 0 auto; background: #2d2d2d; padding: 25px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }}
-            h1 {{ color: #e67e22; text-align: center; margin-bottom: 5px; }}
-            h3 {{ color: #aaaaaa; text-align: center; margin-top: 0; font-weight: normal; }}
-            .card {{ background: #1e1e1e; padding: 15px; border-radius: 6px; margin-bottom: 20px; border-left: 4px solid #e67e22; }}
-            .badge {{ display: inline-block; background: #e67e22; color: white; padding: 4px 8px; border-radius: 4px; font-weight: bold; margin-right: 3px; }}
-            .badge-prono {{ background: #1abc9c; }}
-            .badge-ref {{ background: #555555; }}
-            .score-box {{ display: flex; justify: space-between; gap: 10px; margin-top: 15px; }}
-            .score-card {{ flex: 1; text-align: center; padding: 10px; background: #1e1e1e; border-radius: 6px; border: 1px solid #444; }}
-            form {{ background: #242424; padding: 15px; border-radius: 6px; margin-top: 20px; }}
-            label {{ font-size: 0.9em; color: #cccccc; display: block; margin-top: 10px; }}
-            input {{ width: 100%; padding: 8px; margin-top: 4px; background: #333333; border: 1px solid #444444; color: white; border-radius: 4px; box-sizing: border-box; }}
-            button {{ width: 100%; background: #1abc9c; color: white; border: none; padding: 10px; margin-top: 15px; font-weight: bold; border-radius: 4px; cursor: pointer; }}
-            button:hover {{ background: #16a085; }}
+            body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #121212; color: #ffffff; margin: 0; padding: 20px; }}
+            .container {{ max-width: 700px; margin: 0 auto; background: #1e1e1e; padding: 30px; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.6); }}
+            
+            .header-title {{ text-align: center; color: #ff9800; font-size: 2em; font-weight: 800; margin: 0; text-transform: uppercase; letter-spacing: 1px; }}
+            .header-subtitle {{ text-align: center; color: #888888; font-size: 0.95em; margin-top: 5px; margin-bottom: 25px; }}
+            
+            .card {{ background: #262626; padding: 20px; border-radius: 10px; margin-bottom: 25px; border: 1px solid #333333; }}
+            .card-title {{ color: #ff9800; font-size: 1.1em; font-weight: bold; margin-top: 0; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #333333; padding-bottom: 8px; }}
+            
+            .info-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 12px 20px; font-size: 0.95em; color: #cccccc; }}
+            .info-grid strong {{ color: #ffffff; }}
+            
+            .badge-status {{ display: inline-block; background: #1b4d3e; color: #2ecc71; padding: 3px 8px; border-radius: 4px; font-size: 0.85em; font-weight: bold; border: 1px solid #2ecc71; margin-top: 10px; }}
+            
+            .ball-container {{ display: flex; gap: 8px; margin-top: 8px; margin-bottom: 15px; }}
+            .ball {{ width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.05em; color: #ffffff; }}
+            .ball-prono {{ background: #ff9800; color: #000000; }}
+            .ball-ref {{ background: #3a3a3a; border: 1px solid #555555; color: #dddddd; }}
+            
+            .grid-16 {{ display: grid; grid-template-columns: repeat(8, 1fr); gap: 10px; margin: 20px 0; }}
+            .btn-num {{ background: #2a2a2a; border: 1px solid #444444; color: #ffffff; padding: 12px 0; font-size: 1.1em; font-weight: bold; border-radius: 6px; cursor: pointer; text-align: center; transition: all 0.2s; }}
+            .btn-num:hover {{ background: #3d3d3d; }}
+            .btn-num.selected {{ background: #ff9800; color: #000000; border-color: #ff9800; box-shadow: 0 0 10px rgba(255, 152, 0, 0.5); }}
+            .btn-num.active-axis {{ background: #1abc9c; color: #ffffff; border-color: #1abc9c; }}
+            
+            .btn-reset {{ width: 100%; background: #1abc9c; color: #ffffff; border: none; padding: 12px; font-size: 1em; font-weight: bold; border-radius: 6px; cursor: pointer; transition: background 0.2s; }}
+            .btn-reset:hover {{ background: #16a085; }}
+            
+            .score-box {{ display: flex; justify-content: space-between; gap: 15px; margin-bottom: 25px; }}
+            .score-card {{ flex: 1; text-align: center; padding: 12px; background: #262626; border-radius: 8px; border: 1px solid #333; }}
+            
+            form {{ background: #212121; padding: 20px; border-radius: 10px; margin-top: 30px; border: 1px solid #333333; }}
+            label {{ font-size: 0.85em; color: #aaaaaa; display: block; margin-top: 12px; }}
+            input {{ width: 100%; padding: 10px; margin-top: 5px; background: #2d2d2d; border: 1px solid #444444; color: #ffffff; border-radius: 6px; box-sizing: border-box; }}
+            button[type="submit"] {{ width: 100%; background: #ff9800; color: #000000; border: none; padding: 12px; margin-top: 20px; font-weight: bold; border-radius: 6px; cursor: pointer; font-size: 1em; }}
+            button[type="submit"]:hover {{ background: #e68a00; }}
         </style>
     </head>
     <body>
         <div class="container">
-            <h1>PEGASUS QUINTÉ</h1>
-            <h3>Analyseur Géométrique SGE ({len(HISTORIQUE_SGE_DATA)} courses en base)</h3>
+            <h1 class="header-title">PEGASUS QUINTÉ</h1>
+            <div class="header-subtitle">Espace Visiteur — Synthèse & Analyseur d'Axes</div>
 
-            <!-- INFORMATIONS COURSE -->
+            <!-- INFORMATIONS DE LA COURSE -->
             <div class="card">
-                <h2 style="margin-top:0; font-size: 1.1em;">[{course_info['numero_course']}] {course_info['nom_course']} — {course_info['lieu']} ({course_info['date']})</h2>
-                <p><strong>Favoris presse :</strong> 
-                    {' '.join([f'<span class="badge">{n.strip()}</span>' for n in course_info['favoris'].split('-')])}
-                </p>
-                <p><strong>Pronostic SGE :</strong> 
-                    {' '.join([f'<span class="badge badge-prono">{n.strip()}</span>' for n in course_info['prono_sge'].split('-')])}
-                </p>
-                <p><strong>Combinaison de la course :</strong> 
-                    {' '.join([f'<span class="badge badge-ref">{n.strip()}</span>' for n in course_info['combinaison'].split('-')])}
-                </p>
+                <div class="card-title">INFORMATIONS DE LA COURSE</div>
+                <div class="info-grid">
+                    <div>Date : <strong>{course_info['date']}</strong></div>
+                    <div>Hippodrome : <strong>{course_info['lieu']}</strong></div>
+                    <div>Course : <strong>[{course_info['numero_course']}] {course_info['nom_course']}</strong></div>
+                    <div>Non-partant(s) : <strong style="color: #ff5252;">{course_info['non_partants']}</strong></div>
+                    <div>Type / Dist. : <strong>{course_info['type_dist']}</strong></div>
+                </div>
+                
+                <div class="badge-status">COURSE NON PARTIE</div>
+
+                <p style="margin-top: 20px; margin-bottom: 5px; font-size: 0.9em; color: #aaaaaa;">Pronostic SGE :</p>
+                <div class="ball-container">
+                    {' '.join([f'<div class="ball ball-prono">{n.strip()}</div>' for n in course_info['prono_sge'].split('-')])}
+                </div>
+
+                <p style="margin-top: 15px; margin-bottom: 5px; font-size: 0.9em; color: #aaaaaa;">Arrivée Réf. Veille :</p>
+                <div class="ball-container">
+                    {' '.join([f'<div class="ball ball-ref">{n.strip()}</div>' for n in course_info['combinaison'].split('-')])}
+                </div>
             </div>
 
-            <!-- TABLEAU DES SCORES GEOMETRIQUES -->
+            <!-- ANALYSEUR GÉOMÉTRIQUE -->
+            <div class="card">
+                <div class="card-title" style="text-align: center;">ANALYSEUR GÉOMÉTRIQUE (1–16)</div>
+                <div style="text-align: center; color: #888888; font-size: 0.9em; margin-bottom: 15px;">Sélectionne des numéros pour analyser la grille</div>
+                
+                <div class="grid-16">
+                    {''.join([f'<div class="btn-num" id="btn-{i}" onclick="toggleNum({i})">{i}</div>' for i in range(1, 17)])}
+                </div>
+
+                <button class="btn-reset" onclick="resetGrid()">Réinitialiser la sélection</button>
+            </div>
+
+            <!-- SCORES PONDÉRÉS SGE -->
             <div class="score-box">
                 <div class="score-card">
                     <div style="font-size:0.85em; color:#aaa;">Pondération Pronostic SGE</div>
-                    <div style="font-size:1.3em; font-weight:bold; color:#1abc9c;">{score_prono} pts</div>
+                    <div style="font-size:1.4em; font-weight:bold; color:#ff9800; margin-top: 4px;">{score_prono} pts</div>
                 </div>
                 <div class="score-card">
                     <div style="font-size:0.85em; color:#aaa;">Pondération Arrivée/Combinaison</div>
-                    <div style="font-size:1.3em; font-weight:bold; color:#e67e22;">{score_combi} pts</div>
+                    <div style="font-size:1.4em; font-weight:bold; color:#1abc9c; margin-top: 4px;">{score_combi} pts</div>
                 </div>
             </div>
 
-            <!-- FORMULAIRE D'ÉDITION DES INFOS -->
+            <!-- FORMULAIRE DE CONFIGURATION DES DONNÉES -->
             <form action="/update" method="post">
-                <h4 style="margin: 0; color: #e67e22;">Saisir / Éditer les informations de la course</h4>
+                <div class="card-title" style="border: none; padding: 0; margin-bottom: 10px;">Saisir / Éditer les données de la course</div>
+                
                 <div style="display: flex; gap: 10px;">
                     <div style="flex: 1;">
                         <label>Date :</label>
@@ -276,24 +318,55 @@ def generer_html():
                     </div>
                 </div>
 
-                <label>Lieu :</label>
+                <label>Hippodrome / Lieu :</label>
                 <input type="text" name="lieu" value="{course_info['lieu']}">
 
                 <label>Nom de la course :</label>
                 <input type="text" name="nom_course" value="{course_info['nom_course']}">
 
-                <label>Favoris de la presse (séparés par un tiret) :</label>
-                <input type="text" name="favoris" value="{course_info['favoris']}">
+                <div style="display: flex; gap: 10px;">
+                    <div style="flex: 1;">
+                        <label>Type / Distance :</label>
+                        <input type="text" name="type_dist" value="{course_info['type_dist']}">
+                    </div>
+                    <div style="flex: 1;">
+                        <label>Non-partant(s) :</label>
+                        <input type="text" name="non_partants" value="{course_info['non_partants']}">
+                    </div>
+                </div>
 
-                <label>Pronostic SGE (séparés par un tiret) :</label>
+                <label>Pronostic SGE (5 numéros séparés par un tiret) :</label>
                 <input type="text" name="prono_sge" value="{course_info['prono_sge']}">
 
-                <label>Combinaison jouée / Arrivée (séparés par un tiret) :</label>
+                <label>Arrivée Réf. Veille / Combinaison (5 numéros séparés par un tiret) :</label>
                 <input type="text" name="combinaison" value="{course_info['combinaison']}">
 
                 <button type="submit">Mettre à jour la page</button>
             </form>
         </div>
+
+        <script>
+            const selectedNums = new Set();
+
+            function toggleNum(num) {{
+                const btn = document.getElementById(`btn-${{num}}`);
+                if (selectedNums.has(num)) {{
+                    selectedNums.delete(num);
+                    btn.classList.remove('selected');
+                }} else {{
+                    selectedNums.add(num);
+                    btn.classList.add('selected');
+                }}
+            }}
+
+            function resetGrid() {{
+                selectedNums.clear();
+                for (let i = 1; i <= 16; i++) {{
+                    const btn = document.getElementById(`btn-${{i}}`);
+                    if (btn) btn.classList.remove('selected');
+                }}
+            }}
+        </script>
     </body>
     </html>
     """
