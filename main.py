@@ -121,7 +121,7 @@ HISTORIQUE_SGE_DATA = [
 ]
 
 # ==============================================================================
-# 2. MOTEUR SGE (AXES, RÉSONANCE & PONDÉRATION)
+# 2. MOTEUR SGE (AXES, RÉSONANCE & GÉNÉRATION AUTOMATIQUE)
 # ==============================================================================
 OPPOSITIONS_VERTICALES = {
     1: 9, 2: 10, 3: 11, 4: 12, 5: 13, 6: 14, 7: 15, 8: 16,
@@ -159,17 +159,31 @@ def calculer_score_sge(combinaison):
     ponderation = COEFFICIENTS_RESONANCE.get(nombre_axes, 2.0)
     return int(score_brut * ponderation)
 
+def generer_prono_automatique(combinaison_ref):
+    """
+    Génère automatiquement le pronostic SGE optimal de 5 numéros 
+    en s'appuyant sur l'arrivée/combinaison saisie.
+    """
+    if len(combinaison_ref) < 5:
+        return [11, 4, 7, 5, 9]
+
+    # Numéros opposés sur la grille pour créer des axes à forte résonance
+    opposes = [OPPOSITIONS_VERTICALES[n] for n in combinaison_ref]
+    candidats = list(dict.fromkeys(combinaison_ref + opposes))
+
+    scores_candidats = []
+    from itertools import combinations
+    for combo in combinations(candidats, 5):
+        score = calculer_score_sge(list(combo))
+        scores_candidats.append((score, list(combo)))
+
+    scores_candidats.sort(key=lambda x: x[0], reverse=True)
+    return scores_candidats[0][1] if scores_candidats else combinaison_ref[:5]
+
 # ==============================================================================
 # 3. ÉTAT INITIAL ET ROUTES API
 # ==============================================================================
 course_info = {
-    "date": "01/09/2026",
-    "lieu": "SAINT CLOUD",
-    "nom_course": "PRIX DE SAINT-PAIR-DU-MONT",
-    "numero_course": "R1C1",
-    "type_dist": "Plat (2400 m)",
-    "non_partants": "Aucun",
-    "prono_sge": "11 - 4 - 7 - 5 - 9",
     "combinaison": "4 - 11 - 8 - 9 - 7"
 }
 
@@ -178,31 +192,18 @@ def page_visiteur():
     return generer_html()
 
 @app.post("/update", response_class=HTMLResponse)
-def mettre_a_jour(
-    date: str = Form(...),
-    lieu: str = Form(...),
-    nom_course: str = Form(...),
-    numero_course: str = Form(...),
-    type_dist: str = Form(...),
-    non_partants: str = Form(...),
-    prono_sge: str = Form(...),
-    combinaison: str = Form(...)
-):
-    course_info["date"] = date
-    course_info["lieu"] = lieu
-    course_info["nom_course"] = nom_course
-    course_info["numero_course"] = numero_course
-    course_info["type_dist"] = type_dist
-    course_info["non_partants"] = non_partants
-    course_info["prono_sge"] = prono_sge
+def mettre_a_jour(combinaison: str = Form(...)):
     course_info["combinaison"] = combinaison
     return generer_html()
 
 def generer_html():
-    nums_prono = [int(n.strip()) for n in course_info["prono_sge"].split("-") if n.strip().isdigit()]
-    score_prono = calculer_score_sge(nums_prono) if len(nums_prono) == 5 else 0
-
     nums_combi = [int(n.strip()) for n in course_info["combinaison"].split("-") if n.strip().isdigit()]
+    
+    # Génération automatique du pronostic SGE
+    nums_prono = generer_prono_automatique(nums_combi)
+    prono_sge_str = " - ".join(map(str, nums_prono))
+
+    score_prono = calculer_score_sge(nums_prono)
     score_combi = calculer_score_sge(nums_combi) if len(nums_combi) == 5 else 0
 
     return f"""
@@ -221,21 +222,10 @@ def generer_html():
             .card {{ background: #262626; padding: 20px; border-radius: 10px; margin-bottom: 25px; border: 1px solid #333333; }}
             .card-title {{ color: #ff9800; font-size: 1.1em; font-weight: bold; margin-top: 0; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #333333; padding-bottom: 8px; }}
             
-            .info-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 12px 20px; font-size: 0.95em; color: #cccccc; }}
-            .info-grid strong {{ color: #ffffff; }}
-            
-            .badge-status {{ display: inline-block; background: #1b4d3e; color: #2ecc71; padding: 3px 8px; border-radius: 4px; font-size: 0.85em; font-weight: bold; border: 1px solid #2ecc71; margin-top: 10px; }}
-            
-            .ball-container {{ display: flex; gap: 8px; margin-top: 8px; margin-bottom: 15px; }}
-            .ball {{ width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.05em; color: #ffffff; }}
-            .ball-prono {{ background: #ff9800; color: #000000; }}
-            .ball-ref {{ background: #3a3a3a; border: 1px solid #555555; color: #dddddd; }}
-            
             .grid-16 {{ display: grid; grid-template-columns: repeat(8, 1fr); gap: 10px; margin: 20px 0; }}
             .btn-num {{ background: #2a2a2a; border: 1px solid #444444; color: #ffffff; padding: 12px 0; font-size: 1.1em; font-weight: bold; border-radius: 6px; cursor: pointer; text-align: center; transition: all 0.2s; }}
             .btn-num:hover {{ background: #3d3d3d; }}
             .btn-num.selected {{ background: #ff9800; color: #000000; border-color: #ff9800; box-shadow: 0 0 10px rgba(255, 152, 0, 0.5); }}
-            .btn-num.active-axis {{ background: #1abc9c; color: #ffffff; border-color: #1abc9c; }}
             
             .btn-reset {{ width: 100%; background: #1abc9c; color: #ffffff; border: none; padding: 12px; font-size: 1em; font-weight: bold; border-radius: 6px; cursor: pointer; transition: background 0.2s; }}
             .btn-reset:hover {{ background: #16a085; }}
@@ -243,11 +233,13 @@ def generer_html():
             .score-box {{ display: flex; justify-content: space-between; gap: 15px; margin-bottom: 25px; }}
             .score-card {{ flex: 1; text-align: center; padding: 12px; background: #262626; border-radius: 8px; border: 1px solid #333; }}
             
-            form {{ background: #212121; padding: 20px; border-radius: 10px; margin-top: 30px; border: 1px solid #333333; }}
-            label {{ font-size: 0.85em; color: #aaaaaa; display: block; margin-top: 12px; }}
+            form {{ background: #212121; padding: 20px; border-radius: 10px; margin-bottom: 25px; border: 1px solid #333333; }}
+            label {{ font-size: 0.85em; color: #aaaaaa; display: block; margin-top: 5px; }}
             input {{ width: 100%; padding: 10px; margin-top: 5px; background: #2d2d2d; border: 1px solid #444444; color: #ffffff; border-radius: 6px; box-sizing: border-box; }}
-            button[type="submit"] {{ width: 100%; background: #ff9800; color: #000000; border: none; padding: 12px; margin-top: 20px; font-weight: bold; border-radius: 6px; cursor: pointer; font-size: 1em; }}
+            button[type="submit"] {{ width: 100%; background: #ff9800; color: #000000; border: none; padding: 12px; margin-top: 15px; font-weight: bold; border-radius: 6px; cursor: pointer; font-size: 1em; }}
             button[type="submit"]:hover {{ background: #e68a00; }}
+
+            .prono-auto-box {{ background: #2d2211; border: 1px solid #ff9800; padding: 12px; border-radius: 6px; margin-top: 15px; font-size: 0.9em; text-align: center; color: #ffcc80; }}
         </style>
     </head>
     <body>
@@ -255,34 +247,24 @@ def generer_html():
             <h1 class="header-title">PEGASUS QUINTÉ</h1>
             <div class="header-subtitle">Espace Visiteur — Synthèse & Analyseur d'Axes</div>
 
-            <!-- INFORMATIONS DE LA COURSE -->
-            <div class="card">
-                <div class="card-title">INFORMATIONS DE LA COURSE</div>
-                <div class="info-grid">
-                    <div>Date : <strong>{course_info['date']}</strong></div>
-                    <div>Hippodrome : <strong>{course_info['lieu']}</strong></div>
-                    <div>Course : <strong>[{course_info['numero_course']}] {course_info['nom_course']}</strong></div>
-                    <div>Non-partant(s) : <strong style="color: #ff5252;">{course_info['non_partants']}</strong></div>
-                    <div>Type / Dist. : <strong>{course_info['type_dist']}</strong></div>
-                </div>
-                
-                <div class="badge-status">COURSE NON PARTIE</div>
+            <!-- 1. FORMULAIRE DE SAISIE DE COMBINAISON (PLACÉ EN PREMIER) -->
+            <form action="/update" method="post">
+                <div class="card-title" style="border: none; padding: 0; margin-bottom: 10px;">Saisir / Éditer les données de la course</div>
 
-                <p style="margin-top: 20px; margin-bottom: 5px; font-size: 0.9em; color: #aaaaaa;">Pronostic SGE :</p>
-                <div class="ball-container">
-                    {' '.join([f'<div class="ball ball-prono">{n.strip()}</div>' for n in course_info['prono_sge'].split('-')])}
-                </div>
+                <label>Arrivée Réf. Veille / Combinaison (5 numéros séparés par un tiret) :</label>
+                <input type="text" name="combinaison" value="{course_info['combinaison']}">
 
-                <p style="margin-top: 15px; margin-bottom: 5px; font-size: 0.9em; color: #aaaaaa;">Arrivée Réf. Veille :</p>
-                <div class="ball-container">
-                    {' '.join([f'<div class="ball ball-ref">{n.strip()}</div>' for n in course_info['combinaison'].split('-')])}
-                </div>
-            </div>
+                <button type="submit">Mettre à jour & Générer le Pronostic SGE</button>
 
-            <!-- ANALYSEUR GÉOMÉTRIQUE -->
+                <div class="prono-auto-box">
+                    Pronostic SGE calculé automatiquement : <strong>{prono_sge_str}</strong>
+                </div>
+            </form>
+
+            <!-- 2. ANALYSEUR GÉOMÉTRIQUE -->
             <div class="card">
                 <div class="card-title" style="text-align: center;">ANALYSEUR GÉOMÉTRIQUE (1–16)</div>
-                <div style="text-align: center; color: #888888; font-size: 0.9em; margin-bottom: 15px;">Sélectionne des numéros pour analyser la grille</div>
+                <div style="text-align: center; color: #888888; font-size: 0.9em; margin-bottom: 15px;">Sélectionne 5 numéros pour analyser la grille</div>
                 
                 <div class="grid-16">
                     {''.join([f'<div class="btn-num" id="btn-{i}" onclick="toggleNum({i})">{i}</div>' for i in range(1, 17)])}
@@ -294,7 +276,7 @@ def generer_html():
             <!-- SCORES PONDÉRÉS SGE -->
             <div class="score-box">
                 <div class="score-card">
-                    <div style="font-size:0.85em; color:#aaa;">Pondération Pronostic SGE</div>
+                    <div style="font-size:0.85em; color:#aaa;">Pondération Pronostic SGE (Auto)</div>
                     <div style="font-size:1.4em; font-weight:bold; color:#ff9800; margin-top: 4px;">{score_prono} pts</div>
                 </div>
                 <div class="score-card">
@@ -302,47 +284,6 @@ def generer_html():
                     <div style="font-size:1.4em; font-weight:bold; color:#1abc9c; margin-top: 4px;">{score_combi} pts</div>
                 </div>
             </div>
-
-            <!-- FORMULAIRE DE CONFIGURATION DES DONNÉES -->
-            <form action="/update" method="post">
-                <div class="card-title" style="border: none; padding: 0; margin-bottom: 10px;">Saisir / Éditer les données de la course</div>
-                
-                <div style="display: flex; gap: 10px;">
-                    <div style="flex: 1;">
-                        <label>Date :</label>
-                        <input type="text" name="date" value="{course_info['date']}">
-                    </div>
-                    <div style="flex: 1;">
-                        <label>N° Course :</label>
-                        <input type="text" name="numero_course" value="{course_info['numero_course']}">
-                    </div>
-                </div>
-
-                <label>Hippodrome / Lieu :</label>
-                <input type="text" name="lieu" value="{course_info['lieu']}">
-
-                <label>Nom de la course :</label>
-                <input type="text" name="nom_course" value="{course_info['nom_course']}">
-
-                <div style="display: flex; gap: 10px;">
-                    <div style="flex: 1;">
-                        <label>Type / Distance :</label>
-                        <input type="text" name="type_dist" value="{course_info['type_dist']}">
-                    </div>
-                    <div style="flex: 1;">
-                        <label>Non-partant(s) :</label>
-                        <input type="text" name="non_partants" value="{course_info['non_partants']}">
-                    </div>
-                </div>
-
-                <label>Pronostic SGE (5 numéros séparés par un tiret) :</label>
-                <input type="text" name="prono_sge" value="{course_info['prono_sge']}">
-
-                <label>Arrivée Réf. Veille / Combinaison (5 numéros séparés par un tiret) :</label>
-                <input type="text" name="combinaison" value="{course_info['combinaison']}">
-
-                <button type="submit">Mettre à jour la page</button>
-            </form>
         </div>
 
         <script>
