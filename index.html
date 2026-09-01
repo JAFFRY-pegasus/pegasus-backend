@@ -97,6 +97,12 @@
             border: 1px solid var(--accent-teal);
         }
 
+        .badge-status.arrived {
+            background-color: rgba(255, 152, 0, 0.2);
+            color: var(--accent-orange);
+            border: 1px solid var(--accent-orange);
+        }
+
         .balls-container {
             display: flex;
             gap: 10px;
@@ -220,6 +226,10 @@
                 <span class="label">Type / Dist. : </span>
                 <span class="value" id="race-details">-- (-- m)</span>
             </div>
+            <div class="info-item" id="depart-item" style="display: none;">
+                <span class="label">Départ estimé : </span>
+                <span class="value" id="race-depart">--:--</span>
+            </div>
         </div>
 
         <div style="margin-bottom: 15px;">
@@ -261,7 +271,7 @@
 
 <script>
     let selectedNumbers = [];
-    let currentArriveeVeille = [6, 12, 13, 2, 1];
+    let currentArriveeVeille = [];
 
     function renderGrid() {
         const container = document.getElementById("grid-buttons");
@@ -336,12 +346,25 @@
             const data = await res.json();
             
             document.getElementById("race-date").innerText = data.date;
-            if (data.hippodrome !== "EN ATTENTE") {
+            if (data.hippodrome) {
                 document.getElementById("race-hippo").innerText = data.hippodrome;
                 document.getElementById("race-name").innerText = data.course;
                 document.getElementById("race-details").innerText = `${data.discipline} (${data.distance})`;
                 document.getElementById("race-nps").innerText = data.non_partants;
-                document.getElementById("race-status").innerText = data.statut === "TERMINEE" ? "COURSE TERMINÉE" : "COURSE NON PARTIE";
+                
+                const statusBadge = document.getElementById("race-status");
+                if (data.statut === "ARRIVEE") {
+                    statusBadge.innerText = "ARRIVÉE DÉFINITIVE";
+                    statusBadge.className = "badge badge-status arrived";
+                } else {
+                    statusBadge.innerText = "COURSE NON PARTIE";
+                    statusBadge.className = "badge badge-status";
+                }
+
+                if (data.heure_depart_estimee) {
+                    document.getElementById("depart-item").style.display = "block";
+                    document.getElementById("race-depart").innerText = data.heure_depart_estimee;
+                }
             }
 
             if (data.arrivee_veille && data.arrivee_veille.length >= 5) {
