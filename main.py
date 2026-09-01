@@ -50,8 +50,11 @@ BONUS_HISTORIQUE_BASE = {
 # 2. LOGIQUE API PMU NATIVE
 # ==============================================================================
 
+_last_fetch_error: Optional[str] = None
+
 def fetch_json(url: str) -> Optional[Dict[str, Any]]:
     """ Effectue une requête HTTP native via urllib sans dépendance système """
+    global _last_fetch_error
     try:
         req = urllib.request.Request(
             url,
@@ -61,8 +64,10 @@ def fetch_json(url: str) -> Optional[Dict[str, Any]]:
             }
         )
         with urllib.request.urlopen(req, timeout=4) as resp:
+            _last_fetch_error = None
             return json.loads(resp.read().decode('utf-8'))
     except Exception as e:
+        _last_fetch_error = f"{type(e).__name__}: {e}"
         print(f"Erreur fetch {url}: {e}")
         return None
 
@@ -144,17 +149,28 @@ def obtenir_infos_course_sync() -> Dict[str, Any]:
         "arrivee_veille": [4, 11, 8, 9, 7],
         "pronostic_sge": [],
         "heure_depart_estimee": None,
+        "source": "fallback_defaut",
+        "derniere_erreur": None,
     }
 
     base_url = "https://offline.turfinfo.api.pmu.fr/rest/client/7/programme"
 
     try:
         prog_j = fetch_json(f"{base_url}/{date_pmu_jour}")
+        if prog_j is None:
+            data["derniere_erreur"] = _last_fetch_error or f"Echec fetch programme du jour ({base_url}/{date_pmu_jour})"
+
         r_j, c_j = trouver_quinte_dans_programme(prog_j)
+        if prog_j is not None and r_j is None:
+            data["derniere_erreur"] = "Programme du jour recu, mais aucune course Quinte+ trouvee dedans"
 
         if r_j is not None and c_j is not None:
             res_j = fetch_json(f"{base_url}/{date_pmu_jour}/R{r_j}/C{c_j}")
+            if res_j is None:
+                data["derniere_erreur"] = f"Echec fetch details course R{r_j}C{c_j}"
             if res_j:
+                data["source"] = "pmu_live"
+                data["derniere_erreur"] = None
                 hippo = res_j.get("hippodrome", {}).get("libelleCourt", "SAINT CLOUD")
                 libelle = res_j.get("libelle", "PRIX DU JOUR")
                 code = f"R{r_j}C{c_j}"
@@ -167,193 +183,4 @@ def obtenir_infos_course_sync() -> Dict[str, Any]:
                 data["discipline"] = str(discipline_raw).replace("_", " ").title()
                 data["distance"] = f"{res_j.get('distance', 2400)} m"
 
-                nps = [str(p.get("numProno")) for p in res_j.get("participants", []) if p.get("statut") == "NON_PARTANT"]
-                data["non_partants"] = ", ".join(nps) if nps else "Aucun"
-
-                statut_raw = str(res_j.get("statut", "")).upper()
-                if any(k in statut_raw for k in ["ARRIVEE", "FIN", "TERMINE", "CLOTURE"]):
-                    data["statut"] = "ARRIVEE"
-                elif any(k in statut_raw for k in ["COURSE_EN_COURS", "PARTIS", "DEPART_EFFECTUE"]):
-                    data["statut"] = "EN_COURS"
-                else:
-                    data["statut"] = "NON_PARTIE"
-
-                depart = _heure_depart(res_j)
-                if depart:
-                    data["heure_depart_estimee"] = depart.isoformat()
-
-        prog_v = fetch_json(f"{base_url}/{date_pmu_veille}")
-        r_v, c_v = trouver_quinte_dans_programme(prog_v)
-
-        if r_v is not None and c_v is not None:
-            res_v = fetch_json(f"{base_url}/{date_pmu_veille}/R{r_v}/C{c_v}")
-            if res_v:
-                arr = extraire_ordre_arrivee(res_v)
-                if arr:
-                    data["arrivee_veille"] = arr
-    except Exception as e:
-        print(f"Erreur globale lors de la récupération PMU : {e}")
-
-    data["pronostic_sge"] = generer_pronostic_sge(data["arrivee_veille"])
-    return data
-
-# ==============================================================================
-# 3. ALGORITHMES SGE
-# ==============================================================================
-
-def generer_pronostic_sge(arrivee_ref: List[int]) -> List[int]:
-    scores = {}
-    for num in range(1, 17):
-        score = BONUS_HISTORIQUE_BASE.get(num, 1.0)
-        if num in arrivee_ref:
-            score += 1.5
-        scores[num] = score
-
-    tri = sorted(scores.items(), key=lambda x: x[1], reverse=True)
-    top_5 = [num for num, sc in tri[:5]]
-
-    piliers = {3, 5, 11, 13}
-    if not any(n in piliers for n in top_5) and 5 not in top_5:
-        top_5[4] = 5
-
-    return top_5
-
-def est_combinaison_valide(combinaison: List[int]) -> bool:
-    if len(combinaison) != 5:
-        return False
-    piliers_centraux = {3, 5, 11, 13}
-    if not any(num in piliers_centraux for num in combinaison):
-        return False
-    haut = any(1 <= num <= 8 for num in combinaison)
-    bas = any(9 <= num <= 16 for num in combinaison)
-    return haut and bas
-
-def evaluer_combinaison(combinaison: List[int], arrivee_veille: List[int]) -> float:
-    if not est_combinaison_valide(combinaison):
-        return 0.0
-
-    score = 0.0
-    for num in combinaison:
-        score += BONUS_HISTORIQUE_BASE.get(num, 1.0)
-        if num in arrivee_veille:
-            score += 1.5
-
-    nb_miroirs = 0
-    axes_touches = set()
-
-    for num in combinaison:
-        miroir = num + 8 if num <= 8 else num - 8
-        pair = tuple(sorted([num, miroir]))
-        if pair in AXIS_WEIGHTS:
-            axes_touches.add(pair)
-        if miroir in combinaison:
-            nb_miroirs += 1
-
-    for pair in axes_touches:
-        score += AXIS_WEIGHTS[pair] * 2.0
-
-    nb_miroirs_reels = nb_miroirs // 2
-    if nb_miroirs_reels > 0:
-        score *= (1.0 + (0.25 * nb_miroirs_reels))
-
-    return round(score, 2)
-
-# ==============================================================================
-# 4. TACHE DE FOND : RAFRAICHISSEMENT AUTOMATIQUE DU CACHE
-# ==============================================================================
-
-async def refresh_loop():
-    """ Boucle infinie lancée au démarrage du serveur : interroge le PMU,
-    met à jour le cache, attend, recommence. C'est CE thread qui appelle
-    le PMU — jamais les requêtes des visiteurs. """
-    while True:
-        try:
-            loop = asyncio.get_event_loop()
-            data = await loop.run_in_executor(None, obtenir_infos_course_sync)
-
-            async with _cache_lock:
-                _cache["data"] = data
-                _cache["last_updated"] = datetime.now(ZoneInfo("Europe/Paris")).isoformat()
-
-            interval = REFRESH_INTERVAL_DEFAULT
-            depart_str = data.get("heure_depart_estimee")
-            if depart_str:
-                try:
-                    depart = datetime.fromisoformat(depart_str)
-                    delta = (depart - datetime.now(ZoneInfo("Europe/Paris"))).total_seconds()
-                    if 0 <= delta <= 600:
-                        interval = REFRESH_INTERVAL_LIVE
-                except Exception:
-                    pass
-        except Exception as e:
-            print(f"Erreur dans refresh_loop: {e}")
-            interval = REFRESH_INTERVAL_DEFAULT
-
-        await asyncio.sleep(interval)
-
-@app.on_event("startup")
-async def start_background_refresh():
-    asyncio.create_task(refresh_loop())
-
-# ==============================================================================
-# 5. ENDPOINTS FASTAPI
-# ==============================================================================
-
-class CombinationRequest(BaseModel):
-    numbers: List[int]
-    arrivee_veille: Optional[List[int]] = None
-
-@app.get("/")
-def read_root():
-    html_path = os.path.join(os.path.dirname(__file__), "index.html")
-    if os.path.exists(html_path):
-        return FileResponse(html_path)
-    return {"status": "ok", "message": "Fichier index.html introuvable"}
-
-@app.get("/race-info")
-async def get_race_info():
-    """ Ne fait plus AUCUN appel PMU : lit uniquement le cache mis à jour
-    par la tâche de fond. Réponse instantanée pour tous les visiteurs. """
-    async with _cache_lock:
-        if _cache["data"] is None:
-            loop = asyncio.get_event_loop()
-            data = await loop.run_in_executor(None, obtenir_infos_course_sync)
-            _cache["data"] = data
-            _cache["last_updated"] = datetime.now(ZoneInfo("Europe/Paris")).isoformat()
-        return {
-            **_cache["data"],
-            "cache_last_updated": _cache["last_updated"],
-        }
-
-@app.post("/evaluate")
-async def evaluate(payload: CombinationRequest):
-    grid = payload.numbers
-    if len(grid) != 5:
-        raise HTTPException(status_code=400, detail="5 numéros requis.")
-
-    async with _cache_lock:
-        infos = _cache["data"]
-
-    if infos is None:
-        # Cas limite : cache pas encore rempli au tout premier appel.
-        # run_in_executor pour ne pas bloquer l'event loop.
-        loop = asyncio.get_event_loop()
-        infos = await loop.run_in_executor(None, obtenir_infos_course_sync)
-        async with _cache_lock:
-            _cache["data"] = infos
-            _cache["last_updated"] = datetime.now(ZoneInfo("Europe/Paris")).isoformat()
-
-    valide = est_combinaison_valide(grid)
-    score = evaluer_combinaison(grid, infos["arrivee_veille"]) if valide else 0.0
-
-    return {
-        "combination": grid,
-        "is_valid": valide,
-        "score": score,
-        "race_info": infos
-    }
-
-if __name__ == "__main__":
-    import uvicorn
-    port = int(os.environ.get("PORT", 10000))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+                nps = [str(p.get("numProno")) for p in res_j.get("participants", []) if p.get("statut") ==
