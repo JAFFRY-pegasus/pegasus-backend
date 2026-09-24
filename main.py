@@ -1,10 +1,3 @@
-Le déploiement sur Render a échoué à cause d'une erreur de syntaxe (**`SyntaxError`**) à la toute fin du fichier `main.py`. Une guillemet triple de la chaîne HTML (`f"""..."""`) n'a pas été fermée correctement ou comporte un problème d'échappement dans les guillemets de la fonction `generer_html()`.
-
-Voici le code complet et corrigé de **`main.py`**, prêt à être poussé sur GitHub.
-
-### Code `main.py` corrigé
-
-```python
 from fastapi import FastAPI, Form
 from fastapi.responses import HTMLResponse
 from collections import Counter
@@ -295,6 +288,3 @@ def generer_html():
     </script>
 </body>
 </html>"""
-
-```
-
