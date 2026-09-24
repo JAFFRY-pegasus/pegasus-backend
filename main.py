@@ -136,8 +136,8 @@ def calculer_poids_axes():
     for course in HISTORIQUE_SGE_DATA:
         arr = course["arrivee"]
         for num in arr:
-            oppose = OPPOSITIONS_VERTICALES[num]
-            if oppose in arr:
+            oppose = OPPOSITIONS_VERTICALES.get(num)
+            if oppose and oppose in arr:
                 axe = tuple(sorted([num, oppose]))
                 frequence_axes[axe] += 1
     return {axe: freq // 2 for axe, freq in frequence_axes.items()}
@@ -150,7 +150,7 @@ def calculer_score_sge(combinaison):
     for i in range(len(combinaison)):
         for j in range(i + 1, len(combinaison)):
             a, b = combinaison[i], combinaison[j]
-            if OPPOSITIONS_VERTICALES[a] == b:
+            if a in OPPOSITIONS_VERTICALES and OPPOSITIONS_VERTICALES[a] == b:
                 axe = tuple(sorted([a, b]))
                 axes_touches.add(axe)
                 if axe in POIDS_AXES_HISTORIQUE:
@@ -161,11 +161,15 @@ def calculer_score_sge(combinaison):
     return int(score_brut * ponderation)
 
 def generer_prono_automatique(combinaison_ref):
-    if len(combinaison_ref) < 5:
-        return [11, 4, 7, 5, 9]
+    # Filtre uniquement les numéros valides dans la grille 1-16
+    valides = [n for n in combinaison_ref if 1 <= n <= 16]
+    if len(valides) < 5:
+        # Si moins de 5 numéros valides, compléter
+        complements = [n for n in [11, 4, 7, 5, 9, 1, 2, 3, 6, 8, 10, 12, 13, 14, 15, 16] if n not in valides]
+        valides = (valides + complements)[:5]
 
-    opposes = [OPPOSITIONS_VERTICALES[n] for n in combinaison_ref]
-    candidats = list(dict.fromkeys(combinaison_ref + opposes))
+    opposes = [OPPOSITIONS_VERTICALES[n] for n in valides if n in OPPOSITIONS_VERTICALES]
+    candidats = list(dict.fromkeys(valides + opposes))
 
     scores_candidats = []
     for combo in combinations(candidats, 5):
@@ -173,13 +177,13 @@ def generer_prono_automatique(combinaison_ref):
         scores_candidats.append((score, list(combo)))
 
     scores_candidats.sort(key=lambda x: x[0], reverse=True)
-    return scores_candidats[0][1] if scores_candidats else combinaison_ref[:5]
+    return scores_candidats[0][1] if scores_candidats else valides[:5]
 
 # ==============================================================================
-# 3. ÉTAT INITIAL ET ROUTES
+# 3. ÉTAT ET ROUTES API
 # ==============================================================================
 course_info = {
-    "combinaison": "4 - 11 - 8 - 9 - 7"
+    "combinaison": "13 - 6 - 5 - 12 - 2"
 }
 
 @app.get("/", response_class=HTMLResponse)
@@ -192,14 +196,21 @@ def mettre_a_jour(combinaison: str = Form(...)):
     return generer_html()
 
 def generer_html():
-    nums_combi = [int(n.strip()) for n in course_info["combinaison"].split("-") if n.strip().isdigit()]
-    nums_prono = generer_prono_automatique(nums_combi)
+    raw_str = course_info["combinaison"]
+    # extrait tous les nombres saisis
+    nums_saisis = [int(n.strip()) for n in raw_str.replace(",", " ").replace("-", " ").split() if n.strip().isdigit()]
+    
+    # Pronostic calculé basé sur la saisie
+    nums_prono = generer_prono_automatique(nums_saisis)
     
     score_prono = calculer_score_sge(nums_prono)
-    score_combi = calculer_score_sge(nums_combi) if len(nums_combi) == 5 else 0
+    
+    # Score de la combinaison saisie (seulement sur les numéros dans la grille 1-16)
+    nums_combi_grid = [n for n in nums_saisis if 1 <= n <= 16][:5]
+    score_combi = calculer_score_sge(nums_combi_grid) if len(nums_combi_grid) == 5 else 0
 
     html_prono_balls = "".join([f'<span class="ball orange">{n}</span>' for n in nums_prono])
-    html_combi_balls = "".join([f'<span class="ball gray">{n}</span>' for n in nums_combi])
+    html_combi_balls = "".join([f'<span class="ball gray">{n}</span>' for n in nums_saisis])
 
     return f"""<!DOCTYPE html>
 <html lang="fr">
@@ -274,6 +285,7 @@ def generer_html():
             display: flex;
             gap: 10px;
             margin-top: 8px;
+            flex-wrap: wrap;
         }}
 
         .ball {{
@@ -377,7 +389,7 @@ def generer_html():
 
     <!-- FORMULAIRE DE SAISIE -->
     <form action="/update" method="post">
-        <div class="card-title">Saisir / Éditer les données</div>
+        <div class="card-title">SAISIR / ÉDITER LES DONNÉES</div>
         <label style="font-size: 0.9rem; color: var(--text-muted);">Arrivée Réf. Veille / Combinaison (5 numéros séparés par un tiret) :</label>
         <input type="text" name="combinaison" value="{course_info['combinaison']}">
         <button type="submit" class="action-btn">Mettre à jour la page & Recalculer le Pronostic</button>
@@ -385,7 +397,7 @@ def generer_html():
 
     <!-- RÉSULTAT DU PRONOSTIC AUTOMATIQUE -->
     <div class="card">
-        <div class="card-title">Synthèse Géométrique SGE</div>
+        <div class="card-title">SYNTHÈSE GÉOMÉTRIQUE SGE</div>
         
         <div style="margin-bottom: 15px;">
             <div style="font-size: 0.9rem; color: var(--text-muted);">Pronostic SGE calculé automatiquement :</div>
@@ -415,7 +427,7 @@ def generer_html():
 
     <!-- ANALYSEUR GÉOMÉTRIQUE -->
     <div class="card">
-        <div class="card-title" style="text-align: center;">Analyseur Géométrique (1–16)</div>
+        <div class="card-title" style="text-align: center;">ANALYSEUR GÉOMÉTRIQUE (1–16)</div>
         <p style="text-align: center; color: var(--text-muted); font-size: 0.85rem; margin-top: -10px; margin-bottom: 15px;">
             Sélectionne des numéros pour interagir sur la grille
         </p>
