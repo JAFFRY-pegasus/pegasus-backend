@@ -232,3 +232,4 @@ def generer_page_html(resultats_filtre: Optional[str] = None) -> str:
 
 
 
+
