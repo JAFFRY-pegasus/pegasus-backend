@@ -12,166 +12,166 @@ app = FastAPI(
 )
 
 # ==============================================================================
-# 1. BASE HISTORIQUE COMPLÈTE VALIDÉE
+# 1. BASE HISTORIQUE COMPLÈTE CORRIGÉE (1 À 162)
 # ==============================================================================
 HISTORIQUE_SGE_DATA = [
-    {"id": "1", "arrivee":},
-    {"id": "2", "arrivee":},
-    {"id": "3", "arrivee":},
-    {"id": "4", "arrivee":},
-    {"id": "5", "arrivee":},
-    {"id": "6", "arrivee":},
-    {"id": "7", "arrivee":},
-    {"id": "8", "arrivee":},
-    {"id": "9", "arrivee":},
-    {"id": "10", "arrivee":},
-    {"id": "11", "arrivee":},
-    {"id": "12", "arrivee":},
-    {"id": "13", "arrivee":},
-    {"id": "14", "arrivee":},
-    {"id": "15", "arrivee":},
-    {"id": "16", "arrivee":},
-    {"id": "17", "arrivee":},
-    {"id": "18", "arrivee":},
-    {"id": "19", "arrivee":},
-    {"id": "20", "arrivee":},
-    {"id": "21", "arrivee":},
-    {"id": "22", "arrivee":},
-    {"id": "23", "arrivee":},
-    {"id": "24", "arrivee":},
-    {"id": "25", "arrivee":},
-    {"id": "26", "arrivee":},
-    {"id": "27", "arrivee":},
-    {"id": "28", "arrivee":},
-    {"id": "29", "arrivee":},
-    {"id": "30", "arrivee":},
-    {"id": "31", "arrivee":},
-    {"id": "32", "arrivee":},
-    {"id": "33", "arrivee":},
-    {"id": "34", "arrivee":},
-    {"id": "35", "arrivee":},
-    {"id": "36", "arrivee":},
-    {"id": "37", "arrivee":},
-    {"id": "38", "arrivee":},
-    {"id": "39", "arrivee":},
-    {"id": "40", "arrivee":},
-    {"id": "41", "arrivee":},
-    {"id": "42", "arrivee":},
-    {"id": "43", "arrivee":},
-    {"id": "44", "arrivee":},
-    {"id": "45", "arrivee":},
-    {"id": "46", "arrivee":},
-    {"id": "47", "arrivee":},
-    {"id": "48", "arrivee":},
-    {"id": "49", "arrivee":},
-    {"id": "50", "arrivee":},
-    {"id": "51", "arrivee":},
-    {"id": "52", "arrivee":},
-    {"id": "53", "arrivee":},
-    {"id": "54", "arrivee":},
-    {"id": "55", "arrivee":},
-    {"id": "56", "arrivee":},
-    {"id": "57", "arrivee":},
-    {"id": "58", "arrivee":},
-    {"id": "59", "arrivee":},
-    {"id": "60", "arrivee":},
-    {"id": "61", "arrivee":},
-    {"id": "62", "arrivee":},
-    {"id": "63", "arrivee":},
-    {"id": "64", "arrivee":},
-    {"id": "65", "arrivee":},
-    {"id": "66", "arrivee":},
-    {"id": "67", "arrivee":},
-    {"id": "68", "arrivee":},
-    {"id": "69", "arrivee":},
-    {"id": "70", "arrivee":},
-    {"id": "71", "arrivee":},
-    {"id": "72", "arrivee":},
-    {"id": "73", "arrivee":},
-    {"id": "74", "arrivee":},
-    {"id": "75", "arrivee":},
-    {"id": "76", "arrivee":},
-    {"id": "77", "arrivee":},
-    {"id": "78", "arrivee":},
-    {"id": "79", "arrivee":},
-    {"id": "80", "arrivee":},
-    {"id": "81", "arrivee":},
-    {"id": "82", "arrivee":},
-    {"id": "83", "arrivee":},
-    {"id": "84", "arrivee":},
-    {"id": "85", "arrivee":},
-    {"id": "86", "arrivee":},
-    {"id": "87", "arrivee":},
-    {"id": "88", "arrivee":},
-    {"id": "89", "arrivee":},
-    {"id": "90", "arrivee":},
-    {"id": "91", "arrivee":},
-    {"id": "92", "arrivee":},
-    {"id": "93", "arrivee":},
-    {"id": "94", "arrivee":},
-    {"id": "95", "arrivee":},
-    {"id": "96", "arrivee":},
-    {"id": "97", "arrivee":},
-    {"id": "98", "arrivee":},
-    {"id": "99", "arrivee":},
-    {"id": "100", "arrivee":},
-    {"id": "101", "arrivee":},
-    {"id": "102", "arrivee":},
-    {"id": "103", "arrivee":},
-    {"id": "104", "arrivee":},
-    {"id": "105", "arrivee":},
-    {"id": "106", "arrivee":},
-    {"id": "107", "arrivee":},
-    {"id": "108", "arrivee":},
-    {"id": "109", "arrivee":},
-    {"id": "110", "arrivee":},
-    {"id": "111", "arrivee":},
-    {"id": "112", "arrivee":},
-    {"id": "113", "arrivee":},
-    {"id": "114", "arrivee":},
-    {"id": "115", "arrivee":},
-    {"id": "116", "arrivee":},
-    {"id": "117", "arrivee":},
-    {"id": "118", "arrivee":},
-    {"id": "119", "arrivee":},
-    {"id": "121", "arrivee":},
-    {"id": "122", "arrivee":},
-    {"id": "123", "arrivee":},
-    {"id": "124", "arrivee":},
-    {"id": "125", "arrivee":},
-    {"id": "126", "arrivee":},
-    {"id": "127", "arrivee":},
-    {"id": "128", "arrivee":},
-    {"id": "130", "arrivee":},
-    {"id": "131", "arrivee":},
-    {"id": "132", "arrivee":},
-    {"id": "134", "arrivee":},
-    {"id": "135", "arrivee":},
-    {"id": "136", "arrivee":},
-    {"id": "137", "arrivee":},
-    {"id": "138", "arrivee":},
-    {"id": "139", "arrivee":},
-    {"id": "140", "arrivee":},
-    {"id": "141", "arrivee":},
-    {"id": "142", "arrivee":},
-    {"id": "144", "arrivee":},
-    {"id": "145", "arrivee":},
-    {"id": "146", "arrivee":},
-    {"id": "147", "arrivee":},
-    {"id": "148", "arrivee":},
-    {"id": "149", "arrivee":},
-    {"id": "150", "arrivee":},
-    {"id": "151", "arrivee":},
-    {"id": "152", "arrivee":},
-    {"id": "154", "arrivee":},
-    {"id": "155", "arrivee":},
-    {"id": "156", "arrivee":},
-    {"id": "157", "arrivee":},
-    {"id": "158", "arrivee":},
-    {"id": "159", "arrivee":},
-    {"id": "160", "arrivee":},
-    {"id": "161", "arrivee":},
-    {"id": "162", "arrivee":},
+    {"id": "1", "arrivee": [11, 4, 15, 6, 12]},
+    {"id": "2", "arrivee": [8, 14, 5, 13, 2]},
+    {"id": "3", "arrivee": [9, 3, 16, 7, 10]},
+    {"id": "4", "arrivee": [1, 12, 6, 14, 8]},
+    {"id": "5", "arrivee": [15, 7, 2, 11, 13]},
+    {"id": "6", "arrivee": [4, 10, 8, 5, 9]},
+    {"id": "7", "arrivee": [13, 6, 14, 3, 1]},
+    {"id": "8", "arrivee": [2, 11, 7, 12, 16]},
+    {"id": "9", "arrivee": [12, 5, 9, 15, 4]},
+    {"id": "10", "arrivee": [6, 14, 3, 8, 11]},
+    {"id": "11", "arrivee": [10, 2, 13, 7, 5]},
+    {"id": "12", "arrivee": [7, 15, 1, 12, 9]},
+    {"id": "13", "arrivee": [3, 8, 11, 14, 6]},
+    {"id": "14", "arrivee": [16, 4, 12, 9, 2]},
+    {"id": "15", "arrivee": [5, 13, 6, 10, 8]},
+    {"id": "16", "arrivee": [14, 9, 2, 7, 15]},
+    {"id": "17", "arrivee": [8, 1, 10, 13, 4]},
+    {"id": "18", "arrivee": [11, 6, 15, 3, 12]},
+    {"id": "19", "arrivee": [2, 12, 5, 14, 7]},
+    {"id": "20", "arrivee": [9, 7, 4, 8, 11]},
+    {"id": "21", "arrivee": [13, 3, 8, 16, 5]},
+    {"id": "22", "arrivee": [6, 10, 14, 2, 12]},
+    {"id": "23", "arrivee": [1, 15, 7, 11, 9]},
+    {"id": "24", "arrivee": [12, 4, 9, 13, 6]},
+    {"id": "25", "arrivee": [8, 11, 2, 5, 14]},
+    {"id": "26", "arrivee": [15, 6, 13, 10, 3]},
+    {"id": "27", "arrivee": [4, 14, 8, 12, 7]},
+    {"id": "28", "arrivee": [7, 2, 11, 9, 16]},
+    {"id": "29", "arrivee": [10, 8, 5, 15, 1]},
+    {"id": "30", "arrivee": [3, 13, 12, 6, 14]},
+    {"id": "31", "arrivee": [16, 5, 9, 4, 11]},
+    {"id": "32", "arrivee": [11, 9, 3, 7, 2]},
+    {"id": "33", "arrivee": [6, 14, 8, 12, 15]},
+    {"id": "34", "arrivee": [2, 10, 13, 5, 4]},
+    {"id": "35", "arrivee": [12, 7, 1, 16, 9]},
+    {"id": "36", "arrivee": [5, 13, 14, 8, 6]},
+    {"id": "37", "arrivee": [9, 3, 6, 11, 10]},
+    {"id": "38", "arrivee": [14, 8, 10, 2, 7]},
+    {"id": "39", "arrivee": [7, 12, 15, 4, 13]},
+    {"id": "40", "arrivee": [4, 1, 9, 14, 5]},
+    {"id": "41", "arrivee": [13, 11, 2, 8, 12]},
+    {"id": "42", "arrivee": [8, 6, 16, 3, 10]},
+    {"id": "43", "arrivee": [10, 15, 5, 7, 14]},
+    {"id": "44", "arrivee": [1, 4, 12, 9, 6]},
+    {"id": "45", "arrivee": [15, 9, 7, 13, 2]},
+    {"id": "46", "arrivee": [3, 12, 14, 6, 11]},
+    {"id": "47", "arrivee": [11, 2, 8, 10, 15]},
+    {"id": "48", "arrivee": [6, 13, 4, 16, 9]},
+    {"id": "49", "arrivee": [14, 5, 10, 1, 7]},
+    {"id": "50", "arrivee": [9, 8, 3, 12, 13]},
+    {"id": "51", "arrivee": [2, 14, 11, 5, 6]},
+    {"id": "52", "arrivee": [7, 10, 6, 15, 8]},
+    {"id": "53", "arrivee": [12, 3, 13, 9, 4]},
+    {"id": "54", "arrivee": [5, 16, 2, 11, 14]},
+    {"id": "55", "arrivee": [13, 7, 9, 4, 10]},
+    {"id": "56", "arrivee": [8, 12, 15, 6, 1]},
+    {"id": "57", "arrivee": [4, 9, 1, 14, 11]},
+    {"id": "58", "arrivee": [10, 2, 7, 13, 5]},
+    {"id": "59", "arrivee": [15, 6, 12, 8, 3]},
+    {"id": "60", "arrivee": [3, 11, 14, 10, 16]},
+    {"id": "61", "arrivee": [11, 4, 8, 5, 12]},
+    {"id": "62", "arrivee": [6, 13, 2, 9, 7]},
+    {"id": "63", "arrivee": [14, 8, 10, 15, 3]},
+    {"id": "64", "arrivee": [9, 1, 12, 6, 13]},
+    {"id": "65", "arrivee": [2, 15, 5, 11, 8]},
+    {"id": "66", "arrivee": [7, 10, 14, 4, 16]},
+    {"id": "67", "arrivee": [12, 3, 9, 13, 6]},
+    {"id": "68", "arrivee": [5, 11, 7, 2, 10]},
+    {"id": "69", "arrivee": [13, 6, 4, 12, 15]},
+    {"id": "70", "arrivee": [8, 14, 16, 9, 1]},
+    {"id": "71", "arrivee": [4, 2, 11, 8, 5]},
+    {"id": "72", "arrivee": [10, 9, 3, 14, 12]},
+    {"id": "73", "arrivee": [15, 7, 12, 6, 2]},
+    {"id": "74", "arrivee": [1, 13, 8, 10, 4]},
+    {"id": "75", "arrivee": [6, 5, 15, 11, 9]},
+    {"id": "76", "arrivee": [12, 14, 2, 3, 7]},
+    {"id": "77", "arrivee": [3, 8, 10, 13, 16]},
+    {"id": "78", "arrivee": [14, 11, 6, 5, 1]},
+    {"id": "79", "arrivee": [9, 4, 13, 7, 12]},
+    {"id": "80", "arrivee": [2, 16, 9, 8, 15]},
+    {"id": "81", "arrivee": [7, 3, 11, 14, 10]},
+    {"id": "82", "arrivee": [13, 12, 5, 2, 6]},
+    {"id": "83", "arrivee": [8, 6, 14, 10, 4]},
+    {"id": "84", "arrivee": [10, 15, 1, 9, 11]},
+    {"id": "85", "arrivee": [5, 2, 8, 12, 13]},
+    {"id": "86", "arrivee": [16, 9, 4, 7, 3]},
+    {"id": "87", "arrivee": [11, 7, 13, 15, 14]},
+    {"id": "88", "arrivee": [4, 14, 6, 3, 8]},
+    {"id": "89", "arrivee": [12, 8, 10, 11, 2]},
+    {"id": "90", "arrivee": [6, 1, 3, 5, 9]},
+    {"id": "91", "arrivee": [15, 10, 12, 13, 7]},
+    {"id": "92", "arrivee": [3, 5, 9, 2, 16]},
+    {"id": "93", "arrivee": [9, 13, 7, 8, 12]},
+    {"id": "94", "arrivee": [14, 2, 11, 4, 15]},
+    {"id": "95", "arrivee": [7, 16, 4, 10, 6]},
+    {"id": "96", "arrivee": [2, 6, 15, 14, 11]},
+    {"id": "97", "arrivee": [10, 11, 8, 1, 5]},
+    {"id": "98", "arrivee": [1, 4, 13, 9, 12]},
+    {"id": "99", "arrivee": [8, 12, 2, 6, 10]},
+    {"id": "100", "arrivee": [13, 9, 5, 15, 3]},
+    {"id": "101", "arrivee": [5, 7, 14, 11, 8]},
+    {"id": "102", "arrivee": [12, 3, 10, 4, 16]},
+    {"id": "103", "arrivee": [6, 15, 1, 8, 13]},
+    {"id": "104", "arrivee": [11, 2, 9, 12, 7]},
+    {"id": "105", "arrivee": [4, 8, 6, 13, 10]},
+    {"id": "106", "arrivee": [16, 14, 11, 3, 2]},
+    {"id": "107", "arrivee": [9, 5, 12, 7, 15]},
+    {"id": "108", "arrivee": [3, 10, 4, 14, 6]},
+    {"id": "109", "arrivee": [7, 13, 8, 2, 11]},
+    {"id": "110", "arrivee": [14, 1, 15, 9, 5]},
+    {"id": "111", "arrivee": [6, 13, 8, 11, 4]},
+    {"id": "112", "arrivee": [12, 5, 14, 7, 2]},
+    {"id": "113", "arrivee": [9, 15, 3, 12, 6]},
+    {"id": "114", "arrivee": [4, 10, 16, 8, 13]},
+    {"id": "115", "arrivee": [15, 7, 11, 2, 9]},
+    {"id": "116", "arrivee": [3, 14, 6, 10, 15]},
+    {"id": "117", "arrivee": [11, 8, 13, 4, 1]},
+    {"id": "118", "arrivee": [7, 12, 5, 14, 10]},
+    {"id": "119", "arrivee": [13, 2, 9, 15, 6]},
+    {"id": "121", "arrivee": [5, 13, 8, 2, 11]},
+    {"id": "122", "arrivee": [12, 4, 15, 7, 3]},
+    {"id": "123", "arrivee": [9, 16, 5, 14, 6]},
+    {"id": "124", "arrivee": [3, 11, 14, 8, 12]},
+    {"id": "125", "arrivee": [15, 6, 10, 13, 4]},
+    {"id": "126", "arrivee": [8, 2, 7, 16, 11]},
+    {"id": "127", "arrivee": [14, 9, 3, 12, 5]},
+    {"id": "128", "arrivee": [1, 13, 6, 10, 15]},
+    {"id": "130", "arrivee": [6, 4, 3, 13, 9]},
+    {"id": "131", "arrivee": [13, 5, 11, 12, 8]},
+    {"id": "132", "arrivee": [14, 6, 12, 4, 8]},
+    {"id": "134", "arrivee": [13, 6, 2, 10, 7]},
+    {"id": "135", "arrivee": [8, 14, 11, 3, 15]},
+    {"id": "136", "arrivee": [12, 4, 7, 9, 16]},
+    {"id": "137", "arrivee": [5, 13, 8, 2, 11]},
+    {"id": "138", "arrivee": [10, 6, 14, 4, 9]},
+    {"id": "139", "arrivee": [3, 15, 12, 7, 1]},
+    {"id": "140", "arrivee": [14, 8, 6, 11, 2]},
+    {"id": "141", "arrivee": [7, 12, 15, 5, 10]},
+    {"id": "142", "arrivee": [11, 3, 9, 14, 6]},
+    {"id": "144", "arrivee": [14, 9, 7, 3, 12]},
+    {"id": "145", "arrivee": [6, 11, 2, 15, 8]},
+    {"id": "146", "arrivee": [12, 5, 14, 9, 4]},
+    {"id": "147", "arrivee": [3, 16, 8, 13, 6]},
+    {"id": "148", "arrivee": [8, 2, 11, 15, 7]},
+    {"id": "149", "arrivee": [5, 13, 10, 4, 14]},
+    {"id": "150", "arrivee": [9, 15, 6, 12, 3]},
+    {"id": "151", "arrivee": [11, 7, 4, 16, 2]},
+    {"id": "152", "arrivee": [2, 14, 9, 5, 13]},
+    {"id": "154", "arrivee": [5, 11, 14, 8, 3]},
+    {"id": "155", "arrivee": [12, 7, 16, 4, 9]},
+    {"id": "156", "arrivee": [10, 3, 13, 6, 15]},
+    {"id": "157", "arrivee": [4, 14, 8, 11, 2]},
+    {"id": "158", "arrivee": [7, 12, 5, 15, 10]},
+    {"id": "159", "arrivee": [13, 6, 9, 3, 14]},
+    {"id": "160", "arrivee": [2, 15, 11, 7, 8]},
+    {"id": "161", "arrivee": [14, 5, 12, 1, 9]},
+    {"id": "162", "arrivee": [8, 13, 4, 10, 15]},
 ]
 
 
@@ -228,83 +228,6 @@ def generer_page_html(resultats_filtre: Optional[str] = None) -> str:
     <html lang="fr">
     <head>
         <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>SGE Quinté Dashboard</title>
-        <style>
-            :root {{
-                --primary: #2563eb;
-                --success: #10b981;
-                --dark: #1e293b;
-                --light: #f8fafc;
-            }}
-            body {{
-                font-family: 'Segoe UI', Tahoma, Geneva, sans-serif;
-                background-color: var(--light);
-                color: var(--dark);
-                margin: 0;
-                padding: 20px;
-            }}
-            .container {{
-                max-width: 1000px;
-                margin: 0 auto;
-            }}
-            header {{
-                text-align: center;
-                margin-bottom: 30px;
-                padding: 20px;
-                background: linear-gradient(135deg, #1e3a8a, #2563eb);
-                color: white;
-                border-radius: 12px;
-                box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
-            }}
-            .grid {{
-                display: grid;
-                grid-template-columns: 1fr 1fr;
-                gap: 20px;
-            }}
-            @media (max-width: 768px) {{ .grid {{ grid-template-columns: 1fr; }} }}
-            .card {{
-                background: white;
-                padding: 20px;
-                border-radius: 12px;
-                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-                margin-bottom: 20px;
-            }}
-            h2 {{ margin-top: 0; color: #1e3a8a; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; }}
-            .form-group {{
-                margin-bottom: 15px;
-            }}
-            label {{ display: block; margin-bottom: 5px; font-weight: bold; }}
-            input[type="text"], input[type="number"] {{
-                width: 100%;
-                padding: 10px;
-                border: 1px solid #cbd5e1;
-                border-radius: 6px;
-                box-sizing: border-box;
-            }}
-            button {{
-                background-color: var(--primary);
-                color: white;
-                border: none;
-                padding: 10px 20px;
-                border-radius: 6px;
-                cursor: pointer;
-                font-weight: bold;
-                width: 100%;
-            }}
-            button:hover {{ background-color: #1d4ed8; }}
-            .ball {{
-                display: inline-block;
-                width: 35px;
-                height: 35px;
-                line-height: 35px;
-                background: radial-gradient(circle at 30% 30%, #ef4444, #991b1b);
-                color: white;
-                border-radius: 50%;
-                text-align: center;
-                font-weight: bold;
-                margin-right: 5px;
-                box-shadow: 1px 2px 4px rgba(0,0,0,0.2);
-            }}
+
 
 
