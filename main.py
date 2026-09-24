@@ -122,7 +122,7 @@ HISTORIQUE_SGE_DATA = [
 ]
 
 # ==============================================================================
-# 2. MOTEUR SGE (AXES, RÉSONANCE & GENERATION AUTOMATIQUE)
+# 2. MOTEUR SGE (AXES & CALCULS)
 # ==============================================================================
 OPPOSITIONS_VERTICALES = {
     1: 9, 2: 10, 3: 11, 4: 12, 5: 13, 6: 14, 7: 15, 8: 16,
@@ -176,7 +176,7 @@ def generer_prono_automatique(combinaison_ref):
     return scores_candidats[0][1] if scores_candidats else combinaison_ref[:5]
 
 # ==============================================================================
-# 3. ÉTAT INITIAL ET ROUTES API
+# 3. ÉTAT INITIAL ET ROUTES
 # ==============================================================================
 course_info = {
     "combinaison": "4 - 11 - 8 - 9 - 7"
@@ -193,98 +193,262 @@ def mettre_a_jour(combinaison: str = Form(...)):
 
 def generer_html():
     nums_combi = [int(n.strip()) for n in course_info["combinaison"].split("-") if n.strip().isdigit()]
-    
     nums_prono = generer_prono_automatique(nums_combi)
-    prono_sge_str = " - ".join(str(n) for n in nums_prono)
-
+    
     score_prono = calculer_score_sge(nums_prono)
     score_combi = calculer_score_sge(nums_combi) if len(nums_combi) == 5 else 0
 
-    grid_btns = "".join([f'<div class="btn-num" id="btn-{i}" onclick="toggleNum({i})">{i}</div>' for i in range(1, 17)])
+    html_prono_balls = "".join([f'<span class="ball orange">{n}</span>' for n in nums_prono])
+    html_combi_balls = "".join([f'<span class="ball gray">{n}</span>' for n in nums_combi])
 
     return f"""<!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>PEGASUS QUINTÉ — Analyseur d'Axes</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PEGASUS QUINTÉ</title>
     <style>
-        body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #121212; color: #ffffff; margin: 0; padding: 20px; }}
-        .container {{ max-width: 700px; margin: 0 auto; background: #1e1e1e; padding: 30px; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.6); }}
-        .header-title {{ text-align: center; color: #ff9800; font-size: 2em; font-weight: 800; margin: 0; text-transform: uppercase; letter-spacing: 1px; }}
-        .header-subtitle {{ text-align: center; color: #888888; font-size: 0.95em; margin-top: 5px; margin-bottom: 25px; }}
-        .card {{ background: #262626; padding: 20px; border-radius: 10px; margin-bottom: 25px; border: 1px solid #333333; }}
-        .card-title {{ color: #ff9800; font-size: 1.1em; font-weight: bold; margin-top: 0; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #333333; padding-bottom: 8px; }}
-        .grid-16 {{ display: grid; grid-template-columns: repeat(8, 1fr); gap: 10px; margin: 20px 0; }}
-        .btn-num {{ background: #2a2a2a; border: 1px solid #444444; color: #ffffff; padding: 12px 0; font-size: 1.1em; font-weight: bold; border-radius: 6px; cursor: pointer; text-align: center; transition: all 0.2s; }}
-        .btn-num:hover {{ background: #3d3d3d; }}
-        .btn-num.selected {{ background: #ff9800; color: #000000; border-color: #ff9800; box-shadow: 0 0 10px rgba(255, 152, 0, 0.5); }}
-        .btn-reset {{ width: 100%; background: #1abc9c; color: #ffffff; border: none; padding: 12px; font-size: 1em; font-weight: bold; border-radius: 6px; cursor: pointer; transition: background 0.2s; }}
-        .btn-reset:hover {{ background: #16a085; }}
-        .score-box {{ display: flex; justify-content: space-between; gap: 15px; margin-bottom: 25px; }}
-        .score-card {{ flex: 1; text-align: center; padding: 12px; background: #262626; border-radius: 8px; border: 1px solid #333; }}
-        form {{ background: #212121; padding: 20px; border-radius: 10px; margin-bottom: 25px; border: 1px solid #333333; }}
-        label {{ font-size: 0.85em; color: #aaaaaa; display: block; margin-top: 5px; }}
-        input {{ width: 100%; padding: 10px; margin-top: 5px; background: #2d2d2d; border: 1px solid #444444; color: #ffffff; border-radius: 6px; box-sizing: border-box; }}
-        button[type="submit"] {{ width: 100%; background: #ff9800; color: #000000; border: none; padding: 12px; margin-top: 15px; font-weight: bold; border-radius: 6px; cursor: pointer; font-size: 1em; }}
-        button[type="submit"]:hover {{ background: #e68a00; }}
-        .prono-auto-box {{ background: #2d2211; border: 1px solid #ff9800; padding: 12px; border-radius: 6px; margin-top: 15px; font-size: 0.9em; text-align: center; color: #ffcc80; }}
+        :root {{
+            --bg-color: #121212;
+            --card-bg: #1e1e1e;
+            --accent-orange: #ff9800;
+            --accent-teal: #26a69a;
+            --text-main: #e0e0e0;
+            --text-muted: #a0a0a0;
+            --border-color: #333333;
+        }}
+
+        body {{
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }}
+
+        .container {{
+            width: 100%;
+            max-width: 800px;
+        }}
+
+        header {{
+            text-align: center;
+            margin-bottom: 25px;
+        }}
+
+        header h1 {{
+            color: var(--accent-orange);
+            margin: 0;
+            font-size: 1.8rem;
+            letter-spacing: 1px;
+        }}
+
+        header p {{
+            color: var(--text-muted);
+            margin-top: 5px;
+            font-size: 0.9rem;
+        }}
+
+        .card {{
+            background-color: var(--card-bg);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }}
+
+        .card-title {{
+            color: var(--accent-orange);
+            font-size: 1.1rem;
+            font-weight: bold;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 8px;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+        }}
+
+        .balls-container {{
+            display: flex;
+            gap: 10px;
+            margin-top: 8px;
+        }}
+
+        .ball {{
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 1rem;
+            color: #fff;
+        }}
+
+        .ball.orange {{ background-color: var(--accent-orange); color: #000; }}
+        .ball.gray {{ background-color: #37474f; color: #fff; }}
+
+        .grid-16 {{
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            gap: 10px;
+            margin-bottom: 20px;
+        }}
+
+        .grid-btn {{
+            background-color: #2a2a2a;
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            padding: 12px 0;
+            border-radius: 6px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.2s;
+        }}
+
+        .grid-btn.active {{
+            background-color: var(--accent-orange);
+            color: #000000;
+            border-color: var(--accent-orange);
+            box-shadow: 0 0 10px rgba(255, 152, 0, 0.5);
+        }}
+
+        .action-btn {{
+            width: 100%;
+            background-color: var(--accent-teal);
+            color: #ffffff;
+            border: none;
+            padding: 12px;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+        }}
+
+        form {{
+            background-color: var(--card-bg);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid var(--border-color);
+        }}
+
+        input[type="text"] {{
+            width: 100%;
+            padding: 10px;
+            margin-top: 8px;
+            margin-bottom: 15px;
+            background-color: #2a2a2a;
+            border: 1px solid var(--border-color);
+            color: #ffffff;
+            border-radius: 6px;
+            box-sizing: border-box;
+        }}
+
+        .score-box {{
+            display: flex;
+            justify-content: space-between;
+            gap: 15px;
+            margin-top: 15px;
+        }}
+
+        .score-card {{
+            flex: 1;
+            text-align: center;
+            padding: 12px;
+            background: #2a2a2a;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }}
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1 class="header-title">PEGASUS QUINTÉ</h1>
-        <div class="header-subtitle">Espace Visiteur — Synthèse & Analyseur d'Axes</div>
 
-        <form action="/update" method="post">
-            <div class="card-title" style="border: none; padding: 0; margin-bottom: 10px;">Saisir / Éditer les données de la course</div>
-            <label>Arrivée Réf. Veille / Combinaison (5 numéros séparés par un tiret) :</label>
-            <input type="text" name="combinaison" value="{course_info['combinaison']}">
-            <button type="submit">Mettre à jour & Générer le Pronostic SGE</button>
-            <div class="prono-auto-box">
-                Pronostic SGE calculé automatiquement : <strong>{prono_sge_str}</strong>
-            </div>
-        </form>
+<div class="container">
+    <header>
+        <h1>PEGASUS QUINTÉ</h1>
+        <p>Espace Visiteur — Synthèse & Analyseur d'Axes</p>
+    </header>
 
-        <div class="card">
-            <div class="card-title" style="text-align: center;">ANALYSEUR GÉOMÉTRIQUE (1–16)</div>
-            <div style="text-align: center; color: #888888; font-size: 0.9em; margin-bottom: 15px;">Sélectionne 5 numéros pour analyser la grille</div>
-            <div class="grid-16">
-                {grid_btns}
+    <!-- FORMULAIRE DE SAISIE -->
+    <form action="/update" method="post">
+        <div class="card-title">Saisir / Éditer les données</div>
+        <label style="font-size: 0.9rem; color: var(--text-muted);">Arrivée Réf. Veille / Combinaison (5 numéros séparés par un tiret) :</label>
+        <input type="text" name="combinaison" value="{course_info['combinaison']}">
+        <button type="submit" class="action-btn">Mettre à jour la page & Recalculer le Pronostic</button>
+    </form>
+
+    <!-- RÉSULTAT DU PRONOSTIC AUTOMATIQUE -->
+    <div class="card">
+        <div class="card-title">Synthèse Géométrique SGE</div>
+        
+        <div style="margin-bottom: 15px;">
+            <div style="font-size: 0.9rem; color: var(--text-muted);">Pronostic SGE calculé automatiquement :</div>
+            <div class="balls-container">
+                {html_prono_balls}
             </div>
-            <button class="btn-reset" onclick="resetGrid()">Réinitialiser la sélection</button>
+        </div>
+
+        <div>
+            <div style="font-size: 0.9rem; color: var(--text-muted);">Arrivée Veille / Combinaison saisie :</div>
+            <div class="balls-container">
+                {html_combi_balls}
+            </div>
         </div>
 
         <div class="score-box">
             <div class="score-card">
-                <div style="font-size:0.85em; color:#aaa;">Pondération Pronostic SGE (Auto)</div>
-                <div style="font-size:1.4em; font-weight:bold; color:#ff9800; margin-top: 4px;">{score_prono} pts</div>
+                <div style="font-size:0.85em; color:var(--text-muted);">Pondération Pronostic SGE</div>
+                <div style="font-size:1.4em; font-weight:bold; color:var(--accent-orange); margin-top:4px;">{score_prono} pts</div>
             </div>
             <div class="score-card">
-                <div style="font-size:0.85em; color:#aaa;">Pondération Arrivée/Combinaison</div>
-                <div style="font-size:1.4em; font-weight:bold; color:#1abc9c; margin-top: 4px;">{score_combi} pts</div>
+                <div style="font-size:0.85em; color:var(--text-muted);">Pondération Combinaison</div>
+                <div style="font-size:1.4em; font-weight:bold; color:var(--accent-teal); margin-top:4px;">{score_combi} pts</div>
             </div>
         </div>
     </div>
 
-    <script>
-        const selectedNums = new Set();
-        function toggleNum(num) {{
-            const btn = document.getElementById(`btn-${{num}}`);
-            if (selectedNums.has(num)) {{
-                selectedNums.delete(num);
-                btn.classList.remove('selected');
-            }} else {{
-                selectedNums.add(num);
-                btn.classList.add('selected');
-            }}
+    <!-- ANALYSEUR GÉOMÉTRIQUE -->
+    <div class="card">
+        <div class="card-title" style="text-align: center;">Analyseur Géométrique (1–16)</div>
+        <p style="text-align: center; color: var(--text-muted); font-size: 0.85rem; margin-top: -10px; margin-bottom: 15px;">
+            Sélectionne des numéros pour interagir sur la grille
+        </p>
+
+        <div class="grid-16">
+            {''.join([f'<div class="grid-btn" id="btn-{i}" onclick="toggleNum({i})">{i}</div>' for i in range(1, 17)])}
+        </div>
+
+        <button class="action-btn" style="background-color: #37474f;" onclick="resetSelection()">Réinitialiser la sélection</button>
+    </div>
+</div>
+
+<script>
+    const selectedNumbers = new Set();
+
+    function toggleNum(num) {{
+        const btn = document.getElementById(`btn-${{num}}`);
+        if (selectedNumbers.has(num)) {{
+            selectedNumbers.delete(num);
+            btn.classList.remove('active');
+        }} else {{
+            selectedNumbers.add(num);
+            btn.classList.add('active');
         }}
-        function resetGrid() {{
-            selectedNums.clear();
-            for (let i = 1; i <= 16; i++) {{
-                const btn = document.getElementById(`btn-${{i}}`);
-                if (btn) btn.classList.remove('selected');
-            }}
+    }}
+
+    function resetSelection() {{
+        selectedNumbers.clear();
+        for (let i = 1; i <= 16; i++) {{
+            const btn = document.getElementById(`btn-${{i}}`);
+            if (btn) btn.classList.remove('active');
         }}
-    </script>
+    }}
+</script>
 </body>
 </html>"""
