@@ -537,7 +537,7 @@ def generer_html():
             btn.classList.add('active');
         }}
 
-        // Met à jour automatiquement le champ de texte du formulaire
+        // Conservation stricte de l'ordre de clic avec insertion automatique des tirets
         if (selectedNumbers.length > 0) {{
             document.getElementById('combinaison-input').value = selectedNumbers.join(' - ');
         }} else {{
