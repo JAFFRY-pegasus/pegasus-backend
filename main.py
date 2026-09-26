@@ -464,7 +464,7 @@ def generer_html():
                 </div>
                 <div class="form-group full-width">
                     <label>Synthèse Presse / Favoris (séparés par tirets) :</label>
-                    <input type="text" name="synthesis_pmu" value="{course_info['synthesis_pmu']}">
+                    <input type="text" id="synthesis-input" name="synthesis_pmu" value="{course_info['synthesis_pmu']}">
                 </div>
             </div>
 
@@ -537,7 +537,6 @@ def generer_html():
             btn.classList.add('active');
         }}
 
-        // Conservation stricte de l'ordre de clic avec insertion automatique des tirets
         if (selectedNumbers.length > 0) {{
             document.getElementById('combinaison-input').value = selectedNumbers.join(' - ');
         }} else {{
@@ -553,6 +552,15 @@ def generer_html():
         }}
         document.getElementById('combinaison-input').value = '';
     }}
+
+    // Formatage automatique avec des tirets pour la Synthèse Presse au clavier
+    document.getElementById('synthesis-input').addEventListener('input', function(e) {{
+        let val = e.target.value;
+        let nums = val.replace(/[^0-9]/g, ' ').trim().split(/\\s+/);
+        if (nums.length > 0 && nums[0] !== "") {{
+            e.target.value = nums.join(' - ');
+        }}
+    }});
 </script>
 </body>
 </html>"""
