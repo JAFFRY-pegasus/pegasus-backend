@@ -178,7 +178,7 @@ def generer_prono_automatique(combinaison_ref):
     return scores_candidats[0][1] if scores_candidats else valides[:5]
 
 # ==============================================================================
-# 3. ÉTAT DE L'APPLICATION (STOCKAGE EN MÉMOIRE)
+# 3. ÉTAT DE L'APPLICATION
 # ==============================================================================
 course_info = {
     "hippodrome": "PARIS-VINCENNES",
@@ -227,7 +227,7 @@ def generer_html():
     score_combi = calculer_score_sge(nums_combi_grid) if len(nums_combi_grid) == 5 else 0
 
     html_prono_balls = "".join([f'<span class="ball orange">{n}</span>' for n in nums_prono])
-    html_combi_balls = "".join([f'<span class="ball gray">{n}</span>' for n in raw_str.replace(",", " ").replace("-", " ").split() if n.strip().isdigit()])
+    html_combi_balls = "".join([f'<span class="ball gray">{n}</span>' for n in nums_saisis])
     
     synth_nums = [n.strip() for n in course_info["synthesis_pmu"].replace(",", " ").replace("-", " ").split() if n.strip().isdigit()]
     html_synth_pmu = "".join([f'<span class="ball teal">{n}</span>' for n in synth_nums]) if synth_nums else '<span style="color: var(--text-muted); font-style: italic;">Aucun favori saisi</span>'
@@ -237,16 +237,17 @@ def generer_html():
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PEGASUS QUINTÉ</title>
+    <title>PEGASUS QUINTÉ — Analyseur SGE</title>
     <style>
         :root {{
-            --bg-color: #121212;
-            --card-bg: #1e1e1e;
-            --accent-orange: #ff9800;
-            --accent-teal: #26a69a;
-            --text-main: #e0e0e0;
-            --text-muted: #a0a0a0;
-            --border-color: #333333;
+            --bg-color: #0d0f12;
+            --card-bg: #161920;
+            --accent-orange: #f39c12;
+            --accent-teal: #1abc9c;
+            --text-main: #f5f6fa;
+            --text-muted: #95a5a6;
+            --border-color: #2c3e50;
+            --input-bg: #1e222b;
         }}
 
         body {{
@@ -254,57 +255,59 @@ def generer_html():
             background-color: var(--bg-color);
             color: var(--text-main);
             margin: 0;
-            padding: 20px;
+            padding: 30px 15px;
             display: flex;
             justify-content: center;
         }}
 
         .container {{
             width: 100%;
-            max-width: 800px;
+            max-width: 820px;
         }}
 
         header {{
             text-align: center;
-            margin-bottom: 25px;
+            margin-bottom: 30px;
         }}
 
         header h1 {{
             color: var(--accent-orange);
             margin: 0;
-            font-size: 1.8rem;
-            letter-spacing: 1px;
+            font-size: 2.2rem;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
         }}
 
         header p {{
             color: var(--text-muted);
-            margin-top: 5px;
-            font-size: 0.9rem;
+            margin-top: 8px;
+            font-size: 0.95rem;
         }}
 
         .card {{
             background-color: var(--card-bg);
-            border-radius: 8px;
-            padding: 20px;
-            margin-bottom: 20px;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 22px;
             border: 1px solid var(--border-color);
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.4);
         }}
 
         .card-title {{
             color: var(--accent-orange);
             font-size: 1.1rem;
-            font-weight: bold;
+            font-weight: 700;
             border-bottom: 1px solid var(--border-color);
-            padding-bottom: 8px;
-            margin-bottom: 15px;
+            padding-bottom: 10px;
+            margin-bottom: 18px;
             text-transform: uppercase;
+            letter-spacing: 0.5px;
         }}
 
         .form-grid {{
             display: grid;
             grid-template-columns: repeat(2, 1fr);
-            gap: 12px;
+            gap: 15px;
             margin-bottom: 15px;
         }}
 
@@ -312,17 +315,19 @@ def generer_html():
             display: block;
             font-size: 0.85rem;
             color: var(--text-muted);
-            margin-bottom: 4px;
+            margin-bottom: 5px;
+            font-weight: 600;
         }}
 
         .form-group input {{
             width: 100%;
-            padding: 8px;
-            background-color: #2a2a2a;
+            padding: 10px;
+            background-color: var(--input-bg);
             border: 1px solid var(--border-color);
             color: #ffffff;
-            border-radius: 6px;
+            border-radius: 8px;
             box-sizing: border-box;
+            font-size: 0.95rem;
         }}
 
         .full-width {{
@@ -331,79 +336,90 @@ def generer_html():
 
         .balls-container {{
             display: flex;
-            gap: 8px;
-            margin-top: 8px;
+            gap: 10px;
+            margin-top: 10px;
             flex-wrap: wrap;
             align-items: center;
         }}
 
         .ball {{
-            width: 34px;
-            height: 34px;
+            width: 38px;
+            height: 38px;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             font-weight: bold;
-            font-size: 0.95rem;
-            color: #fff;
+            font-size: 1rem;
+            box-shadow: 0 3px 6px rgba(0,0,0,0.3);
         }}
 
         .ball.orange {{ background-color: var(--accent-orange); color: #000; }}
-        .ball.gray {{ background-color: #37474f; color: #fff; }}
-        .ball.teal {{ background-color: var(--accent-teal); color: #fff; }}
+        .ball.gray {{ background-color: #34495e; color: #fff; }}
+        .ball.teal {{ background-color: var(--accent-teal); color: #000; }}
 
         .grid-16 {{
             display: grid;
             grid-template-columns: repeat(8, 1fr);
             gap: 10px;
-            margin-bottom: 20px;
+            margin-bottom: 18px;
         }}
 
         .grid-btn {{
-            background-color: #2a2a2a;
+            background-color: var(--input-bg);
             border: 1px solid var(--border-color);
             color: var(--text-main);
-            padding: 12px 0;
-            border-radius: 6px;
-            font-size: 1.1rem;
+            padding: 14px 0;
+            border-radius: 8px;
+            font-size: 1.15rem;
             font-weight: bold;
             cursor: pointer;
             text-align: center;
+            transition: all 0.2s ease;
+        }}
+
+        .grid-btn:hover {{
+            border-color: var(--accent-orange);
         }}
 
         .grid-btn.active {{
             background-color: var(--accent-orange);
             color: #000000;
             border-color: var(--accent-orange);
-            box-shadow: 0 0 10px rgba(255, 152, 0, 0.5);
+            box-shadow: 0 0 12px rgba(243, 156, 18, 0.5);
         }}
 
         .action-btn {{
             width: 100%;
             background-color: var(--accent-teal);
-            color: #ffffff;
+            color: #000000;
             border: none;
-            padding: 12px;
-            border-radius: 6px;
-            font-size: 1rem;
+            padding: 14px;
+            border-radius: 8px;
+            font-size: 1.05rem;
             font-weight: bold;
             cursor: pointer;
-            margin-top: 10px;
+            margin-top: 12px;
+            text-transform: uppercase;
+            transition: opacity 0.2s;
+        }}
+
+        .action-btn:hover {{
+            opacity: 0.9;
         }}
 
         .score-box {{
             display: flex;
             justify-content: space-between;
             gap: 15px;
-            margin-top: 15px;
+            margin-top: 18px;
         }}
 
         .score-card {{
             flex: 1;
             text-align: center;
-            padding: 12px;
-            background: #2a2a2a;
+            padding: 14px;
+            background: var(--input-bg);
             border-radius: 8px;
             border: 1px solid var(--border-color);
         }}
@@ -414,13 +430,13 @@ def generer_html():
 <div class="container">
     <header>
         <h1>PEGASUS QUINTÉ</h1>
-        <p>Espace Visiteur — Synthèse & Analyseur d'Axes</p>
+        <p>Analyseur Géométrique d'Axes & Stratégie Quinté+</p>
     </header>
 
-    <!-- FORMULAIRE GLOBAL DE MISE À JOUR (COURSES + SAISIE) -->
+    <!-- FORMULAIRE GLOBAL DE CONFIGURATION -->
     <form action="/update" method="post">
         <div class="card">
-            <div class="card-title">CONFIGURATION DU QUINTÉ DU JOUR</div>
+            <div class="card-title">1. Configuration du Quinté du Jour</div>
             <div class="form-grid">
                 <div class="form-group">
                     <label>Hippodrome :</label>
@@ -452,47 +468,42 @@ def generer_html():
                 </div>
             </div>
 
-            <div style="margin-top: 10px;">
-                <label style="display:block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 4px;">Arrivée Réf. Veille / Combinaison (séparés par tirets) :</label>
-                <input type="text" name="combinaison" value="{course_info['combinaison']}" style="width:100%; padding:8px; background-color:#2a2a2a; border:1px solid var(--border-color); color:#fff; border-radius:6px; box-sizing:border-box;">
+            <div style="margin-top: 12px;">
+                <label style="display:block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 5px; font-weight: 600;">Arrivée Réf. Veille / Combinaison de test (séparés par tirets) :</label>
+                <input type="text" id="combinaison-input" name="combinaison" value="{course_info['combinaison']}" style="width:100%; padding:10px; background-color:var(--input-bg); border:1px solid var(--border-color); color:#fff; border-radius:8px; box-sizing:border-box; font-size: 0.95rem;">
             </div>
 
-            <button type="submit" class="action-btn">Mettre à jour toutes les données & Recalculer</button>
+            <button type="submit" class="action-btn">Mettre à jour & Recalculer</button>
         </div>
     </form>
 
-    <!-- AFFICHAGE DES INFOS ACTUELLES -->
+    <!-- ANALYSEUR GÉOMÉTRIQUE INTERACTIF -->
     <div class="card">
-        <div class="card-title">RÉCAPITULATIF DE LA COURSE</div>
-        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; font-size: 0.95rem; margin-bottom: 15px;">
-            <div><span style="color:var(--text-muted);">Hippodrome :</span> <strong>{course_info['hippodrome']}</strong></div>
-            <div><span style="color:var(--text-muted);">Discipline :</span> <strong>{course_info['discipline']}</strong></div>
-            <div><span style="color:var(--text-muted);">Course :</span> <strong>{course_info['course_nom']}</strong></div>
-            <div><span style="color:var(--text-muted);">Distance :</span> <strong>{course_info['distance']}</strong></div>
-            <div><span style="color:var(--text-muted);">Partants :</span> <strong>{course_info['partants']} chevaux</strong></div>
-            <div><span style="color:var(--text-muted);">Départ :</span> <strong>{course_info['heure']}</strong></div>
+        <div class="card-title" style="text-align: center;">2. Analyseur Géométrique (Grille 1–16)</div>
+        <p style="text-align: center; color: var(--text-muted); font-size: 0.85rem; margin-top: -8px; margin-bottom: 18px;">
+            Cliquez sur les numéros de la grille pour composer instantanément votre combinaison
+        </p>
+
+        <div class="grid-16">
+            {''.join([f'<div class="grid-btn" id="btn-{i}" onclick="toggleNum({i})">{i}</div>' for i in range(1, 17)])}
         </div>
-        <div>
-            <div style="font-size: 0.9rem; color: var(--text-muted);">Synthèse Presse enregistrée :</div>
-            <div class="balls-container">
-                {html_synth_pmu}
-            </div>
-        </div>
+
+        <button class="action-btn" style="background-color: #34495e; color: #fff; margin-top: 0;" onclick="resetSelection()">Réinitialiser la grille</button>
     </div>
 
-    <!-- RÉSULTAT DU PRONOSTIC AUTOMATIQUE SGE -->
+    <!-- SYNTHÈSE GÉOMÉTRIQUE SGE & RÉSULTATS -->
     <div class="card">
-        <div class="card-title">SYNTHÈSE GÉOMÉTRIQUE SGE</div>
+        <div class="card-title">3. Résultats & Synthèse SGE</div>
         
-        <div style="margin-bottom: 15px;">
+        <div style="margin-bottom: 18px;">
             <div style="font-size: 0.9rem; color: var(--text-muted);">Pronostic SGE calculé automatiquement :</div>
             <div class="balls-container">
                 {html_prono_balls}
             </div>
         </div>
 
-        <div>
-            <div style="font-size: 0.9rem; color: var(--text-muted);">Combinaison saisie :</div>
+        <div style="margin-bottom: 18px;">
+            <div style="font-size: 0.9rem; color: var(--text-muted);">Combinaison active / saisie :</div>
             <div class="balls-container">
                 {html_combi_balls}
             </div>
@@ -501,50 +512,46 @@ def generer_html():
         <div class="score-box">
             <div class="score-card">
                 <div style="font-size:0.85em; color:var(--text-muted);">Pondération Pronostic SGE</div>
-                <div style="font-size:1.4em; font-weight:bold; color:var(--accent-orange); margin-top:4px;">{score_prono} pts</div>
+                <div style="font-size:1.5em; font-weight:bold; color:var(--accent-orange); margin-top:6px;">{score_prono} pts</div>
             </div>
             <div class="score-card">
                 <div style="font-size:0.85em; color:var(--text-muted);">Pondération Combinaison</div>
-                <div style="font-size:1.4em; font-weight:bold; color:var(--accent-teal); margin-top:4px;">{score_combi} pts</div>
+                <div style="font-size:1.5em; font-weight:bold; color:var(--accent-teal); margin-top:6px;">{score_combi} pts</div>
             </div>
         </div>
-    </div>
-
-    <!-- ANALYSEUR GÉOMÉTRIQUE -->
-    <div class="card">
-        <div class="card-title" style="text-align: center;">ANALYSEUR GÉOMÉTRIQUE (1–16)</div>
-        <p style="text-align: center; color: var(--text-muted); font-size: 0.85rem; margin-top: -10px; margin-bottom: 15px;">
-            Sélectionne des numéros pour interagir sur la grille
-        </p>
-
-        <div class="grid-16">
-            {''.join([f'<div class="grid-btn" id="btn-{i}" onclick="toggleNum({i})">{i}</div>' for i in range(1, 17)])}
-        </div>
-
-        <button class="action-btn" style="background-color: #37474f; margin-top: 0;" onclick="resetSelection()">Réinitialiser la sélection</button>
     </div>
 </div>
 
 <script>
-    const selectedNumbers = new Set();
+    const selectedNumbers = [];
 
     function toggleNum(num) {{
         const btn = document.getElementById(`btn-${{num}}`);
-        if (selectedNumbers.has(num)) {{
-            selectedNumbers.delete(num);
+        const index = selectedNumbers.indexOf(num);
+
+        if (index > -1) {{
+            selectedNumbers.splice(index, 1);
             btn.classList.remove('active');
         }} else {{
-            selectedNumbers.add(num);
+            selectedNumbers.push(num);
             btn.classList.add('active');
+        }}
+
+        // Met à jour automatiquement le champ de texte du formulaire
+        if (selectedNumbers.length > 0) {{
+            document.getElementById('combinaison-input').value = selectedNumbers.join(' - ');
+        }} else {{
+            document.getElementById('combinaison-input').value = '';
         }}
     }}
 
     function resetSelection() {{
-        selectedNumbers.clear();
+        selectedNumbers.length = 0;
         for (let i = 1; i <= 16; i++) {{
             const btn = document.getElementById(`btn-${{i}}`);
             if (btn) btn.classList.remove('active');
         }}
+        document.getElementById('combinaison-input').value = '';
     }}
 </script>
 </body>
