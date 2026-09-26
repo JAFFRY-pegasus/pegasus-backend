@@ -469,7 +469,7 @@ def generer_html():
             </div>
 
             <div style="margin-top: 12px;">
-                <label style="display:block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 5px; font-weight: 600;">Arrivée Réf. Veille / Combinaison de test (séparés par tirets) :</label>
+                <label style="display:block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 5px; font-weight: 600;">Combinaison de test (séparés par tirets) :</label>
                 <input type="text" id="combinaison-input" name="combinaison" value="{course_info['combinaison']}" style="width:100%; padding:10px; background-color:var(--input-bg); border:1px solid var(--border-color); color:#fff; border-radius:8px; box-sizing:border-box; font-size: 0.95rem;">
             </div>
 
