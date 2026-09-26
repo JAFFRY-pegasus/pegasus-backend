@@ -2,8 +2,6 @@ from fastapi import FastAPI, Form
 from fastapi.responses import HTMLResponse
 from collections import Counter
 from itertools import combinations
-import requests
-from datetime import datetime
 
 app = FastAPI()
 
@@ -124,73 +122,7 @@ HISTORIQUE_SGE_DATA = [
 ]
 
 # ==============================================================================
-# 2. CONNECTEUR PMU AVEC MESSAGE D'ATTENTE SOUPLE
-# ==============================================================================
-def obtenir_infos_pmu_jour():
-    aujourdhui = datetime.now().strftime("%d%m%Y")
-    url_programme = f"https://aipmu.pmu.fr/rest/client/7/programme/1/programme/{aujourdhui}"
-    
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    }
-
-    # Données d'attente neutres (n'interfèrent pas avec le site)
-    attente = {
-        "hippodrome": "En attente...",
-        "course_nom": "En attente d'actualisation PMU",
-        "discipline": "--",
-        "distance": "--",
-        "partants": "--",
-        "heure": "--:--",
-        "synthesis_pmu": []
-    }
-    
-    try:
-        r = requests.get(url_programme, headers=headers, timeout=2)
-        if r.status_code == 200:
-            data = r.json()
-            for reunion in data.get("programme", {}).get("reunions", []):
-                for course in reunion.get("courses", []):
-                    if course.get("evenementOptionnel"):
-                        hippo = reunion.get("hippodrome", {}).get("libelleCourt", "PMU")
-                        nom = course.get("libelle", "QUINTÉ+")
-                        disc = course.get("discipline", "TROT")
-                        dist = f"{course.get('distance', 0)}m"
-                        partants = str(course.get("nombrePartants", 16))
-                        
-                        ts = course.get("heureDepart", 0) / 1000
-                        heure_str = datetime.fromtimestamp(ts).strftime("%H:%M") if ts > 0 else "13:50"
-                        
-                        num_r = reunion.get("numOfficiel")
-                        num_c = course.get("numOrdre")
-                        url_partants = f"https://aipmu.pmu.fr/rest/client/7/programme/1/programme/{aujourdhui}/R{num_r}/C{num_c}/partants"
-                        
-                        synth_pmu = []
-                        try:
-                            rp = requests.get(url_partants, headers=headers, timeout=2)
-                            if rp.status_code == 200:
-                                partants_data = rp.json().get("partants", [])
-                                partants_data.sort(key=lambda x: x.get("coteProbable", 999) or 999)
-                                synth_pmu = [p.get("numProno", p.get("numOrdre")) for p in partants_data if p.get("numProno") or p.get("numOrdre")][:8]
-                        except Exception:
-                            pass
-
-                        return {
-                            "hippodrome": hippo,
-                            "course_nom": nom,
-                            "discipline": disc,
-                            "distance": dist,
-                            "partants": partants,
-                            "heure": heure_str,
-                            "synthesis_pmu": synth_pmu
-                        }
-    except Exception:
-        pass
-        
-    return attente
-
-# ==============================================================================
-# 3. MOTEUR SGE
+# 2. MOTEUR SGE
 # ==============================================================================
 OPPOSITIONS_VERTICALES = {
     1: 9, 2: 10, 3: 11, 4: 12, 5: 13, 6: 14, 7: 15, 8: 16,
@@ -246,9 +178,16 @@ def generer_prono_automatique(combinaison_ref):
     return scores_candidats[0][1] if scores_candidats else valides[:5]
 
 # ==============================================================================
-# 4. ÉTAT ET ROUTES API
+# 3. ÉTAT DE L'APPLICATION (STOCKAGE EN MÉMOIRE)
 # ==============================================================================
 course_info = {
+    "hippodrome": "PARIS-VINCENNES",
+    "discipline": "TROT ATTELE",
+    "course_nom": "PRIX DU QUINTÉ+",
+    "distance": "2700m",
+    "partants": "16",
+    "heure": "13:50",
+    "synthesis_pmu": "13 - 8 - 10 - 4 - 16 - 6 - 5 - 12",
     "combinaison": "13 - 6 - 5 - 12 - 18"
 }
 
@@ -257,13 +196,27 @@ def page_visiteur():
     return generer_html()
 
 @app.post("/update", response_class=HTMLResponse)
-def mettre_a_jour(combinaison: str = Form(...)):
+def mettre_a_jour(
+    hippodrome: str = Form(...),
+    discipline: str = Form(...),
+    course_nom: str = Form(...),
+    distance: str = Form(...),
+    partants: str = Form(...),
+    heure: str = Form(...),
+    synthesis_pmu: str = Form(...),
+    combinaison: str = Form(...)
+):
+    course_info["hippodrome"] = hippodrome
+    course_info["discipline"] = discipline
+    course_info["course_nom"] = course_nom
+    course_info["distance"] = distance
+    course_info["partants"] = partants
+    course_info["heure"] = heure
+    course_info["synthesis_pmu"] = synthesis_pmu
     course_info["combinaison"] = combinaison
     return generer_html()
 
 def generer_html():
-    pmu_data = obtenir_infos_pmu_jour()
-    
     raw_str = course_info["combinaison"]
     nums_saisis = [int(n.strip()) for n in raw_str.replace(",", " ").replace("-", " ").split() if n.strip().isdigit()]
     
@@ -274,12 +227,10 @@ def generer_html():
     score_combi = calculer_score_sge(nums_combi_grid) if len(nums_combi_grid) == 5 else 0
 
     html_prono_balls = "".join([f'<span class="ball orange">{n}</span>' for n in nums_prono])
-    html_combi_balls = "".join([f'<span class="ball gray">{n}</span>' for n in nums_saisis])
+    html_combi_balls = "".join([f'<span class="ball gray">{n}</span>' for n in raw_str.replace(",", " ").replace("-", " ").split() if n.strip().isdigit()])
     
-    if pmu_data["synthesis_pmu"]:
-        html_synth_pmu = "".join([f'<span class="ball teal">{n}</span>' for n in pmu_data["synthesis_pmu"]])
-    else:
-        html_synth_pmu = '<span style="color: var(--text-muted); font-size: 0.85rem; font-style: italic;">En attente d’actualisation PMU...</span>'
+    synth_nums = [n.strip() for n in course_info["synthesis_pmu"].replace(",", " ").replace("-", " ").split() if n.strip().isdigit()]
+    html_synth_pmu = "".join([f'<span class="ball teal">{n}</span>' for n in synth_nums]) if synth_nums else '<span style="color: var(--text-muted); font-style: italic;">Aucun favori saisi</span>'
 
     return f"""<!DOCTYPE html>
 <html lang="fr">
@@ -350,16 +301,33 @@ def generer_html():
             text-transform: uppercase;
         }}
 
-        .info-grid {{
+        .form-grid {{
             display: grid;
             grid-template-columns: repeat(2, 1fr);
             gap: 12px;
             margin-bottom: 15px;
-            font-size: 0.95rem;
         }}
 
-        .info-item span.label {{ color: var(--text-muted); }}
-        .info-item span.value {{ font-weight: bold; color: #ffffff; }}
+        .form-group label {{
+            display: block;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }}
+
+        .form-group input {{
+            width: 100%;
+            padding: 8px;
+            background-color: #2a2a2a;
+            border: 1px solid var(--border-color);
+            color: #ffffff;
+            border-radius: 6px;
+            box-sizing: border-box;
+        }}
+
+        .full-width {{
+            grid-column: span 2;
+        }}
 
         .balls-container {{
             display: flex;
@@ -421,26 +389,7 @@ def generer_html():
             font-size: 1rem;
             font-weight: bold;
             cursor: pointer;
-        }}
-
-        form {{
-            background-color: var(--card-bg);
-            border-radius: 8px;
-            padding: 20px;
-            margin-bottom: 20px;
-            border: 1px solid var(--border-color);
-        }}
-
-        input[type="text"] {{
-            width: 100%;
-            padding: 10px;
-            margin-top: 8px;
-            margin-bottom: 15px;
-            background-color: #2a2a2a;
-            border: 1px solid var(--border-color);
-            color: #ffffff;
-            border-radius: 6px;
-            box-sizing: border-box;
+            margin-top: 10px;
         }}
 
         .score-box {{
@@ -468,35 +417,70 @@ def generer_html():
         <p>Espace Visiteur — Synthèse & Analyseur d'Axes</p>
     </header>
 
-    <!-- INFORMATIONS DU QUINTÉ DU JOUR (PMU) -->
-    <div class="card">
-        <div class="card-title">INFORMATIONS DE LA COURSE DU JOUR</div>
-        <div class="info-grid">
-            <div class="info-item"><span class="label">Hippodrome : </span><span class="value">{pmu_data['hippodrome']}</span></div>
-            <div class="info-item"><span class="label">Discipline : </span><span class="value">{pmu_data['discipline']}</span></div>
-            <div class="info-item"><span class="label">Course : </span><span class="value">{pmu_data['course_nom']}</span></div>
-            <div class="info-item"><span class="label">Distance : </span><span class="value">{pmu_data['distance']}</span></div>
-            <div class="info-item"><span class="label">Partants : </span><span class="value">{pmu_data['partants']} chevaux</span></div>
-            <div class="info-item"><span class="label">Départ : </span><span class="value">{pmu_data['heure']}</span></div>
-        </div>
+    <!-- FORMULAIRE GLOBAL DE MISE À JOUR (COURSES + SAISIE) -->
+    <form action="/update" method="post">
+        <div class="card">
+            <div class="card-title">CONFIGURATION DU QUINTÉ DU JOUR</div>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Hippodrome :</label>
+                    <input type="text" name="hippodrome" value="{course_info['hippodrome']}">
+                </div>
+                <div class="form-group">
+                    <label>Discipline :</label>
+                    <input type="text" name="discipline" value="{course_info['discipline']}">
+                </div>
+                <div class="form-group">
+                    <label>Nom de la course :</label>
+                    <input type="text" name="course_nom" value="{course_info['course_nom']}">
+                </div>
+                <div class="form-group">
+                    <label>Distance :</label>
+                    <input type="text" name="distance" value="{course_info['distance']}">
+                </div>
+                <div class="form-group">
+                    <label>Nombre de partants :</label>
+                    <input type="text" name="partants" value="{course_info['partants']}">
+                </div>
+                <div class="form-group">
+                    <label>Heure de départ :</label>
+                    <input type="text" name="heure" value="{course_info['heure']}">
+                </div>
+                <div class="form-group full-width">
+                    <label>Synthèse Presse / Favoris (séparés par tirets) :</label>
+                    <input type="text" name="synthesis_pmu" value="{course_info['synthesis_pmu']}">
+                </div>
+            </div>
 
-        <div style="margin-top: 15px;">
-            <div style="font-size: 0.9rem; color: var(--text-muted);">Synthèse de la Presse / Favoris PMU :</div>
+            <div style="margin-top: 10px;">
+                <label style="display:block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 4px;">Arrivée Réf. Veille / Combinaison (séparés par tirets) :</label>
+                <input type="text" name="combinaison" value="{course_info['combinaison']}" style="width:100%; padding:8px; background-color:#2a2a2a; border:1px solid var(--border-color); color:#fff; border-radius:6px; box-sizing:border-box;">
+            </div>
+
+            <button type="submit" class="action-btn">Mettre à jour toutes les données & Recalculer</button>
+        </div>
+    </form>
+
+    <!-- AFFICHAGE DES INFOS ACTUELLES -->
+    <div class="card">
+        <div class="card-title">RÉCAPITULATIF DE LA COURSE</div>
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; font-size: 0.95rem; margin-bottom: 15px;">
+            <div><span style="color:var(--text-muted);">Hippodrome :</span> <strong>{course_info['hippodrome']}</strong></div>
+            <div><span style="color:var(--text-muted);">Discipline :</span> <strong>{course_info['discipline']}</strong></div>
+            <div><span style="color:var(--text-muted);">Course :</span> <strong>{course_info['course_nom']}</strong></div>
+            <div><span style="color:var(--text-muted);">Distance :</span> <strong>{course_info['distance']}</strong></div>
+            <div><span style="color:var(--text-muted);">Partants :</span> <strong>{course_info['partants']} chevaux</strong></div>
+            <div><span style="color:var(--text-muted);">Départ :</span> <strong>{course_info['heure']}</strong></div>
+        </div>
+        <div>
+            <div style="font-size: 0.9rem; color: var(--text-muted);">Synthèse Presse enregistrée :</div>
             <div class="balls-container">
                 {html_synth_pmu}
             </div>
         </div>
     </div>
 
-    <!-- FORMULAIRE DE SAISIE -->
-    <form action="/update" method="post">
-        <div class="card-title">SAISIR / ÉDITER LES DONNÉES</div>
-        <label style="font-size: 0.9rem; color: var(--text-muted);">Arrivée Réf. Veille / Combinaison (numéros séparés par des tirets) :</label>
-        <input type="text" name="combinaison" value="{course_info['combinaison']}">
-        <button type="submit" class="action-btn">Mettre à jour la page & Recalculer le Pronostic</button>
-    </form>
-
-    <!-- RÉSULTAT DU PRONOSTIC AUTOMATIQUE -->
+    <!-- RÉSULTAT DU PRONOSTIC AUTOMATIQUE SGE -->
     <div class="card">
         <div class="card-title">SYNTHÈSE GÉOMÉTRIQUE SGE</div>
         
@@ -508,7 +492,7 @@ def generer_html():
         </div>
 
         <div>
-            <div style="font-size: 0.9rem; color: var(--text-muted);">Arrivée Veille / Combinaison saisie :</div>
+            <div style="font-size: 0.9rem; color: var(--text-muted);">Combinaison saisie :</div>
             <div class="balls-container">
                 {html_combi_balls}
             </div>
@@ -537,7 +521,7 @@ def generer_html():
             {''.join([f'<div class="grid-btn" id="btn-{i}" onclick="toggleNum({i})">{i}</div>' for i in range(1, 17)])}
         </div>
 
-        <button class="action-btn" style="background-color: #37474f;" onclick="resetSelection()">Réinitialiser la sélection</button>
+        <button class="action-btn" style="background-color: #37474f; margin-top: 0;" onclick="resetSelection()">Réinitialiser la sélection</button>
     </div>
 </div>
 
