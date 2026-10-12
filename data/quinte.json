@@ -1,0 +1,18 @@
+{
+  "derniere_maj": null,
+  "course_du_jour": {
+    "date": null,
+    "hippodrome": "PARIS-VINCENNES",
+    "discipline": "TROT ATTELE",
+    "course_nom": "PRIX DU QUINTÉ+",
+    "distance": "2700m",
+    "partants": "16",
+    "heure": "13:50",
+    "favoris_cotes": [13, 8, 10, 4, 16, 6, 5, 12],
+    "synthese_pmu": [13, 8, 10, 4, 16, 6, 5, 12],
+    "combinaison": [],
+    "reunion": null,
+    "course": null
+  },
+  "nouvelles_arrivees": []
+}
