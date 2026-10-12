@@ -1,7 +1,17 @@
-from fastapi import FastAPI, Form
-from fastapi.responses import HTMLResponse
+import json
+import os
+import time
 from collections import Counter
 from itertools import combinations
+from pathlib import Path
+
+from fastapi import FastAPI, Form
+from fastapi.responses import HTMLResponse
+
+try:
+    import requests  # utilisé seulement si QUINTE_JSON_URL est défini
+except ImportError:  # pragma: no cover
+    requests = None
 
 app = FastAPI()
 
@@ -131,9 +141,11 @@ OPPOSITIONS_VERTICALES = {
 
 COEFFICIENTS_RESONANCE = {0: 0.5, 1: 1.0, 2: 1.5, 3: 2.0}
 
-def calculer_poids_axes():
+def calculer_poids_axes(historique=None):
+    if historique is None:
+        historique = HISTORIQUE_SGE_DATA
     frequence_axes = Counter()
-    for course in HISTORIQUE_SGE_DATA:
+    for course in historique:
         arr = course["arrivee"]
         for num in arr:
             oppose = OPPOSITIONS_VERTICALES.get(num)
@@ -142,7 +154,9 @@ def calculer_poids_axes():
                 frequence_axes[axe] += 1
     return {axe: freq // 2 for axe, freq in frequence_axes.items()}
 
-POIDS_AXES_HISTORIQUE = calculer_poids_axes()
+# Historique actif = base statique + arrivées ajoutées automatiquement (data/quinte.json)
+HISTORIQUE_COMPLET = list(HISTORIQUE_SGE_DATA)
+POIDS_AXES_HISTORIQUE = calculer_poids_axes(HISTORIQUE_COMPLET)
 
 def calculer_score_sge(combinaison):
     score_brut = 0
@@ -191,8 +205,98 @@ course_info = {
     "combinaison": "13 - 6 - 5 - 12 - 18"
 }
 
+# ==============================================================================
+# 3 bis. DONNÉES AUTOMATIQUES (alimentées par scripts/fetch_quinte.py via GitHub Actions)
+# ==============================================================================
+DATA_FILE = Path(__file__).resolve().parent / "data" / "quinte.json"
+# Optionnel : URL "raw" du fichier sur GitHub, si l'hébergeur ne redéploie pas à chaque commit.
+# Exemple : https://raw.githubusercontent.com/<user>/<repo>/main/data/quinte.json
+QUINTE_JSON_URL = os.getenv("QUINTE_JSON_URL", "").strip()
+RECHARGEMENT_SECONDES = 300
+
+donnees_auto = {
+    "signature": None,
+    "derniere_maj": None,
+    "nb_arrivees": 0,
+    "dernier_controle": 0.0,
+}
+
+def _lire_json_quinte():
+    """Lit les données automatiques (URL GitHub si configurée, sinon fichier local)."""
+    if QUINTE_JSON_URL and requests is not None:
+        try:
+            r = requests.get(QUINTE_JSON_URL, timeout=10)
+            r.raise_for_status()
+            return r.json()
+        except Exception as exc:
+            print(f"[warn] Lecture de {QUINTE_JSON_URL} impossible : {exc}")
+    try:
+        if DATA_FILE.exists():
+            return json.loads(DATA_FILE.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        print(f"[warn] Lecture de {DATA_FILE} impossible : {exc}")
+    return None
+
+def _liste_en_texte(valeur):
+    if isinstance(valeur, (list, tuple)):
+        return " - ".join(str(n) for n in valeur)
+    return str(valeur or "")
+
+def _arrivee_valide(arr):
+    return (
+        isinstance(arr, list)
+        and len(arr) == 5
+        and all(isinstance(n, int) and 1 <= n <= 16 for n in arr)
+        and len(set(arr)) == 5
+    )
+
+def appliquer_donnees_auto(data):
+    """Fusionne les nouvelles arrivées dans l'historique et met à jour la course du jour."""
+    global HISTORIQUE_COMPLET, POIDS_AXES_HISTORIQUE
+
+    nouvelles = [
+        {"id": str(a.get("id", "")), "arrivee": a["arrivee"]}
+        for a in data.get("nouvelles_arrivees", [])
+        if _arrivee_valide(a.get("arrivee"))
+    ]
+    HISTORIQUE_COMPLET = HISTORIQUE_SGE_DATA + nouvelles
+    POIDS_AXES_HISTORIQUE = calculer_poids_axes(HISTORIQUE_COMPLET)
+
+    course = data.get("course_du_jour") or {}
+    if course.get("course_nom"):
+        for cle in ("hippodrome", "discipline", "course_nom", "distance", "partants", "heure"):
+            if course.get(cle):
+                course_info[cle] = str(course[cle])
+        if course.get("synthese_pmu"):
+            course_info["synthesis_pmu"] = _liste_en_texte(course["synthese_pmu"])
+        # La combinaison de test reste une saisie manuelle, sauf si le JSON en fournit une.
+        if course.get("combinaison"):
+            course_info["combinaison"] = _liste_en_texte(course["combinaison"])
+
+    donnees_auto["nb_arrivees"] = len(nouvelles)
+    donnees_auto["derniere_maj"] = data.get("derniere_maj")
+
+def rafraichir_donnees(force=False):
+    """Recharge les données automatiques au plus toutes les 5 minutes, et seulement si elles ont changé."""
+    maintenant = time.time()
+    if not force and maintenant - donnees_auto["dernier_controle"] < RECHARGEMENT_SECONDES:
+        return
+    donnees_auto["dernier_controle"] = maintenant
+
+    data = _lire_json_quinte()
+    if not data:
+        return
+    signature = json.dumps(data, sort_keys=True)
+    if signature == donnees_auto["signature"]:
+        return
+    donnees_auto["signature"] = signature
+    appliquer_donnees_auto(data)
+
+rafraichir_donnees(force=True)
+
 @app.get("/", response_class=HTMLResponse)
 def page_visiteur():
+    rafraichir_donnees()
     return generer_html()
 
 @app.post("/update", response_class=HTMLResponse)
@@ -206,6 +310,7 @@ def mettre_a_jour(
     synthesis_pmu: str = Form(...),
     combinaison: str = Form(...)
 ):
+    rafraichir_donnees()
     course_info["hippodrome"] = hippodrome
     course_info["discipline"] = discipline
     course_info["course_nom"] = course_nom
@@ -218,6 +323,9 @@ def mettre_a_jour(
 
 def generer_html():
     raw_str = course_info["combinaison"]
+    maj_txt = str(donnees_auto["derniere_maj"] or "jamais").replace("T", " ")[:16]
+    nb_base = len(HISTORIQUE_COMPLET)
+    nb_auto = donnees_auto["nb_arrivees"]
     nums_saisis = [int(n.strip()) for n in raw_str.replace(",", " ").replace("-", " ").split() if n.strip().isdigit()]
     
     nums_prono = generer_prono_automatique(nums_saisis)
@@ -431,6 +539,7 @@ def generer_html():
     <header>
         <h1>PEGASUS QUINTÉ</h1>
         <p>Analyseur Géométrique d'Axes & Stratégie Quinté+</p>
+        <p style="font-size:0.8rem;">Base : {nb_base} quintés (dont {nb_auto} ajoutés automatiquement) · Dernière mise à jour PMU : {maj_txt}</p>
     </header>
 
     <!-- FORMULAIRE GLOBAL DE CONFIGURATION -->
@@ -494,7 +603,14 @@ def generer_html():
     <!-- SYNTHÈSE GÉOMÉTRIQUE SGE & RÉSULTATS -->
     <div class="card">
         <div class="card-title">3. Résultats & Synthèse SGE</div>
-        
+
+        <div style="margin-bottom: 18px;">
+            <div style="font-size: 0.9rem; color: var(--text-muted);">Synthèse Presse / Favoris :</div>
+            <div class="balls-container">
+                {html_synth_pmu}
+            </div>
+        </div>
+
         <div style="margin-bottom: 18px;">
             <div style="font-size: 0.9rem; color: var(--text-muted);">Pronostic SGE calculé automatiquement :</div>
             <div class="balls-container">
