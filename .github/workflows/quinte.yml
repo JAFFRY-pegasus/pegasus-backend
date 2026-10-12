@@ -1,0 +1,46 @@
+name: Mise à jour Quinté+
+
+on:
+  schedule:
+    # Cron en UTC. 07:30 UTC = 09:30 (hiver) / 08:30 (été) à Paris : programme du jour
+    - cron: "30 7 * * *"
+    # 17:30 UTC = 19:30 (hiver) / 18:30 (été) à Paris : arrivée du jour
+    - cron: "30 17 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: quinte
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v4
+
+      - name: Installer Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Installer les dépendances
+        run: pip install requests
+
+      - name: Récupérer les données PMU
+        run: python scripts/fetch_quinte.py
+
+      - name: Commit si changement
+        run: |
+          if [ -n "$(git status --porcelain data/quinte.json)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add data/quinte.json
+            git commit -m "chore: mise à jour Quinté+ $(date -u +%F)"
+            git push
+          else
+            echo "Aucun changement."
+          fi
