@@ -1,36 +1,18 @@
 {
-  "derniere_maj": "2026-10-12T12:31:44+02:00",
+  "derniere_maj": "2026-10-13T01:40:07+02:00",
   "course_du_jour": {
-    "date": "2026-10-12",
-    "hippodrome": "BORELY",
+    "date": "2026-10-13",
+    "hippodrome": "PARISLONGCHAMP",
     "discipline": "PLAT",
-    "course_nom": "PRIX JACQUES ROSSI (PRIX JULES MORGAN)",
-    "distance": "2100m",
+    "course_nom": "PRIX DE LA GALERIE DES VARIETES",
+    "distance": "1600m",
     "partants": "16",
     "heure": "13:55",
-    "favoris_cotes": [
-      3,
-      11,
-      10,
-      2,
-      15,
-      1,
-      12,
-      7
-    ],
-    "synthese_pmu": [
-      3,
-      11,
-      10,
-      2,
-      15,
-      1,
-      12,
-      7
-    ],
+    "favoris_cotes": [],
+    "synthese_pmu": [],
     "combinaison": [],
     "reunion": 1,
-    "course": 4
+    "course": 1
   },
   "nouvelles_arrivees": [
     {
@@ -42,6 +24,17 @@
         3,
         12,
         1
+      ]
+    },
+    {
+      "id": "2026-10-12",
+      "course": "PRIX JACQUES ROSSI (PRIX JULES MORGAN)",
+      "arrivee": [
+        2,
+        10,
+        14,
+        11,
+        12
       ]
     }
   ]
