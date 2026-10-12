@@ -1,18 +1,48 @@
 {
-  "derniere_maj": null,
+  "derniere_maj": "2026-10-12T12:31:44+02:00",
   "course_du_jour": {
-    "date": null,
-    "hippodrome": "PARIS-VINCENNES",
-    "discipline": "TROT ATTELE",
-    "course_nom": "PRIX DU QUINTÉ+",
-    "distance": "2700m",
+    "date": "2026-10-12",
+    "hippodrome": "BORELY",
+    "discipline": "PLAT",
+    "course_nom": "PRIX JACQUES ROSSI (PRIX JULES MORGAN)",
+    "distance": "2100m",
     "partants": "16",
-    "heure": "13:50",
-    "favoris_cotes": [13, 8, 10, 4, 16, 6, 5, 12],
-    "synthese_pmu": [13, 8, 10, 4, 16, 6, 5, 12],
+    "heure": "13:55",
+    "favoris_cotes": [
+      3,
+      11,
+      10,
+      2,
+      15,
+      1,
+      12,
+      7
+    ],
+    "synthese_pmu": [
+      3,
+      11,
+      10,
+      2,
+      15,
+      1,
+      12,
+      7
+    ],
     "combinaison": [],
-    "reunion": null,
-    "course": null
+    "reunion": 1,
+    "course": 4
   },
-  "nouvelles_arrivees": []
+  "nouvelles_arrivees": [
+    {
+      "id": "2026-10-11",
+      "course": "PRIX MONTGOMERY (GROUPE III)",
+      "arrivee": [
+        15,
+        2,
+        3,
+        12,
+        1
+      ]
+    }
+  ]
 }
