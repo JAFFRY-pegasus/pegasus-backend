@@ -669,13 +669,27 @@ def generer_html():
         document.getElementById('combinaison-input').value = '';
     }}
 
-    // Formatage automatique avec des tirets pour la Synthèse Presse au clavier
-    document.getElementById('synthesis-input').addEventListener('input', function(e) {{
-        let val = e.target.value;
-        let nums = val.replace(/[^0-9]/g, ' ').trim().split(/\\s+/);
-        if (nums.length > 0 && nums[0] !== "") {{
-            e.target.value = nums.join(' - ');
+    // Formatage automatique avec des tirets (Synthèse Presse + Combinaison de test)
+    function formaterAvecTirets(e) {{
+        const input = e.target;
+        const val = input.value;
+        const nums = val.match(/\\d+/g);
+        if (!nums) {{
+            input.value = '';
+            return;
         }}
+        let res = nums.join(' - ');
+        // Après un séparateur tapé (espace, virgule, tiret), on prépare le tiret suivant,
+        // sauf lors d'une suppression (sinon impossible d'effacer avec retour arrière).
+        const suppression = e.inputType && e.inputType.indexOf('delete') === 0;
+        if (!suppression && /\\D$/.test(val)) {{
+            res += ' - ';
+        }}
+        input.value = res;
+    }}
+    ['synthesis-input', 'combinaison-input'].forEach(function(id) {{
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('input', formaterAvecTirets);
     }});
 </script>
 </body>
