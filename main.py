@@ -202,7 +202,8 @@ course_info = {
     "partants": "16",
     "heure": "13:50",
     "synthesis_pmu": "13 - 8 - 10 - 4 - 16 - 6 - 5 - 12",
-    "combinaison": "13 - 6 - 5 - 12 - 18"
+    "combinaison": "13 - 6 - 5 - 12 - 18",
+    "arrivee": []  # arrivée officielle (5 premiers), remplie automatiquement après la course
 }
 
 # ==============================================================================
@@ -250,20 +251,35 @@ def _arrivee_valide(arr):
         and len(set(arr)) == 5
     )
 
+def _arrivee_affichable(arr):
+    return (
+        isinstance(arr, list)
+        and len(arr) == 5
+        and all(isinstance(n, int) and not isinstance(n, bool) for n in arr)
+        and len(set(arr)) == 5
+    )
+
 def appliquer_donnees_auto(data):
     """Fusionne les nouvelles arrivées dans l'historique et met à jour la course du jour."""
     global HISTORIQUE_COMPLET, POIDS_AXES_HISTORIQUE
 
+    course = data.get("course_du_jour") or {}
+    date_course = str(course.get("date") or "")
+
+    # L'arrivée de la course du jour n'entre PAS dans les poids tant que la course est « du jour » :
+    # sinon le pronostic serait recalculé en connaissant déjà le résultat, et le % de réussite
+    # serait faussé. Elle rejoint l'historique dès le lendemain.
     nouvelles = [
         {"id": str(a.get("id", "")), "arrivee": a["arrivee"]}
         for a in data.get("nouvelles_arrivees", [])
-        if _arrivee_valide(a.get("arrivee"))
+        if _arrivee_valide(a.get("arrivee")) and str(a.get("id", "")) != date_course
     ]
     HISTORIQUE_COMPLET = HISTORIQUE_SGE_DATA + nouvelles
     POIDS_AXES_HISTORIQUE = calculer_poids_axes(HISTORIQUE_COMPLET)
 
-    course = data.get("course_du_jour") or {}
     if course.get("course_nom"):
+        arr = course.get("arrivee")
+        course_info["arrivee"] = list(arr) if _arrivee_affichable(arr) else []
         for cle in ("hippodrome", "discipline", "course_nom", "distance", "partants", "heure"):
             if course.get(cle):
                 course_info[cle] = str(course[cle])
@@ -334,7 +350,40 @@ def generer_html():
     nums_combi_grid = [n for n in nums_saisis if 1 <= n <= 16][:5]
     score_combi = calculer_score_sge(nums_combi_grid) if len(nums_combi_grid) == 5 else 0
 
-    html_prono_balls = "".join([f'<span class="ball orange">{n}</span>' for n in nums_prono])
+    # --- Arrivée officielle et réussite du pronostic SGE ---
+    arrivee = course_info.get("arrivee") or []
+    if len(arrivee) == 5:
+        trouves = [n for n in nums_prono if n in arrivee]
+        nb_ok = len(trouves)
+        pct_reussite = round(100 * nb_ok / len(nums_prono)) if nums_prono else 0
+        html_prono_balls = "".join(
+            [f'<span class="ball orange {"hit" if n in arrivee else "miss"}">{n}</span>' for n in nums_prono]
+        )
+        html_arrivee_balls = "".join([f'<span class="ball white">{n}</span>' for n in arrivee])
+        mot = "numéro" if nb_ok <= 1 else "numéros"
+        html_bloc_arrivee = f"""
+        <div style="margin-bottom: 18px;">
+            <div style="font-size: 0.9rem; color: var(--text-muted);">Arrivée officielle (1er → 5e) :</div>
+            <div class="balls-container">
+                {html_arrivee_balls}
+            </div>
+        </div>
+
+        <div class="score-box" style="margin-top: 0; margin-bottom: 18px;">
+            <div class="score-card">
+                <div style="font-size:0.85em; color:var(--text-muted);">Réussite du pronostic SGE</div>
+                <div style="font-size:1.8em; font-weight:bold; color:var(--accent-teal); margin-top:6px;">{pct_reussite} %</div>
+                <div style="font-size:0.8em; color:var(--text-muted); margin-top:4px;">{nb_ok} {mot} sur {len(nums_prono)} dans les 5 premiers (entourés ci-dessus)</div>
+            </div>
+        </div>
+        """
+    else:
+        html_prono_balls = "".join([f'<span class="ball orange">{n}</span>' for n in nums_prono])
+        html_bloc_arrivee = """
+        <div style="margin-bottom: 18px; font-size: 0.9rem; color: var(--text-muted); font-style: italic;">
+            Arrivée officielle : pas encore disponible.
+        </div>
+        """
     html_combi_balls = "".join([f'<span class="ball gray">{n}</span>' for n in nums_saisis])
     
     synth_nums = [n.strip() for n in course_info["synthesis_pmu"].replace(",", " ").replace("-", " ").split() if n.strip().isdigit()]
@@ -465,6 +514,9 @@ def generer_html():
         .ball.orange {{ background-color: var(--accent-orange); color: #000; }}
         .ball.gray {{ background-color: #34495e; color: #fff; }}
         .ball.teal {{ background-color: var(--accent-teal); color: #000; }}
+        .ball.white {{ background-color: #f5f6fa; color: #000; }}
+        .ball.hit {{ outline: 3px solid var(--accent-teal); outline-offset: 2px; }}
+        .ball.miss {{ opacity: 0.4; }}
 
         .grid-16 {{
             display: grid;
@@ -617,6 +669,8 @@ def generer_html():
                 {html_prono_balls}
             </div>
         </div>
+
+        {html_bloc_arrivee}
 
         <div style="margin-bottom: 18px;">
             <div style="font-size: 0.9rem; color: var(--text-muted);">Combinaison active / saisie :</div>
