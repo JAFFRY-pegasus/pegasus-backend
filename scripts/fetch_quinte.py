@@ -128,6 +128,7 @@ def construire_course(jour: date, reunion: dict, course: dict) -> dict:
         "favoris_cotes": favoris,
         "synthese_pmu": favoris,  # repris par l'appli comme « Synthèse Presse / Favoris »
         "combinaison": [],        # saisie manuelle dans l'appli
+        "arrivee": extraire_arrivee(course) or [],  # vide tant que la course n'est pas courue
         "reunion": num_r,
         "course": num_c,
     }
