@@ -1,5 +1,5 @@
 {
-  "derniere_maj": "2026-10-13T01:40:07+02:00",
+  "derniere_maj": "2026-10-13T17:12:03+02:00",
   "course_du_jour": {
     "date": "2026-10-13",
     "hippodrome": "PARISLONGCHAMP",
@@ -8,9 +8,34 @@
     "distance": "1600m",
     "partants": "16",
     "heure": "13:55",
-    "favoris_cotes": [],
-    "synthese_pmu": [],
+    "favoris_cotes": [
+      12,
+      16,
+      14,
+      7,
+      9,
+      3,
+      5,
+      10
+    ],
+    "synthese_pmu": [
+      12,
+      16,
+      14,
+      7,
+      9,
+      3,
+      5,
+      10
+    ],
     "combinaison": [],
+    "arrivee": [
+      9,
+      16,
+      2,
+      14,
+      1
+    ],
     "reunion": 1,
     "course": 1
   },
@@ -35,6 +60,17 @@
         14,
         11,
         12
+      ]
+    },
+    {
+      "id": "2026-10-13",
+      "course": "PRIX DE LA GALERIE DES VARIETES",
+      "arrivee": [
+        9,
+        16,
+        2,
+        14,
+        1
       ]
     }
   ]
