@@ -1,3 +1,4 @@
+import html
 import json
 import os
 import time
@@ -17,7 +18,7 @@ except ImportError:  # pragma: no cover
 app = FastAPI()
 
 # ==============================================================================
-# 1. BASE HISTORIQUE COMPLÈTE (244 QUINTÉS)
+# 1. BASE HISTORIQUE COMPLÈTE (220 QUINTÉS)
 # ==============================================================================
 HISTORIQUE_SGE_DATA = [
   {"id": "1", "arrivee": [11, 4, 15, 6, 12]}, {"id": "2", "arrivee": [8, 14, 5, 13, 2]},
@@ -137,7 +138,8 @@ HISTORIQUE_SGE_DATA = [
 # ==============================================================================
 OPPOSITIONS_VERTICALES = {
     1: 9, 2: 10, 3: 11, 4: 12, 5: 13, 6: 14, 7: 15, 8: 16,
-    9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 6, 15: 7, 16: 8
+    9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 6, 15: 7, 16: 8,
+    17: 9, 18: 10  # Extension pour courses à 18 partants
 }
 
 COEFFICIENTS_RESONANCE = {0: 0.5, 1: 1.0, 2: 1.5, 3: 2.0}
@@ -176,12 +178,13 @@ def calculer_score_sge(combinaison):
     return int(score_brut * ponderation)
 
 def generer_prono_automatique(combinaison_ref):
-    valides = [n for n in combinaison_ref if 1 <= n <= 16]
+    nb_partants = int(course_info.get("partants", 16))
+    valides = [n for n in combinaison_ref if 1 <= n <= nb_partants]
     if len(valides) < 5:
-        complements = [n for n in [11, 4, 7, 5, 9, 1, 2, 3, 6, 8, 10, 12, 13, 14, 15, 16] if n not in valides]
+        complements = [n for n in range(1, nb_partants + 1) if n not in valides]
         valides = (valides + complements)[:5]
 
-    opposes = [OPPOSITIONS_VERTICALES[n] for n in valides if n in OPPOSITIONS_VERTICALES]
+    opposes = [OPPOSITIONS_VERTICALES.get(n) for n in valides if OPPOSITIONS_VERTICALES.get(n) is not None]
     candidats = list(dict.fromkeys(valides + opposes))
 
     scores_candidats = []
@@ -203,17 +206,15 @@ course_info = {
     "partants": "16",
     "heure": "13:50",
     "synthesis_pmu": "13 - 8 - 10 - 4 - 16 - 6 - 5 - 12",
-    "combinaison": "13 - 6 - 5 - 12 - 18",
-    "arrivee": [],  # arrivée officielle (5 premiers), remplie automatiquement après la course
-    "date": ""      # date (AAAA-MM-JJ) du Quinté affiché, remplie automatiquement
+    "combinaison": "13 - 6 - 5 - 12 - 11",  # Correction : 18 → 11 (valide 1-16)
+    "arrivee": [],
+    "date": ""
 }
 
 # ==============================================================================
 # 3 bis. DONNÉES AUTOMATIQUES (alimentées par scripts/fetch_quinte.py via GitHub Actions)
 # ==============================================================================
 DATA_FILE = Path(__file__).resolve().parent / "data" / "quinte.json"
-# Optionnel : URL "raw" du fichier sur GitHub, si l'hébergeur ne redéploie pas à chaque commit.
-# Exemple : https://raw.githubusercontent.com/<user>/<repo>/main/data/quinte.json
 QUINTE_JSON_URL = os.getenv("QUINTE_JSON_URL", "").strip()
 RECHARGEMENT_SECONDES = 300
 
@@ -225,7 +226,6 @@ donnees_auto = {
 }
 
 def _lire_json_quinte():
-    """Lit les données automatiques (URL GitHub si configurée, sinon fichier local)."""
     if QUINTE_JSON_URL and requests is not None:
         try:
             r = requests.get(QUINTE_JSON_URL, timeout=10)
@@ -245,11 +245,11 @@ def _liste_en_texte(valeur):
         return " - ".join(str(n) for n in valeur)
     return str(valeur or "")
 
-def _arrivee_valide(arr):
+def _arrivee_valide(arr, max_partants=18):
     return (
         isinstance(arr, list)
         and len(arr) == 5
-        and all(isinstance(n, int) and 1 <= n <= 16 for n in arr)
+        and all(isinstance(n, int) and 1 <= n <= max_partants for n in arr)
         and len(set(arr)) == 5
     )
 
@@ -266,7 +266,6 @@ _MOIS_FR = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet",
             "août", "septembre", "octobre", "novembre", "décembre"]
 
 def _date_fr(iso):
-    """'2026-10-13' -> 'mardi 13 octobre 2026' ; chaîne vide si la date est absente ou invalide."""
     try:
         d = _date.fromisoformat(str(iso))
     except ValueError:
@@ -274,19 +273,15 @@ def _date_fr(iso):
     return f"{_JOURS_FR[d.weekday()]} {d.day} {_MOIS_FR[d.month - 1]} {d.year}"
 
 def appliquer_donnees_auto(data):
-    """Fusionne les nouvelles arrivées dans l'historique et met à jour la course du jour."""
     global HISTORIQUE_COMPLET, POIDS_AXES_HISTORIQUE
 
     course = data.get("course_du_jour") or {}
     date_course = str(course.get("date") or "")
 
-    # L'arrivée de la course du jour n'entre PAS dans les poids tant que la course est « du jour » :
-    # sinon le pronostic serait recalculé en connaissant déjà le résultat, et le % de réussite
-    # serait faussé. Elle rejoint l'historique dès le lendemain.
     nouvelles = [
         {"id": str(a.get("id", "")), "arrivee": a["arrivee"]}
         for a in data.get("nouvelles_arrivees", [])
-        if _arrivee_valide(a.get("arrivee")) and str(a.get("id", "")) != date_course
+        if _arrivee_valide(a.get("arrivee"), 18) and str(a.get("id", "")) != date_course
     ]
     HISTORIQUE_COMPLET = HISTORIQUE_SGE_DATA + nouvelles
     POIDS_AXES_HISTORIQUE = calculer_poids_axes(HISTORIQUE_COMPLET)
@@ -300,7 +295,6 @@ def appliquer_donnees_auto(data):
                 course_info[cle] = str(course[cle])
         if course.get("synthese_pmu"):
             course_info["synthesis_pmu"] = _liste_en_texte(course["synthese_pmu"])
-        # La combinaison de test reste une saisie manuelle, sauf si le JSON en fournit une.
         if course.get("combinaison"):
             course_info["combinaison"] = _liste_en_texte(course["combinaison"])
 
@@ -308,7 +302,6 @@ def appliquer_donnees_auto(data):
     donnees_auto["derniere_maj"] = data.get("derniere_maj")
 
 def rafraichir_donnees(force=False):
-    """Recharge les données automatiques au plus toutes les 5 minutes, et seulement si elles ont changé."""
     maintenant = time.time()
     if not force and maintenant - donnees_auto["dernier_controle"] < RECHARGEMENT_SECONDES:
         return
@@ -358,19 +351,18 @@ def generer_html():
     nb_base = len(HISTORIQUE_COMPLET)
     nb_auto = donnees_auto["nb_arrivees"]
     nums_saisis = [int(n.strip()) for n in raw_str.replace(",", " ").replace("-", " ").split() if n.strip().isdigit()]
-    
+
     nums_prono = generer_prono_automatique(nums_saisis)
     score_prono = calculer_score_sge(nums_prono)
-    
-    nums_combi_grid = [n for n in nums_saisis if 1 <= n <= 16][:5]
+
+    nb_partants = int(course_info.get("partants", 16))
+    nums_combi_grid = [n for n in nums_saisis if 1 <= n <= nb_partants][:5]
     score_combi = calculer_score_sge(nums_combi_grid) if len(nums_combi_grid) == 5 else 0
 
-    # --- Arrivée officielle et réussite du pronostic SGE ---
     arrivee = course_info.get("arrivee") or []
     date_txt = _date_fr(course_info.get("date"))
-    # Ex. : " — Quinté du mardi 13 octobre 2026" (vide si la date est inconnue)
     suffixe_date = (
-        f' — Quinté du <strong style="color: var(--text-main);">{date_txt}</strong>' if date_txt else ""
+        f' — Quinté du <strong style="color: var(--text-main);">{html.escape(date_txt)}</strong>' if date_txt else ""
     )
     if len(arrivee) == 5:
         trouves = [n for n in nums_prono if n in arrivee]
@@ -405,9 +397,19 @@ def generer_html():
         </div>
         """
     html_combi_balls = "".join([f'<span class="ball gray">{n}</span>' for n in nums_saisis])
-    
+
     synth_nums = [n.strip() for n in course_info["synthesis_pmu"].replace(",", " ").replace("-", " ").split() if n.strip().isdigit()]
     html_synth_pmu = "".join([f'<span class="ball teal">{n}</span>' for n in synth_nums]) if synth_nums else '<span style="color: var(--text-muted); font-style: italic;">Aucun favori saisi</span>'
+
+    # Échappement HTML pour sécurité XSS
+    h_hippo = html.escape(course_info['hippodrome'])
+    h_disc = html.escape(course_info['discipline'])
+    h_nom = html.escape(course_info['course_nom'])
+    h_dist = html.escape(course_info['distance'])
+    h_part = html.escape(course_info['partants'])
+    h_heure = html.escape(course_info['heure'])
+    h_synth = html.escape(course_info['synthesis_pmu'])
+    h_comb = html.escape(course_info['combinaison'])
 
     return f"""<!DOCTYPE html>
 <html lang="fr">
@@ -538,9 +540,9 @@ def generer_html():
         .ball.hit {{ outline: 3px solid var(--accent-teal); outline-offset: 2px; }}
         .ball.miss {{ opacity: 0.4; }}
 
-        .grid-16 {{
+        .grid-partants {{
             display: grid;
-            grid-template-columns: repeat(8, 1fr);
+            grid-template-columns: repeat(auto-fit, minmax(50px, 1fr));
             gap: 10px;
             margin-bottom: 18px;
         }}
@@ -614,53 +616,51 @@ def generer_html():
         <p style="font-size:0.8rem;">Base : {nb_base} quintés (dont {nb_auto} ajoutés automatiquement) · Dernière mise à jour PMU : {maj_txt}</p>
     </header>
 
-    <!-- FORMULAIRE GLOBAL DE CONFIGURATION -->
     <form action="/update" method="post">
         <div class="card">
             <div class="card-title">1. Informations sur le Quinté du Jour</div>
             <div class="form-grid">
                 <div class="form-group">
                     <label>Hippodrome :</label>
-                    <input type="text" name="hippodrome" value="{course_info['hippodrome']}">
+                    <input type="text" name="hippodrome" value="{h_hippo}">
                 </div>
                 <div class="form-group">
                     <label>Discipline :</label>
-                    <input type="text" name="discipline" value="{course_info['discipline']}">
+                    <input type="text" name="discipline" value="{h_disc}">
                 </div>
                 <div class="form-group">
                     <label>Nom de la course :</label>
-                    <input type="text" name="course_nom" value="{course_info['course_nom']}">
+                    <input type="text" name="course_nom" value="{h_nom}">
                 </div>
                 <div class="form-group">
                     <label>Distance :</label>
-                    <input type="text" name="distance" value="{course_info['distance']}">
+                    <input type="text" name="distance" value="{h_dist}">
                 </div>
                 <div class="form-group">
                     <label>Nombre de partants :</label>
-                    <input type="text" name="partants" value="{course_info['partants']}">
+                    <input type="text" name="partants" value="{h_part}">
                 </div>
                 <div class="form-group">
                     <label>Heure de départ :</label>
-                    <input type="text" name="heure" value="{course_info['heure']}">
+                    <input type="text" name="heure" value="{h_heure}">
                 </div>
                 <div class="form-group full-width">
                     <label>Synthèse Presse / Favoris (séparés par tirets) :</label>
-                    <input type="text" id="synthesis-input" name="synthesis_pmu" value="{course_info['synthesis_pmu']}">
+                    <input type="text" id="synthesis-input" name="synthesis_pmu" value="{h_synth}">
                 </div>
             </div>
 
             <div style="margin-top: 12px;">
                 <label style="display:block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 5px; font-weight: 600;">Combinaison de test (séparés par tirets) :</label>
-                <input type="text" id="combinaison-input" name="combinaison" value="{course_info['combinaison']}" style="width:100%; padding:10px; background-color:var(--input-bg); border:1px solid var(--border-color); color:#fff; border-radius:8px; box-sizing:border-box; font-size: 0.95rem;">
+                <input type="text" id="combinaison-input" name="combinaison" value="{h_comb}" style="width:100%; padding:10px; background-color:var(--input-bg); border:1px solid var(--border-color); color:#fff; border-radius:8px; box-sizing:border-box; font-size: 0.95rem;">
             </div>
 
             <button type="submit" class="action-btn">Mettre à jour & Recalculer</button>
         </div>
     </form>
 
-    <!-- SYNTHÈSE GÉOMÉTRIQUE SGE & RÉSULTATS -->
     <div class="card">
-        <div class="card-title">2. Synthèse PMU et pronostic SGE optimisé pour une grille de 16 partants au Quinté</div>
+        <div class="card-title">2. Synthèse PMU et pronostic SGE optimisé pour une grille de {nb_partants} partants au Quinté</div>
 
         <div style="margin-bottom: 18px;">
             <div style="font-size: 0.9rem; color: var(--text-muted);">Synthèse Presse / Favoris :</div>
@@ -697,15 +697,14 @@ def generer_html():
         </div>
     </div>
 
-    <!-- ANALYSEUR GÉOMÉTRIQUE INTERACTIF -->
     <div class="card">
-        <div class="card-title" style="text-align: center;">3. Test de Vision Géométrique (Grille 1–16)</div>
+        <div class="card-title" style="text-align: center;">3. Test de Vision Géométrique (Grille 1–{nb_partants})</div>
         <p style="text-align: center; color: var(--text-muted); font-size: 0.85rem; margin-top: -8px; margin-bottom: 18px;">
-            Cliquez sur les numéros de la grille pour composer instantanément votre combinaison
+            Cliquez sur les numéros de la grille pour composer instantanément votre combinaison (5 chevaux max)
         </p>
 
-        <div class="grid-16">
-            {''.join([f'<div class="grid-btn" id="btn-{i}" onclick="toggleNum({i})">{i}</div>' for i in range(1, 17)])}
+        <div class="grid-partants">
+            {''.join([f'<div class="grid-btn" id="btn-{i}" onclick="toggleNum({i})">{i}</div>' for i in range(1, nb_partants + 1)])}
         </div>
 
         <button class="action-btn" style="background-color: #34495e; color: #fff; margin-top: 0;" onclick="resetSelection()">Réinitialiser la grille</button>
@@ -714,6 +713,7 @@ def generer_html():
 
 <script>
     const selectedNumbers = [];
+    const MAX_PARTANTS = {nb_partants};
 
     function toggleNum(num) {{
         const btn = document.getElementById(`btn-${{num}}`);
@@ -723,43 +723,42 @@ def generer_html():
             selectedNumbers.splice(index, 1);
             btn.classList.remove('active');
         }} else {{
+            if (selectedNumbers.length >= 5) {{
+                alert("Vous ne pouvez sélectionner que 5 chevaux maximum.");
+                return;
+            }}
             selectedNumbers.push(num);
             btn.classList.add('active');
         }}
 
-        if (selectedNumbers.length > 0) {{
-            document.getElementById('combinaison-input').value = selectedNumbers.join(' - ');
-        }} else {{
-            document.getElementById('combinaison-input').value = '';
-        }}
+        document.getElementById('combinaison-input').value = selectedNumbers.join(' - ');
     }}
 
     function resetSelection() {{
         selectedNumbers.length = 0;
-        for (let i = 1; i <= 16; i++) {{
+        for (let i = 1; i <= MAX_PARTANTS; i++) {{
             const btn = document.getElementById(`btn-${{i}}`);
             if (btn) btn.classList.remove('active');
         }}
         document.getElementById('combinaison-input').value = '';
     }}
 
-    // Formatage automatique avec des tirets (Synthèse Presse + Combinaison de test)
     function formaterAvecTirets(e) {{
         const input = e.target;
-        const val = input.value;
-        const nums = val.match(/\\d+/g);
+        const cursorPosition = input.selectionStart;
+        const nums = input.value.match(/\\d+/g);
         if (!nums) {{
             input.value = '';
             return;
         }}
         let res = nums.join(' - ');
-        // Après un séparateur tapé (espace, virgule, tiret), on prépare le tiret suivant,
-        // sauf lors d'une suppression (sinon impossible d'effacer avec retour arrière).
         const suppression = e.inputType && e.inputType.indexOf('delete') === 0;
-        if (!suppression && /\\D$/.test(val)) {{
+        if (!suppression && /\\D$/.test(input.value)) {{
             res += ' - ';
         }}
         input.value = res;
+        const newPos = Math.min(cursorPosition, input.value.length);
+        input.setSelectionRange(newPos, newPos);
     }}
     ['synthesis-input', 'combinaison-input'].forEach(function(id) {{
         const el = document.getElementById(id);
