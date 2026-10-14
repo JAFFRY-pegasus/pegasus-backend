@@ -134,12 +134,13 @@ HISTORIQUE_SGE_DATA = [
 ]
 
 # ==============================================================================
-# 2. MOTEUR SGE
+# 2. MOTEUR SGE (Support jusqu'à 20 chevaux)
 # ==============================================================================
 OPPOSITIONS_VERTICALES = {
     1: 9, 2: 10, 3: 11, 4: 12, 5: 13, 6: 14, 7: 15, 8: 16,
     9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 6, 15: 7, 16: 8,
-    17: 9, 18: 10  # Extension pour courses à 18 partants
+    17: 9, 18: 10, 
+    19: 11, 20: 12  # Extension pour courses à 18 ou 20 partants
 }
 
 COEFFICIENTS_RESONANCE = {0: 0.5, 1: 1.0, 2: 1.5, 3: 2.0}
@@ -244,7 +245,8 @@ def _liste_en_texte(valeur):
         return " - ".join(str(n) for n in valeur)
     return str(valeur or "")
 
-def _arrivee_valide(arr, max_partants=18):
+# Support étendu à 20 chevaux
+def _arrivee_valide(arr, max_partants=20):
     return (
         isinstance(arr, list)
         and len(arr) == 5
@@ -277,10 +279,11 @@ def appliquer_donnees_auto(data):
     course = data.get("course_du_jour") or {}
     date_course = str(course.get("date") or "")
 
+    # Validation étendue à 20 chevaux
     nouvelles = [
         {"id": str(a.get("id", "")), "arrivee": a["arrivee"]}
         for a in data.get("nouvelles_arrivees", [])
-        if _arrivee_valide(a.get("arrivee"), 18) and str(a.get("id", "")) != date_course
+        if _arrivee_valide(a.get("arrivee"), 20) and str(a.get("id", "")) != date_course
     ]
     HISTORIQUE_COMPLET = HISTORIQUE_SGE_DATA + nouvelles
     POIDS_AXES_HISTORIQUE = calculer_poids_axes(HISTORIQUE_COMPLET)
@@ -414,6 +417,7 @@ def generer_html():
     h_heure = html.escape(course_info['heure'])
     h_synth = html.escape(course_info['synthesis_pmu'])
     h_comb = html.escape(course_info['combinaison'])
+    h_date = html.escape(date_txt) if date_txt else ""
 
     # Valeurs par défaut pour les placeholders
     default_values = {
@@ -424,7 +428,8 @@ def generer_html():
         "partants": "16",
         "heure": "13:50",
         "synthesis_pmu": "13 - 8 - 10 - 4 - 16 - 6 - 5 - 12",
-        "combinaison": "13 - 6 - 5 - 12 - 11"
+        "combinaison": "13 - 6 - 5 - 12 - 11",
+        "date": "mercredi 14 octobre 2026"
     }
 
     return f"""<!DOCTYPE html>
@@ -528,6 +533,13 @@ def generer_html():
         .form-group input::placeholder {{
             color: #6c757d;
             font-style: italic;
+        }}
+
+        .form-group input[readonly] {{
+            background-color: #2a2f3a;
+            color: var(--accent-teal);
+            font-weight: 600;
+            cursor: not-allowed;
         }}
 
         .full-width {{
@@ -641,6 +653,10 @@ def generer_html():
         <div class="card">
             <div class="card-title">1. Informations sur le Quinté du Jour</div>
             <div class="form-grid">
+                <div class="form-group full-width">
+                    <label>📅 Date de la course (automatique) :</label>
+                    <input type="text" value="{h_date}" placeholder="{default_values['date']}" readonly>
+                </div>
                 <div class="form-group">
                     <label>Hippodrome :</label>
                     <input type="text" name="hippodrome" value="{h_hippo}" placeholder="{default_values['hippodrome']}">
