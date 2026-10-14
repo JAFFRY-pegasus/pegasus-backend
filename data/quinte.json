@@ -1,41 +1,35 @@
 {
-  "derniere_maj": "2026-10-13T17:12:03+02:00",
+  "derniere_maj": "2026-10-14T11:20:45+02:00",
   "course_du_jour": {
-    "date": "2026-10-13",
-    "hippodrome": "PARISLONGCHAMP",
-    "discipline": "PLAT",
-    "course_nom": "PRIX DE LA GALERIE DES VARIETES",
-    "distance": "1600m",
+    "date": "2026-10-14",
+    "hippodrome": "REIMS",
+    "discipline": "ATTELE",
+    "course_nom": "GRAND NATIONAL DU TROT",
+    "distance": "2550m",
     "partants": "16",
     "heure": "13:55",
     "favoris_cotes": [
-      12,
-      16,
-      14,
-      7,
-      9,
-      3,
+      2,
+      15,
+      10,
       5,
-      10
+      6,
+      8,
+      13,
+      9
     ],
     "synthese_pmu": [
-      12,
-      16,
-      14,
-      7,
-      9,
-      3,
+      2,
+      15,
+      10,
       5,
-      10
+      6,
+      8,
+      13,
+      9
     ],
     "combinaison": [],
-    "arrivee": [
-      9,
-      16,
-      2,
-      14,
-      1
-    ],
+    "arrivee": [],
     "reunion": 1,
     "course": 1
   },
