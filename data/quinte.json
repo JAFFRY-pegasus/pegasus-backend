@@ -1,5 +1,5 @@
 {
-  "derniere_maj": "2026-10-14T11:20:45+02:00",
+  "derniere_maj": "2026-10-14T14:58:39+02:00",
   "course_du_jour": {
     "date": "2026-10-14",
     "hippodrome": "REIMS",
@@ -15,8 +15,8 @@
       5,
       6,
       8,
-      13,
-      9
+      9,
+      13
     ],
     "synthese_pmu": [
       2,
@@ -25,11 +25,17 @@
       5,
       6,
       8,
-      13,
-      9
+      9,
+      13
     ],
     "combinaison": [],
-    "arrivee": [],
+    "arrivee": [
+      10,
+      15,
+      13,
+      5,
+      9
+    ],
     "reunion": 1,
     "course": 1
   },
@@ -65,6 +71,17 @@
         2,
         14,
         1
+      ]
+    },
+    {
+      "id": "2026-10-14",
+      "course": "GRAND NATIONAL DU TROT",
+      "arrivee": [
+        10,
+        15,
+        13,
+        5,
+        9
       ]
     }
   ]
