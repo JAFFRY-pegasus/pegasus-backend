@@ -245,7 +245,6 @@ def _liste_en_texte(valeur):
         return " - ".join(str(n) for n in valeur)
     return str(valeur or "")
 
-# Support étendu à 20 chevaux
 def _arrivee_valide(arr, max_partants=20):
     return (
         isinstance(arr, list)
@@ -279,7 +278,6 @@ def appliquer_donnees_auto(data):
     course = data.get("course_du_jour") or {}
     date_course = str(course.get("date") or "")
 
-    # Validation étendue à 20 chevaux
     nouvelles = [
         {"id": str(a.get("id", "")), "arrivee": a["arrivee"]}
         for a in data.get("nouvelles_arrivees", [])
@@ -338,7 +336,6 @@ def mettre_a_jour(
 ):
     rafraichir_donnees()
     
-    # Ne mettre à jour que les champs non vides
     if hippodrome.strip(): course_info["hippodrome"] = hippodrome
     if discipline.strip(): course_info["discipline"] = discipline
     if course_nom.strip(): course_info["course_nom"] = course_nom
@@ -408,7 +405,6 @@ def generer_html():
     synth_nums = [n.strip() for n in course_info["synthesis_pmu"].replace(",", " ").replace("-", " ").split() if n.strip().isdigit()]
     html_synth_pmu = "".join([f'<span class="ball teal">{n}</span>' for n in synth_nums]) if synth_nums else '<span style="color: var(--text-muted); font-style: italic;">Aucun favori saisi</span>'
 
-    # Échappement HTML pour sécurité XSS
     h_hippo = html.escape(course_info['hippodrome'])
     h_disc = html.escape(course_info['discipline'])
     h_nom = html.escape(course_info['course_nom'])
@@ -419,7 +415,6 @@ def generer_html():
     h_comb = html.escape(course_info['combinaison'])
     h_date = html.escape(date_txt) if date_txt else ""
 
-    # Valeurs par défaut pour les placeholders
     default_values = {
         "hippodrome": "PARIS-VINCENNES",
         "discipline": "TROT ATTELE",
@@ -432,7 +427,6 @@ def generer_html():
         "date": "mercredi 14 octobre 2026"
     }
 
-    # Phrase de mission (échappée pour sécurité)
     mission = "Le but de PEGASUS est de donner des ailes à l'intuition du parieur en transformant des données historiques brutes en une stratégie géométrique claire, automatisée et optimisée."
 
     return f"""<!DOCTYPE html>
@@ -441,6 +435,28 @@ def generer_html():
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PEGASUS QUINTÉ — Analyseur de Pronostics</title>
+    <meta name="description" content="PEGASUS QUINTÉ : Analyseur géométrique d'axes et stratégie de pronostic hippique. Transformez vos intuitions en combinaisons optimisées grâce à l'historique des courses.">
+    <meta name="keywords" content="pronostic quinté+, analyse géométrique courses, pegasus quinté, logiciel pronostic hippique, stratégie axes chevaux, PMU">
+    <meta name="author" content="Pegasus Project">
+    <meta name="robots" content="index, follow">
+    <meta property="og:title" content="PEGASUS QUINTÉ — Analyseur Géométrique">
+    <meta property="og:description" content="Donnez des ailes à votre intuition. Pronostics Quinté+ optimisés par analyse géométrique des axes.">
+    <meta property="og:type" content="website">
+    <script type="application/ld+json">
+    {{
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "PEGASUS QUINTÉ",
+      "applicationCategory": "SportsApplication",
+      "operatingSystem": "Web",
+      "description": "Analyseur géométrique d'axes et stratégie de pronostic pour le Quinté+.",
+      "offers": {{
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "EUR"
+      }}
+    }}
+    </script>
     <style>
         :root {{
             --bg-color: #0d0f12;
@@ -656,7 +672,6 @@ def generer_html():
             border: 1px solid var(--border-color);
         }}
 
-        /* Styles pour la diode clignotante */
         .diode-container {{
             display: flex;
             align-items: center;
