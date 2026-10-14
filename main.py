@@ -157,7 +157,6 @@ def calculer_poids_axes(historique=None):
                 frequence_axes[axe] += 1
     return {axe: freq // 2 for axe, freq in frequence_axes.items()}
 
-# Historique actif = base statique + arrivées ajoutées automatiquement (data/quinte.json)
 HISTORIQUE_COMPLET = list(HISTORIQUE_SGE_DATA)
 POIDS_AXES_HISTORIQUE = calculer_poids_axes(HISTORIQUE_COMPLET)
 
@@ -178,7 +177,7 @@ def calculer_score_sge(combinaison):
     return int(score_brut * ponderation)
 
 def generer_prono_automatique(combinaison_ref):
-    nb_partants = int(course_info.get("partants", 16))
+    nb_partants = int(course_info.get("partants") or 16)
     valides = [n for n in combinaison_ref if 1 <= n <= nb_partants]
     if len(valides) < 5:
         complements = [n for n in range(1, nb_partants + 1) if n not in valides]
@@ -206,13 +205,13 @@ course_info = {
     "partants": "16",
     "heure": "13:50",
     "synthesis_pmu": "13 - 8 - 10 - 4 - 16 - 6 - 5 - 12",
-    "combinaison": "13 - 6 - 5 - 12 - 11",  # Correction : 18 → 11 (valide 1-16)
+    "combinaison": "13 - 6 - 5 - 12 - 11",
     "arrivee": [],
     "date": ""
 }
 
 # ==============================================================================
-# 3 bis. DONNÉES AUTOMATIQUES (alimentées par scripts/fetch_quinte.py via GitHub Actions)
+# 3 bis. DONNÉES AUTOMATIQUES
 # ==============================================================================
 DATA_FILE = Path(__file__).resolve().parent / "data" / "quinte.json"
 QUINTE_JSON_URL = os.getenv("QUINTE_JSON_URL", "").strip()
@@ -325,24 +324,27 @@ def page_visiteur():
 
 @app.post("/update", response_class=HTMLResponse)
 def mettre_a_jour(
-    hippodrome: str = Form(...),
-    discipline: str = Form(...),
-    course_nom: str = Form(...),
-    distance: str = Form(...),
-    partants: str = Form(...),
-    heure: str = Form(...),
-    synthesis_pmu: str = Form(...),
-    combinaison: str = Form(...)
+    hippodrome: str = Form(""),
+    discipline: str = Form(""),
+    course_nom: str = Form(""),
+    distance: str = Form(""),
+    partants: str = Form(""),
+    heure: str = Form(""),
+    synthesis_pmu: str = Form(""),
+    combinaison: str = Form("")
 ):
     rafraichir_donnees()
-    course_info["hippodrome"] = hippodrome
-    course_info["discipline"] = discipline
-    course_info["course_nom"] = course_nom
-    course_info["distance"] = distance
-    course_info["partants"] = partants
-    course_info["heure"] = heure
-    course_info["synthesis_pmu"] = synthesis_pmu
-    course_info["combinaison"] = combinaison
+    
+    # Ne mettre à jour que les champs non vides
+    if hippodrome.strip(): course_info["hippodrome"] = hippodrome
+    if discipline.strip(): course_info["discipline"] = discipline
+    if course_nom.strip(): course_info["course_nom"] = course_nom
+    if distance.strip(): course_info["distance"] = distance
+    if partants.strip(): course_info["partants"] = partants
+    if heure.strip(): course_info["heure"] = heure
+    if synthesis_pmu.strip(): course_info["synthesis_pmu"] = synthesis_pmu
+    if combinaison.strip(): course_info["combinaison"] = combinaison
+    
     return generer_html()
 
 def generer_html():
@@ -355,7 +357,7 @@ def generer_html():
     nums_prono = generer_prono_automatique(nums_saisis)
     score_prono = calculer_score_sge(nums_prono)
 
-    nb_partants = int(course_info.get("partants", 16))
+    nb_partants = int(course_info.get("partants") or 16)
     nums_combi_grid = [n for n in nums_saisis if 1 <= n <= nb_partants][:5]
     score_combi = calculer_score_sge(nums_combi_grid) if len(nums_combi_grid) == 5 else 0
 
@@ -364,6 +366,7 @@ def generer_html():
     suffixe_date = (
         f' — Quinté du <strong style="color: var(--text-main);">{html.escape(date_txt)}</strong>' if date_txt else ""
     )
+    
     if len(arrivee) == 5:
         trouves = [n for n in nums_prono if n in arrivee]
         nb_ok = len(trouves)
@@ -396,6 +399,7 @@ def generer_html():
             Arrivée officielle{suffixe_date} : pas encore disponible.
         </div>
         """
+        
     html_combi_balls = "".join([f'<span class="ball gray">{n}</span>' for n in nums_saisis])
 
     synth_nums = [n.strip() for n in course_info["synthesis_pmu"].replace(",", " ").replace("-", " ").split() if n.strip().isdigit()]
@@ -410,6 +414,18 @@ def generer_html():
     h_heure = html.escape(course_info['heure'])
     h_synth = html.escape(course_info['synthesis_pmu'])
     h_comb = html.escape(course_info['combinaison'])
+
+    # Valeurs par défaut pour les placeholders
+    default_values = {
+        "hippodrome": "PARIS-VINCENNES",
+        "discipline": "TROT ATTELE",
+        "course_nom": "PRIX DU QUINTÉ+",
+        "distance": "2700m",
+        "partants": "16",
+        "heure": "13:50",
+        "synthesis_pmu": "13 - 8 - 10 - 4 - 16 - 6 - 5 - 12",
+        "combinaison": "13 - 6 - 5 - 12 - 11"
+    }
 
     return f"""<!DOCTYPE html>
 <html lang="fr">
@@ -507,6 +523,11 @@ def generer_html():
             border-radius: 8px;
             box-sizing: border-box;
             font-size: 0.95rem;
+        }}
+        
+        .form-group input::placeholder {{
+            color: #6c757d;
+            font-style: italic;
         }}
 
         .full-width {{
@@ -622,37 +643,37 @@ def generer_html():
             <div class="form-grid">
                 <div class="form-group">
                     <label>Hippodrome :</label>
-                    <input type="text" name="hippodrome" value="{h_hippo}">
+                    <input type="text" name="hippodrome" value="{h_hippo}" placeholder="{default_values['hippodrome']}">
                 </div>
                 <div class="form-group">
                     <label>Discipline :</label>
-                    <input type="text" name="discipline" value="{h_disc}">
+                    <input type="text" name="discipline" value="{h_disc}" placeholder="{default_values['discipline']}">
                 </div>
                 <div class="form-group">
                     <label>Nom de la course :</label>
-                    <input type="text" name="course_nom" value="{h_nom}">
+                    <input type="text" name="course_nom" value="{h_nom}" placeholder="{default_values['course_nom']}">
                 </div>
                 <div class="form-group">
                     <label>Distance :</label>
-                    <input type="text" name="distance" value="{h_dist}">
+                    <input type="text" name="distance" value="{h_dist}" placeholder="{default_values['distance']}">
                 </div>
                 <div class="form-group">
                     <label>Nombre de partants :</label>
-                    <input type="text" name="partants" value="{h_part}">
+                    <input type="text" name="partants" value="{h_part}" placeholder="{default_values['partants']}">
                 </div>
                 <div class="form-group">
                     <label>Heure de départ :</label>
-                    <input type="text" name="heure" value="{h_heure}">
+                    <input type="text" name="heure" value="{h_heure}" placeholder="{default_values['heure']}">
                 </div>
                 <div class="form-group full-width">
                     <label>Synthèse Presse / Favoris (séparés par tirets) :</label>
-                    <input type="text" id="synthesis-input" name="synthesis_pmu" value="{h_synth}">
+                    <input type="text" id="synthesis-input" name="synthesis_pmu" value="{h_synth}" placeholder="{default_values['synthesis_pmu']}">
                 </div>
             </div>
 
             <div style="margin-top: 12px;">
                 <label style="display:block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 5px; font-weight: 600;">Combinaison de test (séparés par tirets) :</label>
-                <input type="text" id="combinaison-input" name="combinaison" value="{h_comb}" style="width:100%; padding:10px; background-color:var(--input-bg); border:1px solid var(--border-color); color:#fff; border-radius:8px; box-sizing:border-box; font-size: 0.95rem;">
+                <input type="text" id="combinaison-input" name="combinaison" value="{h_comb}" placeholder="{default_values['combinaison']}" style="width:100%; padding:10px; background-color:var(--input-bg); border:1px solid var(--border-color); color:#fff; border-radius:8px; box-sizing:border-box; font-size: 0.95rem;">
             </div>
 
             <button type="submit" class="action-btn">Mettre à jour & Recalculer</button>
