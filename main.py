@@ -638,6 +638,26 @@ def generer_html():
             border-radius: 8px;
             border: 1px solid var(--border-color);
         }}
+
+        /* Styles pour la diode clignotante */
+        .diode-container {{
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+        }}
+        .diode {{
+            width: 8px;
+            height: 8px;
+            background-color: #2ecc71;
+            border-radius: 50%;
+            margin-right: 10px;
+            box-shadow: 0 0 6px #2ecc71, 0 0 10px #2ecc71;
+            animation: blink 1.5s ease-in-out infinite;
+        }}
+        @keyframes blink {{
+            0%, 100% {{ opacity: 1; transform: scale(1); }}
+            50% {{ opacity: 0.4; transform: scale(0.8); }}
+        }}
     </style>
 </head>
 <body>
@@ -688,7 +708,10 @@ def generer_html():
             </div>
 
             <div style="margin-top: 12px;">
-                <label style="display:block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 5px; font-weight: 600;">Combinaison de test (séparés par tirets) :</label>
+                <div class="diode-container">
+                    <span class="diode"></span>
+                    <label style="font-size: 0.85rem; color: var(--text-muted); font-weight: 600;">Inscrivez ici votre combinaison de test en 5 chevaux, elle générera automatiquement la combinaison SGE !</label>
+                </div>
                 <input type="text" id="combinaison-input" name="combinaison" value="{h_comb}" placeholder="{default_values['combinaison']}" style="width:100%; padding:10px; background-color:var(--input-bg); border:1px solid var(--border-color); color:#fff; border-radius:8px; box-sizing:border-box; font-size: 0.95rem;">
             </div>
 
