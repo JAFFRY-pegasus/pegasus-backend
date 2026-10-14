@@ -2,6 +2,7 @@ import json
 import os
 import time
 from collections import Counter
+from datetime import date as _date
 from itertools import combinations
 from pathlib import Path
 
@@ -203,7 +204,8 @@ course_info = {
     "heure": "13:50",
     "synthesis_pmu": "13 - 8 - 10 - 4 - 16 - 6 - 5 - 12",
     "combinaison": "13 - 6 - 5 - 12 - 18",
-    "arrivee": []  # arrivée officielle (5 premiers), remplie automatiquement après la course
+    "arrivee": [],  # arrivée officielle (5 premiers), remplie automatiquement après la course
+    "date": ""      # date (AAAA-MM-JJ) du Quinté affiché, remplie automatiquement
 }
 
 # ==============================================================================
@@ -259,6 +261,18 @@ def _arrivee_affichable(arr):
         and len(set(arr)) == 5
     )
 
+_JOURS_FR = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
+_MOIS_FR = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet",
+            "août", "septembre", "octobre", "novembre", "décembre"]
+
+def _date_fr(iso):
+    """'2026-10-13' -> 'mardi 13 octobre 2026' ; chaîne vide si la date est absente ou invalide."""
+    try:
+        d = _date.fromisoformat(str(iso))
+    except ValueError:
+        return ""
+    return f"{_JOURS_FR[d.weekday()]} {d.day} {_MOIS_FR[d.month - 1]} {d.year}"
+
 def appliquer_donnees_auto(data):
     """Fusionne les nouvelles arrivées dans l'historique et met à jour la course du jour."""
     global HISTORIQUE_COMPLET, POIDS_AXES_HISTORIQUE
@@ -280,6 +294,7 @@ def appliquer_donnees_auto(data):
     if course.get("course_nom"):
         arr = course.get("arrivee")
         course_info["arrivee"] = list(arr) if _arrivee_affichable(arr) else []
+        course_info["date"] = date_course
         for cle in ("hippodrome", "discipline", "course_nom", "distance", "partants", "heure"):
             if course.get(cle):
                 course_info[cle] = str(course[cle])
@@ -352,6 +367,11 @@ def generer_html():
 
     # --- Arrivée officielle et réussite du pronostic SGE ---
     arrivee = course_info.get("arrivee") or []
+    date_txt = _date_fr(course_info.get("date"))
+    # Ex. : " — Quinté du mardi 13 octobre 2026" (vide si la date est inconnue)
+    suffixe_date = (
+        f' — Quinté du <strong style="color: var(--text-main);">{date_txt}</strong>' if date_txt else ""
+    )
     if len(arrivee) == 5:
         trouves = [n for n in nums_prono if n in arrivee]
         nb_ok = len(trouves)
@@ -363,7 +383,7 @@ def generer_html():
         mot = "numéro" if nb_ok <= 1 else "numéros"
         html_bloc_arrivee = f"""
         <div style="margin-bottom: 18px;">
-            <div style="font-size: 0.9rem; color: var(--text-muted);">Arrivée officielle (1er → 5e) :</div>
+            <div style="font-size: 0.9rem; color: var(--text-muted);">Arrivée officielle (1er → 5e){suffixe_date} :</div>
             <div class="balls-container">
                 {html_arrivee_balls}
             </div>
@@ -379,9 +399,9 @@ def generer_html():
         """
     else:
         html_prono_balls = "".join([f'<span class="ball orange">{n}</span>' for n in nums_prono])
-        html_bloc_arrivee = """
+        html_bloc_arrivee = f"""
         <div style="margin-bottom: 18px; font-size: 0.9rem; color: var(--text-muted); font-style: italic;">
-            Arrivée officielle : pas encore disponible.
+            Arrivée officielle{suffixe_date} : pas encore disponible.
         </div>
         """
     html_combi_balls = "".join([f'<span class="ball gray">{n}</span>' for n in nums_saisis])
@@ -597,7 +617,7 @@ def generer_html():
     <!-- FORMULAIRE GLOBAL DE CONFIGURATION -->
     <form action="/update" method="post">
         <div class="card">
-            <div class="card-title">1. Configuration du Quinté du Jour</div>
+            <div class="card-title">1. Informations sur le Quinté du Jour</div>
             <div class="form-grid">
                 <div class="form-group">
                     <label>Hippodrome :</label>
@@ -638,23 +658,9 @@ def generer_html():
         </div>
     </form>
 
-    <!-- ANALYSEUR GÉOMÉTRIQUE INTERACTIF -->
-    <div class="card">
-        <div class="card-title" style="text-align: center;">2. Analyseur Géométrique (Grille 1–16)</div>
-        <p style="text-align: center; color: var(--text-muted); font-size: 0.85rem; margin-top: -8px; margin-bottom: 18px;">
-            Cliquez sur les numéros de la grille pour composer instantanément votre combinaison
-        </p>
-
-        <div class="grid-16">
-            {''.join([f'<div class="grid-btn" id="btn-{i}" onclick="toggleNum({i})">{i}</div>' for i in range(1, 17)])}
-        </div>
-
-        <button class="action-btn" style="background-color: #34495e; color: #fff; margin-top: 0;" onclick="resetSelection()">Réinitialiser la grille</button>
-    </div>
-
     <!-- SYNTHÈSE GÉOMÉTRIQUE SGE & RÉSULTATS -->
     <div class="card">
-        <div class="card-title">3. Résultats & Synthèse SGE</div>
+        <div class="card-title">2. Synthèse PMU et pronostic SGE optimisé pour une grille de 16 partants au Quinté</div>
 
         <div style="margin-bottom: 18px;">
             <div style="font-size: 0.9rem; color: var(--text-muted);">Synthèse Presse / Favoris :</div>
@@ -689,6 +695,20 @@ def generer_html():
                 <div style="font-size:1.5em; font-weight:bold; color:var(--accent-teal); margin-top:6px;">{score_combi} pts</div>
             </div>
         </div>
+    </div>
+
+    <!-- ANALYSEUR GÉOMÉTRIQUE INTERACTIF -->
+    <div class="card">
+        <div class="card-title" style="text-align: center;">3. Test de Vision Géométrique (Grille 1–16)</div>
+        <p style="text-align: center; color: var(--text-muted); font-size: 0.85rem; margin-top: -8px; margin-bottom: 18px;">
+            Cliquez sur les numéros de la grille pour composer instantanément votre combinaison
+        </p>
+
+        <div class="grid-16">
+            {''.join([f'<div class="grid-btn" id="btn-{i}" onclick="toggleNum({i})">{i}</div>' for i in range(1, 17)])}
+        </div>
+
+        <button class="action-btn" style="background-color: #34495e; color: #fff; margin-top: 0;" onclick="resetSelection()">Réinitialiser la grille</button>
     </div>
 </div>
 
