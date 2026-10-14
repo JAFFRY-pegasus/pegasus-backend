@@ -134,7 +134,7 @@ HISTORIQUE_SGE_DATA = [
 ]
 
 # ==============================================================================
-# 2. MOTEUR SGE (Support jusqu'à 20 chevaux)
+# 2. MOTEUR PEGASUS (Support jusqu'à 20 chevaux)
 # ==============================================================================
 OPPOSITIONS_VERTICALES = {
     1: 9, 2: 10, 3: 11, 4: 12, 5: 13, 6: 14, 7: 15, 8: 16,
@@ -161,7 +161,7 @@ def calculer_poids_axes(historique=None):
 HISTORIQUE_COMPLET = list(HISTORIQUE_SGE_DATA)
 POIDS_AXES_HISTORIQUE = calculer_poids_axes(HISTORIQUE_COMPLET)
 
-def calculer_score_sge(combinaison):
+def calculer_score_pegasus(combinaison):
     score_brut = 0
     axes_touches = set()
     for i in range(len(combinaison)):
@@ -189,7 +189,7 @@ def generer_prono_automatique(combinaison_ref):
 
     scores_candidats = []
     for combo in combinations(candidats, 5):
-        score = calculer_score_sge(list(combo))
+        score = calculer_score_pegasus(list(combo))
         scores_candidats.append((score, list(combo)))
 
     scores_candidats.sort(key=lambda x: x[0], reverse=True)
@@ -358,11 +358,11 @@ def generer_html():
     nums_saisis = [int(n.strip()) for n in raw_str.replace(",", " ").replace("-", " ").split() if n.strip().isdigit()]
 
     nums_prono = generer_prono_automatique(nums_saisis)
-    score_prono = calculer_score_sge(nums_prono)
+    score_prono = calculer_score_pegasus(nums_prono)
 
     nb_partants = int(course_info.get("partants") or 16)
     nums_combi_grid = [n for n in nums_saisis if 1 <= n <= nb_partants][:5]
-    score_combi = calculer_score_sge(nums_combi_grid) if len(nums_combi_grid) == 5 else 0
+    score_combi = calculer_score_pegasus(nums_combi_grid) if len(nums_combi_grid) == 5 else 0
 
     arrivee = course_info.get("arrivee") or []
     date_txt = _date_fr(course_info.get("date"))
@@ -389,7 +389,7 @@ def generer_html():
 
         <div class="score-box" style="margin-top: 0; margin-bottom: 18px;">
             <div class="score-card">
-                <div style="font-size:0.85em; color:var(--text-muted);">Réussite du pronostic SGE</div>
+                <div style="font-size:0.85em; color:var(--text-muted);">Réussite du pronostic Pegasus</div>
                 <div style="font-size:1.8em; font-weight:bold; color:var(--accent-teal); margin-top:6px;">{pct_reussite} %</div>
                 <div style="font-size:0.8em; color:var(--text-muted); margin-top:4px;">{nb_ok} {mot} sur {len(nums_prono)} dans les 5 premiers (entourés ci-dessus)</div>
             </div>
@@ -432,12 +432,15 @@ def generer_html():
         "date": "mercredi 14 octobre 2026"
     }
 
+    # Phrase de mission (échappée pour sécurité)
+    mission = "Le but de PEGASUS est de donner des ailes à l'intuition du parieur en transformant des données historiques brutes en une stratégie géométrique claire, automatisée et optimisée."
+
     return f"""<!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PEGASUS QUINTÉ — Analyseur SGE</title>
+    <title>PEGASUS QUINTÉ — Analyseur de Pronostics</title>
     <style>
         :root {{
             --bg-color: #0d0f12;
@@ -482,6 +485,20 @@ def generer_html():
             color: var(--text-muted);
             margin-top: 8px;
             font-size: 0.95rem;
+        }}
+
+        .mission-statement {{
+            font-size: 0.85rem !important;
+            color: var(--text-muted) !important;
+            font-style: italic;
+            margin-top: 12px !important;
+            max-width: 620px;
+            margin-left: auto;
+            margin-right: auto;
+            line-height: 1.5;
+            border-left: 3px solid var(--accent-orange);
+            padding-left: 14px;
+            text-align: left;
         }}
 
         .card {{
@@ -666,6 +683,7 @@ def generer_html():
     <header>
         <h1>PEGASUS QUINTÉ</h1>
         <p>Analyseur Géométrique d'Axes & Stratégie Quinté+</p>
+        <p class="mission-statement">"{mission}"</p>
         <p style="font-size:0.8rem;">Base : {nb_base} quintés (dont {nb_auto} ajoutés automatiquement) · Dernière mise à jour PMU : {maj_txt}</p>
     </header>
 
@@ -710,7 +728,7 @@ def generer_html():
             <div style="margin-top: 12px;">
                 <div class="diode-container">
                     <span class="diode"></span>
-                    <label style="font-size: 0.85rem; color: var(--text-muted); font-weight: 600;">Inscrivez ici votre combinaison de test en 5 chevaux, elle générera automatiquement la combinaison SGE !</label>
+                    <label style="font-size: 0.85rem; color: var(--text-muted); font-weight: 600;">Inscrivez ici votre combinaison de test en 5 chevaux, elle générera automatiquement la combinaison Pegasus !</label>
                 </div>
                 <input type="text" id="combinaison-input" name="combinaison" value="{h_comb}" placeholder="{default_values['combinaison']}" style="width:100%; padding:10px; background-color:var(--input-bg); border:1px solid var(--border-color); color:#fff; border-radius:8px; box-sizing:border-box; font-size: 0.95rem;">
             </div>
@@ -720,7 +738,7 @@ def generer_html():
     </form>
 
     <div class="card">
-        <div class="card-title">2. Synthèse PMU et pronostic SGE optimisé pour une grille de {nb_partants} partants au Quinté</div>
+        <div class="card-title">2. Synthèse PMU et pronostic Pegasus optimisé pour une grille de {nb_partants} partants au Quinté</div>
 
         <div style="margin-bottom: 18px;">
             <div style="font-size: 0.9rem; color: var(--text-muted);">Synthèse Presse / Favoris :</div>
@@ -730,7 +748,7 @@ def generer_html():
         </div>
 
         <div style="margin-bottom: 18px;">
-            <div style="font-size: 0.9rem; color: var(--text-muted);">Pronostic SGE calculé automatiquement :</div>
+            <div style="font-size: 0.9rem; color: var(--text-muted);">Pronostic Pegasus calculé automatiquement :</div>
             <div class="balls-container">
                 {html_prono_balls}
             </div>
@@ -747,7 +765,7 @@ def generer_html():
 
         <div class="score-box">
             <div class="score-card">
-                <div style="font-size:0.85em; color:var(--text-muted);">Pondération Pronostic SGE</div>
+                <div style="font-size:0.85em; color:var(--text-muted);">Pondération Pronostic Pegasus</div>
                 <div style="font-size:1.5em; font-weight:bold; color:var(--accent-orange); margin-top:6px;">{score_prono} pts</div>
             </div>
             <div class="score-card">
