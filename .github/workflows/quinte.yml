@@ -2,9 +2,12 @@ name: Mise à jour Quinté+
 
 on:
   schedule:
-    # Cron en UTC. 07:30 UTC = 09:30 (hiver) / 08:30 (été) à Paris : programme du jour
+    # Cron en UTC (Paris = UTC+2 en heure d'été, UTC+1 en heure d'hiver).
+    # 07:30 UTC = 09:30 (été) / 08:30 (hiver) à Paris : programme du jour
     - cron: "30 7 * * *"
-    # 17:30 UTC = 19:30 (hiver) / 18:30 (été) à Paris : arrivée du jour
+    # 08:30 UTC = 10:30 (été) / 09:30 (hiver) à Paris : exécution de secours (GitHub saute parfois un déclenchement)
+    - cron: "30 8 * * *"
+    # 17:30 UTC = 19:30 (été) / 18:30 (hiver) à Paris : arrivée du jour
     - cron: "30 17 * * *"
   workflow_dispatch:
 
