@@ -1,40 +1,40 @@
 {
-  "derniere_maj": "2026-10-14T14:58:39+02:00",
+  "derniere_maj": "2026-10-15T14:45:36+02:00",
   "course_du_jour": {
-    "date": "2026-10-14",
-    "hippodrome": "REIMS",
-    "discipline": "ATTELE",
-    "course_nom": "GRAND NATIONAL DU TROT",
-    "distance": "2550m",
+    "date": "2026-10-15",
+    "hippodrome": "CHANTILLY",
+    "discipline": "PLAT",
+    "course_nom": "PRIX DE LA VIERGE DE LORETTE",
+    "distance": "1200m",
     "partants": "16",
     "heure": "13:55",
     "favoris_cotes": [
-      2,
-      15,
-      10,
-      5,
-      6,
-      8,
+      1,
       9,
-      13
+      7,
+      4,
+      11,
+      15,
+      2,
+      10
     ],
     "synthese_pmu": [
-      2,
-      15,
-      10,
-      5,
-      6,
-      8,
+      1,
       9,
-      13
+      7,
+      4,
+      11,
+      15,
+      2,
+      10
     ],
     "combinaison": [],
     "arrivee": [
-      10,
-      15,
-      13,
-      5,
-      9
+      12,
+      11,
+      8,
+      9,
+      15
     ],
     "reunion": 1,
     "course": 1
@@ -82,6 +82,17 @@
         13,
         5,
         9
+      ]
+    },
+    {
+      "id": "2026-10-15",
+      "course": "PRIX DE LA VIERGE DE LORETTE",
+      "arrivee": [
+        12,
+        11,
+        8,
+        9,
+        15
       ]
     }
   ]
