@@ -324,7 +324,6 @@ def generer_html():
     nb_partants = int(course_info.get("partants") or 16)
     score_combi = calculer_score_pegasus(nums_saisis[:5]) if len(nums_saisis) >= 5 else 0
 
-    # Exporter les fréquences en JSON pour le JavaScript
     freq_json = json.dumps(FREQUENCES_CHEVAUX)
 
     arrivee = course_info.get("arrivee") or []
@@ -397,7 +396,7 @@ def generer_html():
     </script>
     <style>
         :root {{ --bg-color: #0d0f12; --card-bg: #161920; --accent-orange: #f39c12; --accent-teal: #1abc9c; --text-main: #f5f6fa; --text-muted: #95a5a6; --border-color: #2c3e50; --input-bg: #1e222b; }}
-        body {{ font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: var(--bg-color); color: var(--text-main); margin: 0; padding: 30px 15px; display: flex; justify-content: center; }}
+        body {{ font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: var(--bg-color); color: var(--text-main); margin: 0; padding: 30px 15px; display: flex; justify-content: center; flex-direction: column; align-items: center; }}
         .container {{ width: 100%; max-width: 820px; }}
         header {{ text-align: center; margin-bottom: 30px; }}
         header h1 {{ color: var(--accent-orange); margin: 0; font-size: 2.2rem; letter-spacing: 1.5px; text-transform: uppercase; }}
@@ -434,6 +433,35 @@ def generer_html():
         .taux-reussite-badge {{ display: inline-flex; align-items: center; gap: 8px; padding: 8px 18px; border-radius: 25px; font-weight: bold; font-size: 1.1rem; color: #000; animation: pulse-taux 1.8s ease-in-out infinite; box-shadow: 0 0 15px currentColor; transition: all 0.3s ease; }}
         .taux-reussite-label {{ font-size: 0.85rem; color: var(--text-muted); font-weight: normal; }}
         @keyframes pulse-taux {{ 0%, 100% {{ opacity: 1; transform: scale(1); box-shadow: 0 0 10px currentColor; }} 50% {{ opacity: 0.75; transform: scale(1.05); box-shadow: 0 0 25px currentColor; }} }}
+        
+        /* NOUVEAU : Styles du Footer */
+        .footer-prevention {{
+            text-align: center;
+            margin-top: 40px;
+            padding: 25px 20px;
+            border-top: 1px solid var(--border-color);
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            width: 100%;
+            max-width: 820px;
+        }}
+        .footer-prevention strong {{
+            color: #e74c3c; /* Rouge d'alerte */
+        }}
+        .footer-prevention a {{
+            color: var(--accent-teal);
+            text-decoration: none;
+            font-weight: 600;
+        }}
+        .footer-prevention a:hover {{
+            text-decoration: underline;
+        }}
+        .footer-disclaimer {{
+            font-size: 0.75rem;
+            opacity: 0.7;
+            margin-top: 12px;
+            font-style: italic;
+        }}
     </style>
 </head>
 <body>
@@ -451,7 +479,7 @@ def generer_html():
             <div class="card-title">1. Informations sur le Quinté du Jour</div>
             <div class="form-grid">
                 <div class="form-group full-width">
-                    <label> Date de la course (automatique) :</label>
+                    <label>📅 Date de la course (automatique) :</label>
                     <input type="text" value="{h_date}" placeholder="{default_values['date']}" readonly>
                 </div>
                 <div class="form-group"><label>Hippodrome :</label><input type="text" name="hippodrome" value="{h_hippo}" placeholder="{default_values['hippodrome']}"></div>
@@ -496,7 +524,7 @@ def generer_html():
         </p>
 
         <div class="taux-reussite-container">
-            <span class="taux-reussite-label">📊 Chevaux trouvés en moyenne dans le top 5 historique :</span>
+            <span class="taux-reussite-label"> Chevaux trouvés en moyenne dans le top 5 historique :</span>
             <span id="taux-badge" class="taux-reussite-badge" style="background-color: #e74c3c;">
                 0.00 chevaux — Faible
             </span>
@@ -512,15 +540,24 @@ def generer_html():
     </div>
 </div>
 
+<!-- NOUVEAU : Pied de page avec message de prévention -->
+<footer class="footer-prevention">
+    <p style="margin-bottom: 8px;">
+        <strong>⚠️ Jouer comporte des risques : endettement, isolement, dépendance.</strong><br>
+        Pour être aidé, appelez le <a href="tel:0974751313">09 74 75 13 13</a> (appel non surtaxé) ou visitez 
+        <a href="https://www.joueurs-info-service.fr/" target="_blank" rel="noopener">joueurs-info-service.fr</a>
+    </p>
+    <p class="footer-disclaimer">
+        PEGASUS est un outil d'analyse statistique et géométrique à titre purement indicatif. Il ne garantit aucun gain. Jouez avec modération.
+    </p>
+</footer>
+
 <script>
     const selectedNumbers = [];
     const MAX_SELECTION = 8;
     const NB_COURSES = {nb_base};
-    
-    // Fréquences de chaque cheval dans le top 5 historique
     const FREQUENCES = {freq_json};
     
-    // Calcul du taux en temps réel (indépendant du formulaire)
     function calculerTauxReussite() {{
         if (selectedNumbers.length === 0) {{
             return {{ valeur: "0.00", label: "Faible", couleur: "#e74c3c" }};
@@ -540,7 +577,6 @@ def generer_html():
         }}
     }}
     
-    // Met à jour le badge en temps réel
     function mettreAJourBadge() {{
         const resultat = calculerTauxReussite();
         const badge = document.getElementById('taux-badge');
@@ -564,9 +600,7 @@ def generer_html():
             selectedNumbers.push(num);
             btn.classList.add('active');
         }}
-        // Met à jour le champ combinaison (pour info seulement)
         document.getElementById('combinaison-input').value = selectedNumbers.join(' - ');
-        // Met à jour le badge de la grille (indépendant)
         mettreAJourBadge();
     }}
 
@@ -577,7 +611,7 @@ def generer_html():
             if (btn) btn.classList.remove('active');
         }}
         document.getElementById('combinaison-input').value = '';
-        mettreAJourBadge();  // Réinitialise le badge à "0.00 chevaux — Faible"
+        mettreAJourBadge();
     }}
 
     function formaterAvecTirets(e) {{
