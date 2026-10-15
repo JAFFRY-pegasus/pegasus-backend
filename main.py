@@ -203,12 +203,9 @@ def calculer_frequences_par_cheval():
 
 FREQUENCES_CHEVAUX = calculer_frequences_par_cheval()
 
-# NOUVELLE FONCTION : Top 3 chevaux les plus fréquents
 def obtenir_top3_chevaux_frequents():
-    """Retourne les 3 chevaux les plus fréquents dans le top 5 historique"""
     if not FREQUENCES_CHEVAUX:
         return []
-    # Trier par fréquence décroissante
     tries = sorted(FREQUENCES_CHEVAUX.items(), key=lambda x: x[1], reverse=True)
     return tries[:3]
 
@@ -335,7 +332,6 @@ def generer_html():
 
     freq_json = json.dumps(FREQUENCES_CHEVAUX)
 
-    # NOUVEAU : Récupérer le top 3 des chevaux les plus fréquents
     top3_chevaux = obtenir_top3_chevaux_frequents()
     if len(top3_chevaux) >= 3:
         n1, f1 = top3_chevaux[0]
@@ -346,7 +342,7 @@ def generer_html():
         p3 = round(100 * f3 / nb_base, 1)
         html_top3 = f"""
         <div class="top3-info">
-            <span class="top3-label"> À ce jour, la base de données des quintés nous indique que les chevaux les plus fréquemment présents dans le top 5 sont :</span>
+            <span class="top3-label">📊 À ce jour, la base de données des quintés nous indique que les chevaux les plus fréquemment présents dans le top 5 sont :</span>
             <div class="top3-balls">
                 <span class="top3-ball">n°{n1} <small>({f1} fois — {p1}%)</small></span>
                 <span class="top3-ball">n°{n2} <small>({f2} fois — {p2}%)</small></span>
@@ -427,8 +423,38 @@ def generer_html():
     </script>
     <style>
         :root {{ --bg-color: #0d0f12; --card-bg: #161920; --accent-orange: #f39c12; --accent-teal: #1abc9c; --text-main: #f5f6fa; --text-muted: #95a5a6; --border-color: #2c3e50; --input-bg: #1e222b; }}
-        body {{ font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: var(--bg-color); color: var(--text-main); margin: 0; padding: 30px 15px; display: flex; justify-content: center; flex-direction: column; align-items: center; }}
-        .container {{ width: 100%; max-width: 820px; }}
+        
+        /* NOUVEAU : Fond d'image de course hippique */
+        body {{
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 30px 15px;
+            display: flex;
+            justify-content: center;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+        }}
+        
+        /* Overlay sombre pour la lisibilité */
+        body::before {{
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: url('https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?w=1920&q=80');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            opacity: 0.15;
+            z-index: -1;
+        }}
+        
+        .container {{ width: 100%; max-width: 820px; position: relative; z-index: 1; }}
         header {{ text-align: center; margin-bottom: 30px; }}
         header h1 {{ color: var(--accent-orange); margin: 0; font-size: 2.2rem; letter-spacing: 1.5px; text-transform: uppercase; }}
         header p {{ color: var(--text-muted); margin-top: 8px; font-size: 0.95rem; }}
@@ -465,7 +491,6 @@ def generer_html():
         .taux-reussite-label {{ font-size: 0.85rem; color: var(--text-muted); font-weight: normal; }}
         @keyframes pulse-taux {{ 0%, 100% {{ opacity: 1; transform: scale(1); box-shadow: 0 0 10px currentColor; }} 50% {{ opacity: 0.75; transform: scale(1.05); box-shadow: 0 0 25px currentColor; }} }}
         
-        /* NOUVEAU : Styles pour le Top 3 des chevaux fréquents */
         .top3-info {{
             background: linear-gradient(135deg, rgba(243, 156, 18, 0.08), rgba(26, 188, 156, 0.08));
             border: 1px solid var(--border-color);
@@ -475,19 +500,8 @@ def generer_html():
             margin-bottom: 18px;
             text-align: center;
         }}
-        .top3-label {{
-            display: block;
-            font-size: 0.85rem;
-            color: var(--text-muted);
-            margin-bottom: 10px;
-            font-style: italic;
-        }}
-        .top3-balls {{
-            display: flex;
-            justify-content: center;
-            gap: 12px;
-            flex-wrap: wrap;
-        }}
+        .top3-label {{ display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 10px; font-style: italic; }}
+        .top3-balls {{ display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; }}
         .top3-ball {{
             background-color: var(--accent-orange);
             color: #000;
@@ -497,12 +511,7 @@ def generer_html():
             font-size: 0.95rem;
             box-shadow: 0 2px 6px rgba(243, 156, 18, 0.3);
         }}
-        .top3-ball small {{
-            font-weight: normal;
-            font-size: 0.75rem;
-            opacity: 0.85;
-            margin-left: 4px;
-        }}
+        .top3-ball small {{ font-weight: normal; font-size: 0.75rem; opacity: 0.85; margin-left: 4px; }}
         
         .footer-prevention {{
             text-align: center;
@@ -535,7 +544,7 @@ def generer_html():
             <div class="card-title">1. Informations sur le Quinté du Jour</div>
             <div class="form-grid">
                 <div class="form-group full-width">
-                    <label> Date de la course (automatique) :</label>
+                    <label>📅 Date de la course (automatique) :</label>
                     <input type="text" value="{h_date}" placeholder="{default_values['date']}" readonly>
                 </div>
                 <div class="form-group"><label>Hippodrome :</label><input type="text" name="hippodrome" value="{h_hippo}" placeholder="{default_values['hippodrome']}"></div>
@@ -601,7 +610,7 @@ def generer_html():
 
 <footer class="footer-prevention">
     <p style="margin-bottom: 8px;">
-        <strong>️ Jouer comporte des risques : endettement, isolement, dépendance.</strong><br>
+        <strong>⚠️ Jouer comporte des risques : endettement, isolement, dépendance.</strong><br>
         Pour être aidé, appelez le <a href="tel:0974751313">09 74 75 13 13</a> (appel non surtaxé) ou visitez 
         <a href="https://www.joueurs-info-service.fr/" target="_blank" rel="noopener">joueurs-info-service.fr</a>
     </p>
