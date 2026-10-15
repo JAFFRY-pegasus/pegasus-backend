@@ -142,4 +142,552 @@ OPPOSITIONS_VERTICALES = {
     17: 9, 18: 10, 19: 11, 20: 12
 }
 
-COEFFICIENTS_RESONANCE = {0: 0.5, 1: 1.0, 2: 1.5, 
+COEFFICIENTS_RESONANCE = {0: 0.5, 1: 1.0, 2: 1.5, 3: 2.0}
+
+def calculer_poids_axes(historique=None):
+    if historique is None:
+        historique = HISTORIQUE_SGE_DATA
+    frequence_axes = Counter()
+    for course in historique:
+        arr = course["arrivee"]
+        for num in arr:
+            oppose = OPPOSITIONS_VERTICALES.get(num)
+            if oppose and oppose in arr:
+                axe = tuple(sorted([num, oppose]))
+                frequence_axes[axe] += 1
+    return {axe: freq // 2 for axe, freq in frequence_axes.items()}
+
+HISTORIQUE_COMPLET = list(HISTORIQUE_SGE_DATA)
+POIDS_AXES_HISTORIQUE = calculer_poids_axes(HISTORIQUE_COMPLET)
+
+def calculer_score_pegasus(combinaison):
+    score_brut = 0
+    axes_touches = set()
+    for i in range(len(combinaison)):
+        for j in range(i + 1, len(combinaison)):
+            a, b = combinaison[i], combinaison[j]
+            if a in OPPOSITIONS_VERTICALES and OPPOSITIONS_VERTICALES[a] == b:
+                axe = tuple(sorted([a, b]))
+                axes_touches.add(axe)
+                if axe in POIDS_AXES_HISTORIQUE:
+                    score_brut += POIDS_AXES_HISTORIQUE[axe]
+    nombre_axes = len(axes_touches)
+    ponderation = COEFFICIENTS_RESONANCE.get(nombre_axes, 2.0)
+    return int(score_brut * ponderation)
+
+def generer_prono_automatique(combinaison_ref):
+    nb_partants = int(course_info.get("partants") or 16)
+    valides = [n for n in combinaison_ref if 1 <= n <= nb_partants]
+    taille_cible = 8 if len(combinaison_ref) >= 8 else 5
+    if len(valides) < taille_cible:
+        complements = [n for n in range(1, nb_partants + 1) if n not in valides]
+        valides = (valides + complements)[:taille_cible]
+    opposes = [OPPOSITIONS_VERTICALES.get(n) for n in valides if OPPOSITIONS_VERTICALES.get(n) is not None]
+    candidats = list(dict.fromkeys(valides + opposes))
+    scores_candidats = []
+    for combo in combinations(candidats, taille_cible):
+        score = calculer_score_pegasus(list(combo))
+        scores_candidats.append((score, list(combo)))
+    scores_candidats.sort(key=lambda x: x[0], reverse=True)
+    return scores_candidats[0][1] if scores_candidats else valides[:taille_cible]
+
+# ==============================================================================
+# FRÉQUENCES PAR CHEVAL
+# ==============================================================================
+def calculer_frequences_par_cheval():
+    freq = Counter()
+    for course in HISTORIQUE_COMPLET:
+        for num in course["arrivee"]:
+            freq[num] += 1
+    return dict(freq)
+
+FREQUENCES_CHEVAUX = calculer_frequences_par_cheval()
+
+# NOUVELLE FONCTION : Top 3 chevaux les plus fréquents
+def obtenir_top3_chevaux_frequents():
+    """Retourne les 3 chevaux les plus fréquents dans le top 5 historique"""
+    if not FREQUENCES_CHEVAUX:
+        return []
+    # Trier par fréquence décroissante
+    tries = sorted(FREQUENCES_CHEVAUX.items(), key=lambda x: x[1], reverse=True)
+    return tries[:3]
+
+# ==============================================================================
+# 3. ÉTAT DE L'APPLICATION
+# ==============================================================================
+course_info = {
+    "hippodrome": "PARIS-VINCENNES",
+    "discipline": "TROT ATTELE",
+    "course_nom": "PRIX DU QUINTÉ+",
+    "distance": "2700m",
+    "partants": "16",
+    "heure": "13:50",
+    "synthesis_pmu": "13 - 8 - 10 - 4 - 16 - 6 - 5 - 12",
+    "combinaison": "13 - 6 - 5 - 12 - 11",
+    "arrivee": [],
+    "date": ""
+}
+
+DATA_FILE = Path(__file__).resolve().parent / "data" / "quinte.json"
+QUINTE_JSON_URL = os.getenv("QUINTE_JSON_URL", "").strip()
+RECHARGEMENT_SECONDES = 300
+
+donnees_auto = {"signature": None, "derniere_maj": None, "nb_arrivees": 0, "dernier_controle": 0.0}
+
+def _lire_json_quinte():
+    if QUINTE_JSON_URL and requests is not None:
+        try:
+            r = requests.get(QUINTE_JSON_URL, timeout=10)
+            r.raise_for_status()
+            return r.json()
+        except Exception as exc:
+            print(f"[warn] Lecture de {QUINTE_JSON_URL} impossible : {exc}")
+    try:
+        if DATA_FILE.exists():
+            return json.loads(DATA_FILE.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        print(f"[warn] Lecture de {DATA_FILE} impossible : {exc}")
+    return None
+
+def _liste_en_texte(valeur):
+    if isinstance(valeur, (list, tuple)):
+        return " - ".join(str(n) for n in valeur)
+    return str(valeur or "")
+
+def _arrivee_valide(arr, max_partants=20):
+    return (isinstance(arr, list) and len(arr) == 5 and all(isinstance(n, int) and 1 <= n <= max_partants for n in arr) and len(set(arr)) == 5)
+
+def _arrivee_affichable(arr):
+    return (isinstance(arr, list) and len(arr) == 5 and all(isinstance(n, int) and not isinstance(n, bool) for n in arr) and len(set(arr)) == 5)
+
+_JOURS_FR = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
+_MOIS_FR = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"]
+
+def _date_fr(iso):
+    try:
+        d = _date.fromisoformat(str(iso))
+        return f"{_JOURS_FR[d.weekday()]} {d.day} {_MOIS_FR[d.month - 1]} {d.year}"
+    except ValueError:
+        return ""
+
+def appliquer_donnees_auto(data):
+    global HISTORIQUE_COMPLET, POIDS_AXES_HISTORIQUE, FREQUENCES_CHEVAUX
+    course = data.get("course_du_jour") or {}
+    date_course = str(course.get("date") or "")
+    nouvelles = [{"id": str(a.get("id", "")), "arrivee": a["arrivee"]} for a in data.get("nouvelles_arrivees", []) if _arrivee_valide(a.get("arrivee"), 20) and str(a.get("id", "")) != date_course]
+    HISTORIQUE_COMPLET = HISTORIQUE_SGE_DATA + nouvelles
+    POIDS_AXES_HISTORIQUE = calculer_poids_axes(HISTORIQUE_COMPLET)
+    FREQUENCES_CHEVAUX = calculer_frequences_par_cheval()
+    if course.get("course_nom"):
+        arr = course.get("arrivee")
+        course_info["arrivee"] = list(arr) if _arrivee_affichable(arr) else []
+        course_info["date"] = date_course
+        for cle in ("hippodrome", "discipline", "course_nom", "distance", "partants", "heure"):
+            if course.get(cle): course_info[cle] = str(course[cle])
+        if course.get("synthese_pmu"): course_info["synthesis_pmu"] = _liste_en_texte(course["synthese_pmu"])
+        if course.get("combinaison"): course_info["combinaison"] = _liste_en_texte(course["combinaison"])
+    donnees_auto["nb_arrivees"] = len(nouvelles)
+    donnees_auto["derniere_maj"] = data.get("derniere_maj")
+
+def rafraichir_donnees(force=False):
+    maintenant = time.time()
+    if not force and maintenant - donnees_auto["dernier_controle"] < RECHARGEMENT_SECONDES: return
+    donnees_auto["dernier_controle"] = maintenant
+    data = _lire_json_quinte()
+    if not data: return
+    signature = json.dumps(data, sort_keys=True)
+    if signature == donnees_auto["signature"]: return
+    donnees_auto["signature"] = signature
+    appliquer_donnees_auto(data)
+
+rafraichir_donnees(force=True)
+
+@app.get("/", response_class=HTMLResponse)
+def page_visiteur():
+    rafraichir_donnees()
+    return generer_html()
+
+@app.post("/update", response_class=HTMLResponse)
+def mettre_a_jour(hippodrome: str = Form(""), discipline: str = Form(""), course_nom: str = Form(""), distance: str = Form(""), partants: str = Form(""), heure: str = Form(""), synthesis_pmu: str = Form(""), combinaison: str = Form("")):
+    rafraichir_donnees()
+    if hippodrome.strip(): course_info["hippodrome"] = hippodrome
+    if discipline.strip(): course_info["discipline"] = discipline
+    if course_nom.strip(): course_info["course_nom"] = course_nom
+    if distance.strip(): course_info["distance"] = distance
+    if partants.strip(): course_info["partants"] = partants
+    if heure.strip(): course_info["heure"] = heure
+    if synthesis_pmu.strip(): course_info["synthesis_pmu"] = synthesis_pmu
+    if combinaison.strip(): course_info["combinaison"] = combinaison
+    return generer_html()
+
+def generer_html():
+    raw_str = course_info["combinaison"]
+    maj_txt = str(donnees_auto["derniere_maj"] or "jamais").replace("T", " ")[:16]
+    nb_base = len(HISTORIQUE_COMPLET)
+    nb_auto = donnees_auto["nb_arrivees"]
+    nums_saisis = [int(n.strip()) for n in raw_str.replace(",", " ").replace("-", " ").split() if n.strip().isdigit()]
+
+    nums_prono = generer_prono_automatique(nums_saisis)
+    score_prono = calculer_score_pegasus(nums_prono)
+
+    nb_partants = int(course_info.get("partants") or 16)
+    score_combi = calculer_score_pegasus(nums_saisis[:5]) if len(nums_saisis) >= 5 else 0
+
+    freq_json = json.dumps(FREQUENCES_CHEVAUX)
+
+    # NOUVEAU : Récupérer le top 3 des chevaux les plus fréquents
+    top3_chevaux = obtenir_top3_chevaux_frequents()
+    if len(top3_chevaux) >= 3:
+        n1, f1 = top3_chevaux[0]
+        n2, f2 = top3_chevaux[1]
+        n3, f3 = top3_chevaux[2]
+        p1 = round(100 * f1 / nb_base, 1)
+        p2 = round(100 * f2 / nb_base, 1)
+        p3 = round(100 * f3 / nb_base, 1)
+        html_top3 = f"""
+        <div class="top3-info">
+            <span class="top3-label"> À ce jour, la base de données des quintés nous indique que les chevaux les plus fréquemment présents dans le top 5 sont :</span>
+            <div class="top3-balls">
+                <span class="top3-ball">n°{n1} <small>({f1} fois — {p1}%)</small></span>
+                <span class="top3-ball">n°{n2} <small>({f2} fois — {p2}%)</small></span>
+                <span class="top3-ball">n°{n3} <small>({f3} fois — {p3}%)</small></span>
+            </div>
+        </div>
+        """
+    else:
+        html_top3 = ""
+
+    arrivee = course_info.get("arrivee") or []
+    date_txt = _date_fr(course_info.get("date"))
+    suffixe_date = f' — Quinté du <strong style="color: var(--text-main);">{html.escape(date_txt)}</strong>' if date_txt else ""
+    
+    if len(arrivee) == 5:
+        trouves = [n for n in nums_prono if n in arrivee]
+        nb_ok = len(trouves)
+        pct_reussite = round(100 * nb_ok / len(nums_prono)) if nums_prono else 0
+        html_prono_balls = "".join([f'<span class="ball orange {"hit" if n in arrivee else "miss"}">{n}</span>' for n in nums_prono])
+        html_arrivee_balls = "".join([f'<span class="ball white">{n}</span>' for n in arrivee])
+        mot = "numéro" if nb_ok <= 1 else "numéros"
+        html_bloc_arrivee = f"""
+        <div style="margin-bottom: 18px;">
+            <div style="font-size: 0.9rem; color: var(--text-muted);">Arrivée officielle (1er → 5e){suffixe_date} :</div>
+            <div class="balls-container">{html_arrivee_balls}</div>
+        </div>
+        <div class="score-box" style="margin-top: 0; margin-bottom: 18px;">
+            <div class="score-card">
+                <div style="font-size:0.85em; color:var(--text-muted);">Réussite du pronostic Pegasus</div>
+                <div style="font-size:1.8em; font-weight:bold; color:var(--accent-teal); margin-top:6px;">{pct_reussite} %</div>
+                <div style="font-size:0.8em; color:var(--text-muted); margin-top:4px;">{nb_ok} {mot} sur {len(nums_prono)} dans les 5 premiers (entourés ci-dessus)</div>
+            </div>
+        </div>"""
+    else:
+        html_prono_balls = "".join([f'<span class="ball orange">{n}</span>' for n in nums_prono])
+        html_bloc_arrivee = f"""<div style="margin-bottom: 18px; font-size: 0.9rem; color: var(--text-muted); font-style: italic;">Arrivée officielle{suffixe_date} : pas encore disponible.</div>"""
+        
+    html_combi_balls = "".join([f'<span class="ball gray">{n}</span>' for n in nums_saisis])
+    synth_nums = [n.strip() for n in course_info["synthesis_pmu"].replace(",", " ").replace("-", " ").split() if n.strip().isdigit()]
+    html_synth_pmu = "".join([f'<span class="ball teal">{n}</span>' for n in synth_nums]) if synth_nums else '<span style="color: var(--text-muted); font-style: italic;">Aucun favori saisi</span>'
+
+    h_hippo = html.escape(course_info['hippodrome'])
+    h_disc = html.escape(course_info['discipline'])
+    h_nom = html.escape(course_info['course_nom'])
+    h_dist = html.escape(course_info['distance'])
+    h_part = html.escape(course_info['partants'])
+    h_heure = html.escape(course_info['heure'])
+    h_synth = html.escape(course_info['synthesis_pmu'])
+    h_comb = html.escape(course_info['combinaison'])
+    h_date = html.escape(date_txt) if date_txt else ""
+
+    default_values = {"hippodrome": "PARIS-VINCENNES", "discipline": "TROT ATTELE", "course_nom": "PRIX DU QUINTÉ+", "distance": "2700m", "partants": "16", "heure": "13:50", "synthesis_pmu": "13 - 8 - 10 - 4 - 16 - 6 - 5 - 12", "combinaison": "13 - 6 - 5 - 12 - 11", "date": "mercredi 14 octobre 2026"}
+    mission = "Le but de PEGASUS est de donner des ailes à l'intuition du parieur en transformant des données historiques brutes en une stratégie géométrique claire, automatisée et optimisée."
+
+    return f"""<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PEGASUS QUINTÉ — Analyseur de Pronostics</title>
+    <meta name="description" content="PEGASUS QUINTÉ : Analyseur géométrique d'axes et stratégie de pronostic hippique.">
+    <meta name="keywords" content="pronostic quinté+, analyse géométrique courses, pegasus quinté, logiciel pronostic hippique, stratégie axes chevaux, PMU">
+    <meta name="author" content="Pegasus Project">
+    <meta name="robots" content="index, follow">
+    <meta property="og:title" content="PEGASUS QUINTÉ — Analyseur Géométrique">
+    <meta property="og:description" content="Donnez des ailes à votre intuition. Pronostics Quinté+ optimisés par analyse géométrique des axes.">
+    <meta property="og:type" content="website">
+    <script type="application/ld+json">
+    {{
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "PEGASUS QUINTÉ",
+      "applicationCategory": "SportsApplication",
+      "operatingSystem": "Web",
+      "description": "Analyseur géométrique d'axes et stratégie de pronostic pour le Quinté+.",
+      "offers": {{"@type": "Offer", "price": "0", "priceCurrency": "EUR"}}
+    }}
+    </script>
+    <style>
+        :root {{ --bg-color: #0d0f12; --card-bg: #161920; --accent-orange: #f39c12; --accent-teal: #1abc9c; --text-main: #f5f6fa; --text-muted: #95a5a6; --border-color: #2c3e50; --input-bg: #1e222b; }}
+        body {{ font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: var(--bg-color); color: var(--text-main); margin: 0; padding: 30px 15px; display: flex; justify-content: center; flex-direction: column; align-items: center; }}
+        .container {{ width: 100%; max-width: 820px; }}
+        header {{ text-align: center; margin-bottom: 30px; }}
+        header h1 {{ color: var(--accent-orange); margin: 0; font-size: 2.2rem; letter-spacing: 1.5px; text-transform: uppercase; }}
+        header p {{ color: var(--text-muted); margin-top: 8px; font-size: 0.95rem; }}
+        .mission-statement {{ font-size: 0.85rem !important; color: var(--text-muted) !important; font-style: italic; margin-top: 12px !important; max-width: 620px; margin-left: auto; margin-right: auto; line-height: 1.5; border-left: 3px solid var(--accent-orange); padding-left: 14px; text-align: left; }}
+        .card {{ background-color: var(--card-bg); border-radius: 12px; padding: 24px; margin-bottom: 22px; border: 1px solid var(--border-color); box-shadow: 0 8px 16px rgba(0,0,0,0.4); }}
+        .card-title {{ color: var(--accent-orange); font-size: 1.1rem; font-weight: 700; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 18px; text-transform: uppercase; letter-spacing: 0.5px; }}
+        .form-grid {{ display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 15px; }}
+        .form-group label {{ display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 5px; font-weight: 600; }}
+        .form-group input {{ width: 100%; padding: 10px; background-color: var(--input-bg); border: 1px solid var(--border-color); color: #ffffff; border-radius: 8px; box-sizing: border-box; font-size: 0.95rem; }}
+        .form-group input::placeholder {{ color: #6c757d; font-style: italic; }}
+        .form-group input[readonly] {{ background-color: #2a2f3a; color: var(--accent-teal); font-weight: 600; cursor: not-allowed; }}
+        .full-width {{ grid-column: span 2; }}
+        .balls-container {{ display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; align-items: center; }}
+        .ball {{ width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1rem; box-shadow: 0 3px 6px rgba(0,0,0,0.3); }}
+        .ball.orange {{ background-color: var(--accent-orange); color: #000; }}
+        .ball.gray {{ background-color: #34495e; color: #fff; }}
+        .ball.teal {{ background-color: var(--accent-teal); color: #000; }}
+        .ball.white {{ background-color: #f5f6fa; color: #000; }}
+        .ball.hit {{ outline: 3px solid var(--accent-teal); outline-offset: 2px; }}
+        .ball.miss {{ opacity: 0.4; }}
+        .grid-partants {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(50px, 1fr)); gap: 10px; margin-bottom: 18px; }}
+        .grid-btn {{ background-color: var(--input-bg); border: 1px solid var(--border-color); color: var(--text-main); padding: 14px 0; border-radius: 8px; font-size: 1.15rem; font-weight: bold; cursor: pointer; text-align: center; transition: all 0.2s ease; }}
+        .grid-btn:hover {{ border-color: var(--accent-orange); }}
+        .grid-btn.active {{ background-color: var(--accent-orange); color: #000000; border-color: var(--accent-orange); box-shadow: 0 0 12px rgba(243, 156, 18, 0.5); }}
+        .action-btn {{ width: 100%; background-color: var(--accent-teal); color: #000000; border: none; padding: 14px; border-radius: 8px; font-size: 1.05rem; font-weight: bold; cursor: pointer; margin-top: 12px; text-transform: uppercase; transition: opacity 0.2s; }}
+        .action-btn:hover {{ opacity: 0.9; }}
+        .score-box {{ display: flex; justify-content: space-between; gap: 15px; margin-top: 18px; }}
+        .score-card {{ flex: 1; text-align: center; padding: 14px; background: var(--input-bg); border-radius: 8px; border: 1px solid var(--border-color); }}
+        .diode-container {{ display: flex; align-items: center; margin-bottom: 5px; }}
+        .diode {{ width: 8px; height: 8px; background-color: #2ecc71; border-radius: 50%; margin-right: 10px; box-shadow: 0 0 6px #2ecc71, 0 0 10px #2ecc71; animation: blink 1.5s ease-in-out infinite; }}
+        @keyframes blink {{ 0%, 100% {{ opacity: 1; transform: scale(1); }} 50% {{ opacity: 0.4; transform: scale(0.8); }} }}
+        .taux-reussite-container {{ display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 18px; padding: 12px; background: var(--input-bg); border-radius: 10px; border: 1px solid var(--border-color); flex-wrap: wrap; }}
+        .taux-reussite-badge {{ display: inline-flex; align-items: center; gap: 8px; padding: 8px 18px; border-radius: 25px; font-weight: bold; font-size: 1.1rem; color: #000; animation: pulse-taux 1.8s ease-in-out infinite; box-shadow: 0 0 15px currentColor; transition: all 0.3s ease; }}
+        .taux-reussite-label {{ font-size: 0.85rem; color: var(--text-muted); font-weight: normal; }}
+        @keyframes pulse-taux {{ 0%, 100% {{ opacity: 1; transform: scale(1); box-shadow: 0 0 10px currentColor; }} 50% {{ opacity: 0.75; transform: scale(1.05); box-shadow: 0 0 25px currentColor; }} }}
+        
+        /* NOUVEAU : Styles pour le Top 3 des chevaux fréquents */
+        .top3-info {{
+            background: linear-gradient(135deg, rgba(243, 156, 18, 0.08), rgba(26, 188, 156, 0.08));
+            border: 1px solid var(--border-color);
+            border-left: 4px solid var(--accent-orange);
+            border-radius: 10px;
+            padding: 14px 18px;
+            margin-bottom: 18px;
+            text-align: center;
+        }}
+        .top3-label {{
+            display: block;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 10px;
+            font-style: italic;
+        }}
+        .top3-balls {{
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }}
+        .top3-ball {{
+            background-color: var(--accent-orange);
+            color: #000;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 0.95rem;
+            box-shadow: 0 2px 6px rgba(243, 156, 18, 0.3);
+        }}
+        .top3-ball small {{
+            font-weight: normal;
+            font-size: 0.75rem;
+            opacity: 0.85;
+            margin-left: 4px;
+        }}
+        
+        .footer-prevention {{
+            text-align: center;
+            margin-top: 40px;
+            padding: 25px 20px;
+            border-top: 1px solid var(--border-color);
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            width: 100%;
+            max-width: 820px;
+        }}
+        .footer-prevention strong {{ color: #e74c3c; }}
+        .footer-prevention a {{ color: var(--accent-teal); text-decoration: none; font-weight: 600; }}
+        .footer-prevention a:hover {{ text-decoration: underline; }}
+        .footer-disclaimer {{ font-size: 0.75rem; opacity: 0.7; margin-top: 12px; font-style: italic; }}
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>PEGASUS QUINTÉ</h1>
+        <p>Analyseur Géométrique d'Axes & Stratégie Quinté+</p>
+        <p class="mission-statement">"{mission}"</p>
+        <p style="font-size:0.8rem;">Base : {nb_base} quintés (dont {nb_auto} ajoutés automatiquement) · Dernière mise à jour PMU : {maj_txt}</p>
+    </header>
+
+    <form action="/update" method="post">
+        <div class="card">
+            <div class="card-title">1. Informations sur le Quinté du Jour</div>
+            <div class="form-grid">
+                <div class="form-group full-width">
+                    <label> Date de la course (automatique) :</label>
+                    <input type="text" value="{h_date}" placeholder="{default_values['date']}" readonly>
+                </div>
+                <div class="form-group"><label>Hippodrome :</label><input type="text" name="hippodrome" value="{h_hippo}" placeholder="{default_values['hippodrome']}"></div>
+                <div class="form-group"><label>Discipline :</label><input type="text" name="discipline" value="{h_disc}" placeholder="{default_values['discipline']}"></div>
+                <div class="form-group"><label>Nom de la course :</label><input type="text" name="course_nom" value="{h_nom}" placeholder="{default_values['course_nom']}"></div>
+                <div class="form-group"><label>Distance :</label><input type="text" name="distance" value="{h_dist}" placeholder="{default_values['distance']}"></div>
+                <div class="form-group"><label>Nombre de partants :</label><input type="text" name="partants" value="{h_part}" placeholder="{default_values['partants']}"></div>
+                <div class="form-group"><label>Heure de départ :</label><input type="text" name="heure" value="{h_heure}" placeholder="{default_values['heure']}"></div>
+                <div class="form-group full-width"><label>Synthèse Presse / Favoris (séparés par tirets) :</label><input type="text" id="synthesis-input" name="synthesis_pmu" value="{h_synth}" placeholder="{default_values['synthesis_pmu']}"></div>
+            </div>
+
+            <div style="margin-top: 12px;">
+                <div class="diode-container">
+                    <span class="diode"></span>
+                    <label style="font-size: 0.85rem; color: var(--text-muted); font-weight: 600;">Inscrivez ici votre combinaison de test en 5 ou 8 chevaux, elle générera automatiquement la combinaison Pegasus !</label>
+                </div>
+                <input type="text" id="combinaison-input" name="combinaison" value="{h_comb}" placeholder="{default_values['combinaison']}" style="width:100%; padding:10px; background-color:var(--input-bg); border:1px solid var(--border-color); color:#fff; border-radius:8px; box-sizing:border-box; font-size: 0.95rem;">
+            </div>
+            <button type="submit" class="action-btn">Mettre à jour & Recalculer</button>
+        </div>
+    </form>
+
+    <div class="card">
+        <div class="card-title">2. Synthèse PMU et pronostic Pegasus optimisé pour une grille de {nb_partants} partants au Quinté</div>
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: -10px; margin-bottom: 18px; font-style: italic;">
+            Le moteur Pegasus analyse les {nb_base} dernières arrivées pour identifier les axes géométriques récurrents (ex: 1-9, 2-10) et optimiser votre combinaison de 5 ou 8 chevaux.
+        </p>
+        <div style="margin-bottom: 18px;"><div style="font-size: 0.9rem; color: var(--text-muted);">Synthèse Presse / Favoris :</div><div class="balls-container">{html_synth_pmu}</div></div>
+        <div style="margin-bottom: 18px;"><div style="font-size: 0.9rem; color: var(--text-muted);">Pronostic Pegasus calculé automatiquement :</div><div class="balls-container">{html_prono_balls}</div></div>
+        {html_bloc_arrivee}
+        <div style="margin-bottom: 18px;"><div style="font-size: 0.9rem; color: var(--text-muted);">Combinaison active / saisie :</div><div class="balls-container">{html_combi_balls}</div></div>
+        <div class="score-box">
+            <div class="score-card"><div style="font-size:0.85em; color:var(--text-muted);">Pondération Pronostic Pegasus</div><div style="font-size:1.5em; font-weight:bold; color:var(--accent-orange); margin-top:6px;">{score_prono} pts</div></div>
+            <div class="score-card"><div style="font-size:0.85em; color:var(--text-muted);">Pondération Combinaison</div><div style="font-size:1.5em; font-weight:bold; color:var(--accent-teal); margin-top:6px;">{score_combi} pts</div></div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-title" style="text-align: center;">3. Test de Vision Géométrique (Grille 1–{nb_partants})</div>
+        <p style="text-align: center; color: var(--text-muted); font-size: 0.85rem; margin-top: -8px; margin-bottom: 18px;">
+            Cliquez sur les numéros de la grille pour composer instantanément votre combinaison (8 chevaux max) — outil de test indépendant
+        </p>
+
+        <div class="taux-reussite-container">
+            <span class="taux-reussite-label">📊 Chevaux trouvés en moyenne dans le top 5 historique :</span>
+            <span id="taux-badge" class="taux-reussite-badge" style="background-color: #e74c3c;">
+                0.00 chevaux — Faible
+            </span>
+        </div>
+
+        {html_top3}
+
+        <p style="text-align: center; font-size: 0.75rem; color: var(--text-muted); margin-top: -12px; margin-bottom: 18px; font-style: italic;">
+            (Moyenne sur {nb_base} courses — 3 chevaux ou plus = Très bon, 1 cheval = Faible)
+        </p>
+
+        <div class="grid-partants">
+            {''.join([f'<div class="grid-btn" id="btn-{i}" onclick="toggleNum({i})">{i}</div>' for i in range(1, nb_partants + 1)])}
+        </div>
+        <button class="action-btn" style="background-color: #34495e; color: #fff; margin-top: 0;" onclick="resetSelection()">Réinitialiser la grille</button>
+    </div>
+</div>
+
+<footer class="footer-prevention">
+    <p style="margin-bottom: 8px;">
+        <strong>️ Jouer comporte des risques : endettement, isolement, dépendance.</strong><br>
+        Pour être aidé, appelez le <a href="tel:0974751313">09 74 75 13 13</a> (appel non surtaxé) ou visitez 
+        <a href="https://www.joueurs-info-service.fr/" target="_blank" rel="noopener">joueurs-info-service.fr</a>
+    </p>
+    <p class="footer-disclaimer">
+        PEGASUS est un outil d'analyse statistique et géométrique à titre purement indicatif. Il ne garantit aucun gain. Jouez avec modération.
+    </p>
+</footer>
+
+<script>
+    const selectedNumbers = [];
+    const MAX_SELECTION = 8;
+    const NB_COURSES = {nb_base};
+    const FREQUENCES = {freq_json};
+    
+    function calculerTauxReussite() {{
+        if (selectedNumbers.length === 0) {{
+            return {{ valeur: "0.00", label: "Faible", couleur: "#e74c3c" }};
+        }}
+        let totalHits = 0;
+        selectedNumbers.forEach(num => {{
+            totalHits += FREQUENCES[num] || 0;
+        }});
+        const moyenne = totalHits / NB_COURSES;
+        
+        if (moyenne >= 3) {{
+            return {{ valeur: moyenne.toFixed(2), label: "Très bon", couleur: "#2ecc71" }};
+        }} else if (moyenne >= 2) {{
+            return {{ valeur: moyenne.toFixed(2), label: "Bon", couleur: "#1abc9c" }};
+        }} else {{
+            return {{ valeur: moyenne.toFixed(2), label: "Faible", couleur: "#e74c3c" }};
+        }}
+    }}
+    
+    function mettreAJourBadge() {{
+        const resultat = calculerTauxReussite();
+        const badge = document.getElementById('taux-badge');
+        if (badge) {{
+            badge.style.backgroundColor = resultat.couleur;
+            badge.textContent = resultat.valeur + ' chevaux — ' + resultat.label;
+        }}
+    }}
+
+    function toggleNum(num) {{
+        const btn = document.getElementById(`btn-${{num}}`);
+        const index = selectedNumbers.indexOf(num);
+        if (index > -1) {{
+            selectedNumbers.splice(index, 1);
+            btn.classList.remove('active');
+        }} else {{
+            if (selectedNumbers.length >= MAX_SELECTION) {{
+                alert("Vous ne pouvez sélectionner que 8 chevaux maximum.");
+                return;
+            }}
+            selectedNumbers.push(num);
+            btn.classList.add('active');
+        }}
+        document.getElementById('combinaison-input').value = selectedNumbers.join(' - ');
+        mettreAJourBadge();
+    }}
+
+    function resetSelection() {{
+        selectedNumbers.length = 0;
+        for (let i = 1; i <= {nb_partants}; i++) {{
+            const btn = document.getElementById(`btn-${{i}}`);
+            if (btn) btn.classList.remove('active');
+        }}
+        document.getElementById('combinaison-input').value = '';
+        mettreAJourBadge();
+    }}
+
+    function formaterAvecTirets(e) {{
+        const input = e.target;
+        const cursorPosition = input.selectionStart;
+        const nums = input.value.match(/\\d+/g);
+        if (!nums) {{ input.value = ''; return; }}
+        let res = nums.join(' - ');
+        const suppression = e.inputType && e.inputType.indexOf('delete') === 0;
+        if (!suppression && /\\D$/.test(input.value)) {{ res += ' - '; }}
+        input.value = res;
+        const newPos = Math.min(cursorPosition, input.value.length);
+        input.setSelectionRange(newPos, newPos);
+    }}
+    ['synthesis-input', 'combinaison-input'].forEach(function(id) {{
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('input', formaterAvecTirets);
+    }});
+</script>
+</body>
+</html>"""
