@@ -18,7 +18,7 @@ except ImportError:
 app = FastAPI()
 
 # ==============================================================================
-# 1. BASE HISTORIQUE COMPLÈTE (220+ QUINTÉS)
+# 1. BASE HISTORIQUE COMPLÈTE
 # ==============================================================================
 HISTORIQUE_SGE_DATA = [
   {"id": "1", "arrivee": [11, 4, 15, 6, 12]}, {"id": "2", "arrivee": [8, 14, 5, 13, 2]},
@@ -134,13 +134,12 @@ HISTORIQUE_SGE_DATA = [
 ]
 
 # ==============================================================================
-# 2. MOTEUR PEGASUS (Support jusqu'à 20 chevaux)
+# 2. MOTEUR PEGASUS
 # ==============================================================================
 OPPOSITIONS_VERTICALES = {
     1: 9, 2: 10, 3: 11, 4: 12, 5: 13, 6: 14, 7: 15, 8: 16,
     9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 6, 15: 7, 16: 8,
-    17: 9, 18: 10, 
-    19: 11, 20: 12
+    17: 9, 18: 10, 19: 11, 20: 12
 }
 
 COEFFICIENTS_RESONANCE = {0: 0.5, 1: 1.0, 2: 1.5, 3: 2.0}
@@ -193,22 +192,28 @@ def generer_prono_automatique(combinaison_ref):
     return scores_candidats[0][1] if scores_candidats else valides[:taille_cible]
 
 # ==============================================================================
-# NOUVELLE FONCTION : Taux de réussite historique
+# NOUVELLE FONCTION : Taux de réussite historique (Moyenne de chevaux trouvés)
 # ==============================================================================
 def calculer_taux_couverture_historique(nums_saisis):
-    """
-    Calcule le pourcentage de courses historiques où au moins un cheval 
-    de la sélection est présent dans le top 5 (arrivée).
-    """
     if not nums_saisis:
-        return 0.0
+        return 0.0, "Faible", "#e74c3c"
+    
     nums_set = set(nums_saisis)
-    courses_couvertes = 0
+    total_hits = 0
+    
     for course in HISTORIQUE_COMPLET:
         arrivee_set = set(course["arrivee"])
-        if nums_set & arrivee_set:  # intersection non vide
-            courses_couvertes += 1
-    return round(100 * courses_couvertes / len(HISTORIQUE_COMPLET), 1)
+        hits = len(nums_set & arrivee_set)
+        total_hits += hits
+    
+    moyenne_hits = total_hits / len(HISTORIQUE_COMPLET)
+    
+    if moyenne_hits >= 3:
+        return round(moyenne_hits, 2), "Très bon", "#2ecc71"
+    elif moyenne_hits >= 2:
+        return round(moyenne_hits, 2), "Bon", "#1abc9c"
+    else:
+        return round(moyenne_hits, 2), "Faible", "#e74c3c"
 
 # ==============================================================================
 # 3. ÉTAT DE L'APPLICATION
@@ -226,19 +231,11 @@ course_info = {
     "date": ""
 }
 
-# ==============================================================================
-# 3 bis. DONNÉES AUTOMATIQUES
-# ==============================================================================
 DATA_FILE = Path(__file__).resolve().parent / "data" / "quinte.json"
 QUINTE_JSON_URL = os.getenv("QUINTE_JSON_URL", "").strip()
 RECHARGEMENT_SECONDES = 300
 
-donnees_auto = {
-    "signature": None,
-    "derniere_maj": None,
-    "nb_arrivees": 0,
-    "dernier_controle": 0.0,
-}
+donnees_auto = {"signature": None, "derniere_maj": None, "nb_arrivees": 0, "dernier_controle": 0.0}
 
 def _lire_json_quinte():
     if QUINTE_JSON_URL and requests is not None:
@@ -261,41 +258,26 @@ def _liste_en_texte(valeur):
     return str(valeur or "")
 
 def _arrivee_valide(arr, max_partants=20):
-    return (
-        isinstance(arr, list)
-        and len(arr) == 5
-        and all(isinstance(n, int) and 1 <= n <= max_partants for n in arr)
-        and len(set(arr)) == 5
-    )
+    return (isinstance(arr, list) and len(arr) == 5 and all(isinstance(n, int) and 1 <= n <= max_partants for n in arr) and len(set(arr)) == 5)
 
 def _arrivee_affichable(arr):
-    return (
-        isinstance(arr, list)
-        and len(arr) == 5
-        and all(isinstance(n, int) and not isinstance(n, bool) for n in arr)
-        and len(set(arr)) == 5
-    )
+    return (isinstance(arr, list) and len(arr) == 5 and all(isinstance(n, int) and not isinstance(n, bool) for n in arr) and len(set(arr)) == 5)
 
 _JOURS_FR = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
-_MOIS_FR = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet",
-            "août", "septembre", "octobre", "novembre", "décembre"]
+_MOIS_FR = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"]
 
 def _date_fr(iso):
     try:
         d = _date.fromisoformat(str(iso))
+        return f"{_JOURS_FR[d.weekday()]} {d.day} {_MOIS_FR[d.month - 1]} {d.year}"
     except ValueError:
         return ""
-    return f"{_JOURS_FR[d.weekday()]} {d.day} {_MOIS_FR[d.month - 1]} {d.year}"
 
 def appliquer_donnees_auto(data):
     global HISTORIQUE_COMPLET, POIDS_AXES_HISTORIQUE
     course = data.get("course_du_jour") or {}
     date_course = str(course.get("date") or "")
-    nouvelles = [
-        {"id": str(a.get("id", "")), "arrivee": a["arrivee"]}
-        for a in data.get("nouvelles_arrivees", [])
-        if _arrivee_valide(a.get("arrivee"), 20) and str(a.get("id", "")) != date_course
-    ]
+    nouvelles = [{"id": str(a.get("id", "")), "arrivee": a["arrivee"]} for a in data.get("nouvelles_arrivees", []) if _arrivee_valide(a.get("arrivee"), 20) and str(a.get("id", "")) != date_course]
     HISTORIQUE_COMPLET = HISTORIQUE_SGE_DATA + nouvelles
     POIDS_AXES_HISTORIQUE = calculer_poids_axes(HISTORIQUE_COMPLET)
     if course.get("course_nom"):
@@ -303,26 +285,20 @@ def appliquer_donnees_auto(data):
         course_info["arrivee"] = list(arr) if _arrivee_affichable(arr) else []
         course_info["date"] = date_course
         for cle in ("hippodrome", "discipline", "course_nom", "distance", "partants", "heure"):
-            if course.get(cle):
-                course_info[cle] = str(course[cle])
-        if course.get("synthese_pmu"):
-            course_info["synthesis_pmu"] = _liste_en_texte(course["synthese_pmu"])
-        if course.get("combinaison"):
-            course_info["combinaison"] = _liste_en_texte(course["combinaison"])
+            if course.get(cle): course_info[cle] = str(course[cle])
+        if course.get("synthese_pmu"): course_info["synthesis_pmu"] = _liste_en_texte(course["synthese_pmu"])
+        if course.get("combinaison"): course_info["combinaison"] = _liste_en_texte(course["combinaison"])
     donnees_auto["nb_arrivees"] = len(nouvelles)
     donnees_auto["derniere_maj"] = data.get("derniere_maj")
 
 def rafraichir_donnees(force=False):
     maintenant = time.time()
-    if not force and maintenant - donnees_auto["dernier_controle"] < RECHARGEMENT_SECONDES:
-        return
+    if not force and maintenant - donnees_auto["dernier_controle"] < RECHARGEMENT_SECONDES: return
     donnees_auto["dernier_controle"] = maintenant
     data = _lire_json_quinte()
-    if not data:
-        return
+    if not data: return
     signature = json.dumps(data, sort_keys=True)
-    if signature == donnees_auto["signature"]:
-        return
+    if signature == donnees_auto["signature"]: return
     donnees_auto["signature"] = signature
     appliquer_donnees_auto(data)
 
@@ -334,16 +310,7 @@ def page_visiteur():
     return generer_html()
 
 @app.post("/update", response_class=HTMLResponse)
-def mettre_a_jour(
-    hippodrome: str = Form(""),
-    discipline: str = Form(""),
-    course_nom: str = Form(""),
-    distance: str = Form(""),
-    partants: str = Form(""),
-    heure: str = Form(""),
-    synthesis_pmu: str = Form(""),
-    combinaison: str = Form("")
-):
+def mettre_a_jour(hippodrome: str = Form(""), discipline: str = Form(""), course_nom: str = Form(""), distance: str = Form(""), partants: str = Form(""), heure: str = Form(""), synthesis_pmu: str = Form(""), combinaison: str = Form("")):
     rafraichir_donnees()
     if hippodrome.strip(): course_info["hippodrome"] = hippodrome
     if discipline.strip(): course_info["discipline"] = discipline
@@ -369,44 +336,24 @@ def generer_html():
     nums_combi_grid = [n for n in nums_saisis if 1 <= n <= nb_partants][:8]
     score_combi = calculer_score_pegasus(nums_combi_grid) if len(nums_combi_grid) >= 5 else 0
 
-    # NOUVEAU : Calcul du taux de réussite historique
-    taux_reussite = calculer_taux_couverture_historique(nums_combi_grid)
-    
-    # Couleur dynamique selon le taux
-    if taux_reussite >= 75:
-        taux_couleur = "#2ecc71"  # vert
-        taux_label = "Excellent"
-    elif taux_reussite >= 50:
-        taux_couleur = "#1abc9c"  # teal
-        taux_label = "Bon"
-    elif taux_reussite >= 30:
-        taux_couleur = "#f39c12"  # orange
-        taux_label = "Moyen"
-    else:
-        taux_couleur = "#e74c3c"  # rouge
-        taux_label = "Faible"
+    # NOUVEAU : Calcul du taux de réussite (tuple)
+    taux_reussite, taux_label, taux_couleur = calculer_taux_couverture_historique(nums_combi_grid)
 
     arrivee = course_info.get("arrivee") or []
     date_txt = _date_fr(course_info.get("date"))
-    suffixe_date = (
-        f' — Quinté du <strong style="color: var(--text-main);">{html.escape(date_txt)}</strong>' if date_txt else ""
-    )
+    suffixe_date = f' — Quinté du <strong style="color: var(--text-main);">{html.escape(date_txt)}</strong>' if date_txt else ""
     
     if len(arrivee) == 5:
         trouves = [n for n in nums_prono if n in arrivee]
         nb_ok = len(trouves)
         pct_reussite = round(100 * nb_ok / len(nums_prono)) if nums_prono else 0
-        html_prono_balls = "".join(
-            [f'<span class="ball orange {"hit" if n in arrivee else "miss"}">{n}</span>' for n in nums_prono]
-        )
+        html_prono_balls = "".join([f'<span class="ball orange {"hit" if n in arrivee else "miss"}">{n}</span>' for n in nums_prono])
         html_arrivee_balls = "".join([f'<span class="ball white">{n}</span>' for n in arrivee])
         mot = "numéro" if nb_ok <= 1 else "numéros"
         html_bloc_arrivee = f"""
         <div style="margin-bottom: 18px;">
             <div style="font-size: 0.9rem; color: var(--text-muted);">Arrivée officielle (1er → 5e){suffixe_date} :</div>
-            <div class="balls-container">
-                {html_arrivee_balls}
-            </div>
+            <div class="balls-container">{html_arrivee_balls}</div>
         </div>
         <div class="score-box" style="margin-top: 0; margin-bottom: 18px;">
             <div class="score-card">
@@ -414,18 +361,12 @@ def generer_html():
                 <div style="font-size:1.8em; font-weight:bold; color:var(--accent-teal); margin-top:6px;">{pct_reussite} %</div>
                 <div style="font-size:0.8em; color:var(--text-muted); margin-top:4px;">{nb_ok} {mot} sur {len(nums_prono)} dans les 5 premiers (entourés ci-dessus)</div>
             </div>
-        </div>
-        """
+        </div>"""
     else:
         html_prono_balls = "".join([f'<span class="ball orange">{n}</span>' for n in nums_prono])
-        html_bloc_arrivee = f"""
-        <div style="margin-bottom: 18px; font-size: 0.9rem; color: var(--text-muted); font-style: italic;">
-            Arrivée officielle{suffixe_date} : pas encore disponible.
-        </div>
-        """
+        html_bloc_arrivee = f"""<div style="margin-bottom: 18px; font-size: 0.9rem; color: var(--text-muted); font-style: italic;">Arrivée officielle{suffixe_date} : pas encore disponible.</div>"""
         
     html_combi_balls = "".join([f'<span class="ball gray">{n}</span>' for n in nums_saisis])
-
     synth_nums = [n.strip() for n in course_info["synthesis_pmu"].replace(",", " ").replace("-", " ").split() if n.strip().isdigit()]
     html_synth_pmu = "".join([f'<span class="ball teal">{n}</span>' for n in synth_nums]) if synth_nums else '<span style="color: var(--text-muted); font-style: italic;">Aucun favori saisi</span>'
 
@@ -439,18 +380,7 @@ def generer_html():
     h_comb = html.escape(course_info['combinaison'])
     h_date = html.escape(date_txt) if date_txt else ""
 
-    default_values = {
-        "hippodrome": "PARIS-VINCENNES",
-        "discipline": "TROT ATTELE",
-        "course_nom": "PRIX DU QUINTÉ+",
-        "distance": "2700m",
-        "partants": "16",
-        "heure": "13:50",
-        "synthesis_pmu": "13 - 8 - 10 - 4 - 16 - 6 - 5 - 12",
-        "combinaison": "13 - 6 - 5 - 12 - 11",
-        "date": "mercredi 14 octobre 2026"
-    }
-
+    default_values = {"hippodrome": "PARIS-VINCENNES", "discipline": "TROT ATTELE", "course_nom": "PRIX DU QUINTÉ+", "distance": "2700m", "partants": "16", "heure": "13:50", "synthesis_pmu": "13 - 8 - 10 - 4 - 16 - 6 - 5 - 12", "combinaison": "13 - 6 - 5 - 12 - 11", "date": "mercredi 14 octobre 2026"}
     mission = "Le but de PEGASUS est de donner des ailes à l'intuition du parieur en transformant des données historiques brutes en une stratégie géométrique claire, automatisée et optimisée."
 
     return f"""<!DOCTYPE html>
@@ -474,243 +404,49 @@ def generer_html():
       "applicationCategory": "SportsApplication",
       "operatingSystem": "Web",
       "description": "Analyseur géométrique d'axes et stratégie de pronostic pour le Quinté+.",
-      "offers": {{
-        "@type": "Offer",
-        "price": "0",
-        "priceCurrency": "EUR"
-      }}
+      "offers": {{"@type": "Offer", "price": "0", "priceCurrency": "EUR"}}
     }}
     </script>
     <style>
-        :root {{
-            --bg-color: #0d0f12;
-            --card-bg: #161920;
-            --accent-orange: #f39c12;
-            --accent-teal: #1abc9c;
-            --text-main: #f5f6fa;
-            --text-muted: #95a5a6;
-            --border-color: #2c3e50;
-            --input-bg: #1e222b;
-        }}
-        body {{
-            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-main);
-            margin: 0;
-            padding: 30px 15px;
-            display: flex;
-            justify-content: center;
-        }}
+        :root {{ --bg-color: #0d0f12; --card-bg: #161920; --accent-orange: #f39c12; --accent-teal: #1abc9c; --text-main: #f5f6fa; --text-muted: #95a5a6; --border-color: #2c3e50; --input-bg: #1e222b; }}
+        body {{ font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: var(--bg-color); color: var(--text-main); margin: 0; padding: 30px 15px; display: flex; justify-content: center; }}
         .container {{ width: 100%; max-width: 820px; }}
         header {{ text-align: center; margin-bottom: 30px; }}
-        header h1 {{
-            color: var(--accent-orange);
-            margin: 0;
-            font-size: 2.2rem;
-            letter-spacing: 1.5px;
-            text-transform: uppercase;
-        }}
+        header h1 {{ color: var(--accent-orange); margin: 0; font-size: 2.2rem; letter-spacing: 1.5px; text-transform: uppercase; }}
         header p {{ color: var(--text-muted); margin-top: 8px; font-size: 0.95rem; }}
-        .mission-statement {{
-            font-size: 0.85rem !important;
-            color: var(--text-muted) !important;
-            font-style: italic;
-            margin-top: 12px !important;
-            max-width: 620px;
-            margin-left: auto;
-            margin-right: auto;
-            line-height: 1.5;
-            border-left: 3px solid var(--accent-orange);
-            padding-left: 14px;
-            text-align: left;
-        }}
-        .card {{
-            background-color: var(--card-bg);
-            border-radius: 12px;
-            padding: 24px;
-            margin-bottom: 22px;
-            border: 1px solid var(--border-color);
-            box-shadow: 0 8px 16px rgba(0,0,0,0.4);
-        }}
-        .card-title {{
-            color: var(--accent-orange);
-            font-size: 1.1rem;
-            font-weight: 700;
-            border-bottom: 1px solid var(--border-color);
-            padding-bottom: 10px;
-            margin-bottom: 18px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }}
-        .form-grid {{
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 15px;
-            margin-bottom: 15px;
-        }}
-        .form-group label {{
-            display: block;
-            font-size: 0.85rem;
-            color: var(--text-muted);
-            margin-bottom: 5px;
-            font-weight: 600;
-        }}
-        .form-group input {{
-            width: 100%;
-            padding: 10px;
-            background-color: var(--input-bg);
-            border: 1px solid var(--border-color);
-            color: #ffffff;
-            border-radius: 8px;
-            box-sizing: border-box;
-            font-size: 0.95rem;
-        }}
+        .mission-statement {{ font-size: 0.85rem !important; color: var(--text-muted) !important; font-style: italic; margin-top: 12px !important; max-width: 620px; margin-left: auto; margin-right: auto; line-height: 1.5; border-left: 3px solid var(--accent-orange); padding-left: 14px; text-align: left; }}
+        .card {{ background-color: var(--card-bg); border-radius: 12px; padding: 24px; margin-bottom: 22px; border: 1px solid var(--border-color); box-shadow: 0 8px 16px rgba(0,0,0,0.4); }}
+        .card-title {{ color: var(--accent-orange); font-size: 1.1rem; font-weight: 700; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 18px; text-transform: uppercase; letter-spacing: 0.5px; }}
+        .form-grid {{ display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 15px; }}
+        .form-group label {{ display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 5px; font-weight: 600; }}
+        .form-group input {{ width: 100%; padding: 10px; background-color: var(--input-bg); border: 1px solid var(--border-color); color: #ffffff; border-radius: 8px; box-sizing: border-box; font-size: 0.95rem; }}
         .form-group input::placeholder {{ color: #6c757d; font-style: italic; }}
-        .form-group input[readonly] {{
-            background-color: #2a2f3a;
-            color: var(--accent-teal);
-            font-weight: 600;
-            cursor: not-allowed;
-        }}
+        .form-group input[readonly] {{ background-color: #2a2f3a; color: var(--accent-teal); font-weight: 600; cursor: not-allowed; }}
         .full-width {{ grid-column: span 2; }}
-        .balls-container {{
-            display: flex;
-            gap: 10px;
-            margin-top: 10px;
-            flex-wrap: wrap;
-            align-items: center;
-        }}
-        .ball {{
-            width: 38px;
-            height: 38px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            font-size: 1rem;
-            box-shadow: 0 3px 6px rgba(0,0,0,0.3);
-        }}
+        .balls-container {{ display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; align-items: center; }}
+        .ball {{ width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1rem; box-shadow: 0 3px 6px rgba(0,0,0,0.3); }}
         .ball.orange {{ background-color: var(--accent-orange); color: #000; }}
         .ball.gray {{ background-color: #34495e; color: #fff; }}
         .ball.teal {{ background-color: var(--accent-teal); color: #000; }}
         .ball.white {{ background-color: #f5f6fa; color: #000; }}
         .ball.hit {{ outline: 3px solid var(--accent-teal); outline-offset: 2px; }}
         .ball.miss {{ opacity: 0.4; }}
-        .grid-partants {{
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(50px, 1fr));
-            gap: 10px;
-            margin-bottom: 18px;
-        }}
-        .grid-btn {{
-            background-color: var(--input-bg);
-            border: 1px solid var(--border-color);
-            color: var(--text-main);
-            padding: 14px 0;
-            border-radius: 8px;
-            font-size: 1.15rem;
-            font-weight: bold;
-            cursor: pointer;
-            text-align: center;
-            transition: all 0.2s ease;
-        }}
+        .grid-partants {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(50px, 1fr)); gap: 10px; margin-bottom: 18px; }}
+        .grid-btn {{ background-color: var(--input-bg); border: 1px solid var(--border-color); color: var(--text-main); padding: 14px 0; border-radius: 8px; font-size: 1.15rem; font-weight: bold; cursor: pointer; text-align: center; transition: all 0.2s ease; }}
         .grid-btn:hover {{ border-color: var(--accent-orange); }}
-        .grid-btn.active {{
-            background-color: var(--accent-orange);
-            color: #000000;
-            border-color: var(--accent-orange);
-            box-shadow: 0 0 12px rgba(243, 156, 18, 0.5);
-        }}
-        .action-btn {{
-            width: 100%;
-            background-color: var(--accent-teal);
-            color: #000000;
-            border: none;
-            padding: 14px;
-            border-radius: 8px;
-            font-size: 1.05rem;
-            font-weight: bold;
-            cursor: pointer;
-            margin-top: 12px;
-            text-transform: uppercase;
-            transition: opacity 0.2s;
-        }}
+        .grid-btn.active {{ background-color: var(--accent-orange); color: #000000; border-color: var(--accent-orange); box-shadow: 0 0 12px rgba(243, 156, 18, 0.5); }}
+        .action-btn {{ width: 100%; background-color: var(--accent-teal); color: #000000; border: none; padding: 14px; border-radius: 8px; font-size: 1.05rem; font-weight: bold; cursor: pointer; margin-top: 12px; text-transform: uppercase; transition: opacity 0.2s; }}
         .action-btn:hover {{ opacity: 0.9; }}
-        .score-box {{
-            display: flex;
-            justify-content: space-between;
-            gap: 15px;
-            margin-top: 18px;
-        }}
-        .score-card {{
-            flex: 1;
-            text-align: center;
-            padding: 14px;
-            background: var(--input-bg);
-            border-radius: 8px;
-            border: 1px solid var(--border-color);
-        }}
-        .diode-container {{
-            display: flex;
-            align-items: center;
-            margin-bottom: 5px;
-        }}
-        .diode {{
-            width: 8px;
-            height: 8px;
-            background-color: #2ecc71;
-            border-radius: 50%;
-            margin-right: 10px;
-            box-shadow: 0 0 6px #2ecc71, 0 0 10px #2ecc71;
-            animation: blink 1.5s ease-in-out infinite;
-        }}
-        @keyframes blink {{
-            0%, 100% {{ opacity: 1; transform: scale(1); }}
-            50% {{ opacity: 0.4; transform: scale(0.8); }}
-        }}
+        .score-box {{ display: flex; justify-content: space-between; gap: 15px; margin-top: 18px; }}
+        .score-card {{ flex: 1; text-align: center; padding: 14px; background: var(--input-bg); border-radius: 8px; border: 1px solid var(--border-color); }}
+        .diode-container {{ display: flex; align-items: center; margin-bottom: 5px; }}
+        .diode {{ width: 8px; height: 8px; background-color: #2ecc71; border-radius: 50%; margin-right: 10px; box-shadow: 0 0 6px #2ecc71, 0 0 10px #2ecc71; animation: blink 1.5s ease-in-out infinite; }}
+        @keyframes blink {{ 0%, 100% {{ opacity: 1; transform: scale(1); }} 50% {{ opacity: 0.4; transform: scale(0.8); }} }}
         
-        /* NOUVEAU : Badge taux de réussite clignotant */
-        .taux-reussite-container {{
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 12px;
-            margin-bottom: 18px;
-            padding: 12px;
-            background: var(--input-bg);
-            border-radius: 10px;
-            border: 1px solid var(--border-color);
-        }}
-        .taux-reussite-badge {{
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: 8px 18px;
-            border-radius: 25px;
-            font-weight: bold;
-            font-size: 1.1rem;
-            color: #000;
-            animation: pulse-taux 1.8s ease-in-out infinite;
-            box-shadow: 0 0 15px currentColor;
-        }}
-        .taux-reussite-label {{
-            font-size: 0.85rem;
-            color: var(--text-muted);
-            font-weight: normal;
-        }}
-        @keyframes pulse-taux {{
-            0%, 100% {{ 
-                opacity: 1; 
-                transform: scale(1);
-                box-shadow: 0 0 10px currentColor;
-            }}
-            50% {{ 
-                opacity: 0.75; 
-                transform: scale(1.05);
-                box-shadow: 0 0 25px currentColor;
-            }}
-        }}
+        .taux-reussite-container {{ display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 18px; padding: 12px; background: var(--input-bg); border-radius: 10px; border: 1px solid var(--border-color); flex-wrap: wrap; }}
+        .taux-reussite-badge {{ display: inline-flex; align-items: center; gap: 8px; padding: 8px 18px; border-radius: 25px; font-weight: bold; font-size: 1.1rem; color: #000; animation: pulse-taux 1.8s ease-in-out infinite; box-shadow: 0 0 15px currentColor; }}
+        .taux-reussite-label {{ font-size: 0.85rem; color: var(--text-muted); font-weight: normal; }}
+        @keyframes pulse-taux {{ 0%, 100% {{ opacity: 1; transform: scale(1); box-shadow: 0 0 10px currentColor; }} 50% {{ opacity: 0.75; transform: scale(1.05); box-shadow: 0 0 25px currentColor; }} }}
     </style>
 </head>
 <body>
@@ -728,37 +464,16 @@ def generer_html():
             <div class="card-title">1. Informations sur le Quinté du Jour</div>
             <div class="form-grid">
                 <div class="form-group full-width">
-                    <label>📅 Date de la course (automatique) :</label>
+                    <label> Date de la course (automatique) :</label>
                     <input type="text" value="{h_date}" placeholder="{default_values['date']}" readonly>
                 </div>
-                <div class="form-group">
-                    <label>Hippodrome :</label>
-                    <input type="text" name="hippodrome" value="{h_hippo}" placeholder="{default_values['hippodrome']}">
-                </div>
-                <div class="form-group">
-                    <label>Discipline :</label>
-                    <input type="text" name="discipline" value="{h_disc}" placeholder="{default_values['discipline']}">
-                </div>
-                <div class="form-group">
-                    <label>Nom de la course :</label>
-                    <input type="text" name="course_nom" value="{h_nom}" placeholder="{default_values['course_nom']}">
-                </div>
-                <div class="form-group">
-                    <label>Distance :</label>
-                    <input type="text" name="distance" value="{h_dist}" placeholder="{default_values['distance']}">
-                </div>
-                <div class="form-group">
-                    <label>Nombre de partants :</label>
-                    <input type="text" name="partants" value="{h_part}" placeholder="{default_values['partants']}">
-                </div>
-                <div class="form-group">
-                    <label>Heure de départ :</label>
-                    <input type="text" name="heure" value="{h_heure}" placeholder="{default_values['heure']}">
-                </div>
-                <div class="form-group full-width">
-                    <label>Synthèse Presse / Favoris (séparés par tirets) :</label>
-                    <input type="text" id="synthesis-input" name="synthesis_pmu" value="{h_synth}" placeholder="{default_values['synthesis_pmu']}">
-                </div>
+                <div class="form-group"><label>Hippodrome :</label><input type="text" name="hippodrome" value="{h_hippo}" placeholder="{default_values['hippodrome']}"></div>
+                <div class="form-group"><label>Discipline :</label><input type="text" name="discipline" value="{h_disc}" placeholder="{default_values['discipline']}"></div>
+                <div class="form-group"><label>Nom de la course :</label><input type="text" name="course_nom" value="{h_nom}" placeholder="{default_values['course_nom']}"></div>
+                <div class="form-group"><label>Distance :</label><input type="text" name="distance" value="{h_dist}" placeholder="{default_values['distance']}"></div>
+                <div class="form-group"><label>Nombre de partants :</label><input type="text" name="partants" value="{h_part}" placeholder="{default_values['partants']}"></div>
+                <div class="form-group"><label>Heure de départ :</label><input type="text" name="heure" value="{h_heure}" placeholder="{default_values['heure']}"></div>
+                <div class="form-group full-width"><label>Synthèse Presse / Favoris (séparés par tirets) :</label><input type="text" id="synthesis-input" name="synthesis_pmu" value="{h_synth}" placeholder="{default_values['synthesis_pmu']}"></div>
             </div>
 
             <div style="margin-top: 12px;">
@@ -768,7 +483,6 @@ def generer_html():
                 </div>
                 <input type="text" id="combinaison-input" name="combinaison" value="{h_comb}" placeholder="{default_values['combinaison']}" style="width:100%; padding:10px; background-color:var(--input-bg); border:1px solid var(--border-color); color:#fff; border-radius:8px; box-sizing:border-box; font-size: 0.95rem;">
             </div>
-
             <button type="submit" class="action-btn">Mettre à jour & Recalculer</button>
         </div>
     </form>
@@ -778,33 +492,13 @@ def generer_html():
         <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: -10px; margin-bottom: 18px; font-style: italic;">
             Le moteur Pegasus analyse les {nb_base} dernières arrivées pour identifier les axes géométriques récurrents (ex: 1-9, 2-10) et optimiser votre combinaison de 5 ou 8 chevaux.
         </p>
-
-        <div style="margin-bottom: 18px;">
-            <div style="font-size: 0.9rem; color: var(--text-muted);">Synthèse Presse / Favoris :</div>
-            <div class="balls-container">{html_synth_pmu}</div>
-        </div>
-
-        <div style="margin-bottom: 18px;">
-            <div style="font-size: 0.9rem; color: var(--text-muted);">Pronostic Pegasus calculé automatiquement :</div>
-            <div class="balls-container">{html_prono_balls}</div>
-        </div>
-
+        <div style="margin-bottom: 18px;"><div style="font-size: 0.9rem; color: var(--text-muted);">Synthèse Presse / Favoris :</div><div class="balls-container">{html_synth_pmu}</div></div>
+        <div style="margin-bottom: 18px;"><div style="font-size: 0.9rem; color: var(--text-muted);">Pronostic Pegasus calculé automatiquement :</div><div class="balls-container">{html_prono_balls}</div></div>
         {html_bloc_arrivee}
-
-        <div style="margin-bottom: 18px;">
-            <div style="font-size: 0.9rem; color: var(--text-muted);">Combinaison active / saisie :</div>
-            <div class="balls-container">{html_combi_balls}</div>
-        </div>
-
+        <div style="margin-bottom: 18px;"><div style="font-size: 0.9rem; color: var(--text-muted);">Combinaison active / saisie :</div><div class="balls-container">{html_combi_balls}</div></div>
         <div class="score-box">
-            <div class="score-card">
-                <div style="font-size:0.85em; color:var(--text-muted);">Pondération Pronostic Pegasus</div>
-                <div style="font-size:1.5em; font-weight:bold; color:var(--accent-orange); margin-top:6px;">{score_prono} pts</div>
-            </div>
-            <div class="score-card">
-                <div style="font-size:0.85em; color:var(--text-muted);">Pondération Combinaison</div>
-                <div style="font-size:1.5em; font-weight:bold; color:var(--accent-teal); margin-top:6px;">{score_combi} pts</div>
-            </div>
+            <div class="score-card"><div style="font-size:0.85em; color:var(--text-muted);">Pondération Pronostic Pegasus</div><div style="font-size:1.5em; font-weight:bold; color:var(--accent-orange); margin-top:6px;">{score_prono} pts</div></div>
+            <div class="score-card"><div style="font-size:0.85em; color:var(--text-muted);">Pondération Combinaison</div><div style="font-size:1.5em; font-weight:bold; color:var(--accent-teal); margin-top:6px;">{score_combi} pts</div></div>
         </div>
     </div>
 
@@ -814,21 +508,19 @@ def generer_html():
             Cliquez sur les numéros de la grille pour composer instantanément votre combinaison (8 chevaux max)
         </p>
 
-        <!-- NOUVEAU : Badge taux de réussite clignotant -->
         <div class="taux-reussite-container">
-            <span class="taux-reussite-label"> Taux de réussite historique de votre sélection :</span>
+            <span class="taux-reussite-label"> Chevaux trouvés en moyenne dans le top 5 historique :</span>
             <span class="taux-reussite-badge" style="background-color: {taux_couleur};">
-                {taux_reussite}% — {taux_label}
+                {taux_reussite} chevaux — {taux_label}
             </span>
         </div>
         <p style="text-align: center; font-size: 0.75rem; color: var(--text-muted); margin-top: -12px; margin-bottom: 18px; font-style: italic;">
-            (Basé sur l'analyse de {nb_base} courses — % de courses contenant au moins 1 cheval de votre sélection dans le top 5)
+            (Moyenne sur {nb_base} courses — 3 chevaux ou plus = Très bon, 1 cheval = Faible)
         </p>
 
         <div class="grid-partants">
             {''.join([f'<div class="grid-btn" id="btn-{i}" onclick="toggleNum({i})">{i}</div>' for i in range(1, nb_partants + 1)])}
         </div>
-
         <button class="action-btn" style="background-color: #34495e; color: #fff; margin-top: 0;" onclick="resetSelection()">Réinitialiser la grille</button>
     </div>
 </div>
@@ -867,15 +559,10 @@ def generer_html():
         const input = e.target;
         const cursorPosition = input.selectionStart;
         const nums = input.value.match(/\\d+/g);
-        if (!nums) {{
-            input.value = '';
-            return;
-        }}
+        if (!nums) {{ input.value = ''; return; }}
         let res = nums.join(' - ');
         const suppression = e.inputType && e.inputType.indexOf('delete') === 0;
-        if (!suppression && /\\D$/.test(input.value)) {{
-            res += ' - ';
-        }}
+        if (!suppression && /\\D$/.test(input.value)) {{ res += ' - '; }}
         input.value = res;
         const newPos = Math.min(cursorPosition, input.value.length);
         input.setSelectionRange(newPos, newPos);
