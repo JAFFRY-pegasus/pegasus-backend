@@ -11,14 +11,14 @@ from fastapi import FastAPI, Form
 from fastapi.responses import HTMLResponse
 
 try:
-    import requests  # utilisé seulement si QUINTE_JSON_URL est défini
-except ImportError:  # pragma: no cover
+    import requests
+except ImportError:
     requests = None
 
 app = FastAPI()
 
 # ==============================================================================
-# 1. BASE HISTORIQUE COMPLÈTE (220 QUINTÉS)
+# 1. BASE HISTORIQUE COMPLÈTE (220+ QUINTÉS)
 # ==============================================================================
 HISTORIQUE_SGE_DATA = [
   {"id": "1", "arrivee": [11, 4, 15, 6, 12]}, {"id": "2", "arrivee": [8, 14, 5, 13, 2]},
@@ -140,7 +140,7 @@ OPPOSITIONS_VERTICALES = {
     1: 9, 2: 10, 3: 11, 4: 12, 5: 13, 6: 14, 7: 15, 8: 16,
     9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 6, 15: 7, 16: 8,
     17: 9, 18: 10, 
-    19: 11, 20: 12  # Extension pour courses à 18 ou 20 partants
+    19: 11, 20: 12
 }
 
 COEFFICIENTS_RESONANCE = {0: 0.5, 1: 1.0, 2: 1.5, 3: 2.0}
@@ -172,7 +172,6 @@ def calculer_score_pegasus(combinaison):
                 axes_touches.add(axe)
                 if axe in POIDS_AXES_HISTORIQUE:
                     score_brut += POIDS_AXES_HISTORIQUE[axe]
-
     nombre_axes = len(axes_touches)
     ponderation = COEFFICIENTS_RESONANCE.get(nombre_axes, 2.0)
     return int(score_brut * ponderation)
@@ -180,20 +179,36 @@ def calculer_score_pegasus(combinaison):
 def generer_prono_automatique(combinaison_ref):
     nb_partants = int(course_info.get("partants") or 16)
     valides = [n for n in combinaison_ref if 1 <= n <= nb_partants]
-    if len(valides) < 5:
+    taille_cible = 8 if len(combinaison_ref) >= 8 else 5
+    if len(valides) < taille_cible:
         complements = [n for n in range(1, nb_partants + 1) if n not in valides]
-        valides = (valides + complements)[:5]
-
+        valides = (valides + complements)[:taille_cible]
     opposes = [OPPOSITIONS_VERTICALES.get(n) for n in valides if OPPOSITIONS_VERTICALES.get(n) is not None]
     candidats = list(dict.fromkeys(valides + opposes))
-
     scores_candidats = []
-    for combo in combinations(candidats, 5):
+    for combo in combinations(candidats, taille_cible):
         score = calculer_score_pegasus(list(combo))
         scores_candidats.append((score, list(combo)))
-
     scores_candidats.sort(key=lambda x: x[0], reverse=True)
-    return scores_candidats[0][1] if scores_candidats else valides[:5]
+    return scores_candidats[0][1] if scores_candidats else valides[:taille_cible]
+
+# ==============================================================================
+# NOUVELLE FONCTION : Taux de réussite historique
+# ==============================================================================
+def calculer_taux_couverture_historique(nums_saisis):
+    """
+    Calcule le pourcentage de courses historiques où au moins un cheval 
+    de la sélection est présent dans le top 5 (arrivée).
+    """
+    if not nums_saisis:
+        return 0.0
+    nums_set = set(nums_saisis)
+    courses_couvertes = 0
+    for course in HISTORIQUE_COMPLET:
+        arrivee_set = set(course["arrivee"])
+        if nums_set & arrivee_set:  # intersection non vide
+            courses_couvertes += 1
+    return round(100 * courses_couvertes / len(HISTORIQUE_COMPLET), 1)
 
 # ==============================================================================
 # 3. ÉTAT DE L'APPLICATION
@@ -274,10 +289,8 @@ def _date_fr(iso):
 
 def appliquer_donnees_auto(data):
     global HISTORIQUE_COMPLET, POIDS_AXES_HISTORIQUE
-
     course = data.get("course_du_jour") or {}
     date_course = str(course.get("date") or "")
-
     nouvelles = [
         {"id": str(a.get("id", "")), "arrivee": a["arrivee"]}
         for a in data.get("nouvelles_arrivees", [])
@@ -285,7 +298,6 @@ def appliquer_donnees_auto(data):
     ]
     HISTORIQUE_COMPLET = HISTORIQUE_SGE_DATA + nouvelles
     POIDS_AXES_HISTORIQUE = calculer_poids_axes(HISTORIQUE_COMPLET)
-
     if course.get("course_nom"):
         arr = course.get("arrivee")
         course_info["arrivee"] = list(arr) if _arrivee_affichable(arr) else []
@@ -297,7 +309,6 @@ def appliquer_donnees_auto(data):
             course_info["synthesis_pmu"] = _liste_en_texte(course["synthese_pmu"])
         if course.get("combinaison"):
             course_info["combinaison"] = _liste_en_texte(course["combinaison"])
-
     donnees_auto["nb_arrivees"] = len(nouvelles)
     donnees_auto["derniere_maj"] = data.get("derniere_maj")
 
@@ -306,7 +317,6 @@ def rafraichir_donnees(force=False):
     if not force and maintenant - donnees_auto["dernier_controle"] < RECHARGEMENT_SECONDES:
         return
     donnees_auto["dernier_controle"] = maintenant
-
     data = _lire_json_quinte()
     if not data:
         return
@@ -335,7 +345,6 @@ def mettre_a_jour(
     combinaison: str = Form("")
 ):
     rafraichir_donnees()
-    
     if hippodrome.strip(): course_info["hippodrome"] = hippodrome
     if discipline.strip(): course_info["discipline"] = discipline
     if course_nom.strip(): course_info["course_nom"] = course_nom
@@ -344,7 +353,6 @@ def mettre_a_jour(
     if heure.strip(): course_info["heure"] = heure
     if synthesis_pmu.strip(): course_info["synthesis_pmu"] = synthesis_pmu
     if combinaison.strip(): course_info["combinaison"] = combinaison
-    
     return generer_html()
 
 def generer_html():
@@ -358,8 +366,25 @@ def generer_html():
     score_prono = calculer_score_pegasus(nums_prono)
 
     nb_partants = int(course_info.get("partants") or 16)
-    nums_combi_grid = [n for n in nums_saisis if 1 <= n <= nb_partants][:5]
-    score_combi = calculer_score_pegasus(nums_combi_grid) if len(nums_combi_grid) == 5 else 0
+    nums_combi_grid = [n for n in nums_saisis if 1 <= n <= nb_partants][:8]
+    score_combi = calculer_score_pegasus(nums_combi_grid) if len(nums_combi_grid) >= 5 else 0
+
+    # NOUVEAU : Calcul du taux de réussite historique
+    taux_reussite = calculer_taux_couverture_historique(nums_combi_grid)
+    
+    # Couleur dynamique selon le taux
+    if taux_reussite >= 75:
+        taux_couleur = "#2ecc71"  # vert
+        taux_label = "Excellent"
+    elif taux_reussite >= 50:
+        taux_couleur = "#1abc9c"  # teal
+        taux_label = "Bon"
+    elif taux_reussite >= 30:
+        taux_couleur = "#f39c12"  # orange
+        taux_label = "Moyen"
+    else:
+        taux_couleur = "#e74c3c"  # rouge
+        taux_label = "Faible"
 
     arrivee = course_info.get("arrivee") or []
     date_txt = _date_fr(course_info.get("date"))
@@ -383,7 +408,6 @@ def generer_html():
                 {html_arrivee_balls}
             </div>
         </div>
-
         <div class="score-box" style="margin-top: 0; margin-bottom: 18px;">
             <div class="score-card">
                 <div style="font-size:0.85em; color:var(--text-muted);">Réussite du pronostic Pegasus</div>
@@ -435,7 +459,7 @@ def generer_html():
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PEGASUS QUINTÉ — Analyseur de Pronostics</title>
-    <meta name="description" content="PEGASUS QUINTÉ : Analyseur géométrique d'axes et stratégie de pronostic hippique. Transformez vos intuitions en combinaisons optimisées grâce à l'historique des courses.">
+    <meta name="description" content="PEGASUS QUINTÉ : Analyseur géométrique d'axes et stratégie de pronostic hippique.">
     <meta name="keywords" content="pronostic quinté+, analyse géométrique courses, pegasus quinté, logiciel pronostic hippique, stratégie axes chevaux, PMU">
     <meta name="author" content="Pegasus Project">
     <meta name="robots" content="index, follow">
@@ -468,7 +492,6 @@ def generer_html():
             --border-color: #2c3e50;
             --input-bg: #1e222b;
         }}
-
         body {{
             font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             background-color: var(--bg-color);
@@ -478,17 +501,8 @@ def generer_html():
             display: flex;
             justify-content: center;
         }}
-
-        .container {{
-            width: 100%;
-            max-width: 820px;
-        }}
-
-        header {{
-            text-align: center;
-            margin-bottom: 30px;
-        }}
-
+        .container {{ width: 100%; max-width: 820px; }}
+        header {{ text-align: center; margin-bottom: 30px; }}
         header h1 {{
             color: var(--accent-orange);
             margin: 0;
@@ -496,13 +510,7 @@ def generer_html():
             letter-spacing: 1.5px;
             text-transform: uppercase;
         }}
-
-        header p {{
-            color: var(--text-muted);
-            margin-top: 8px;
-            font-size: 0.95rem;
-        }}
-
+        header p {{ color: var(--text-muted); margin-top: 8px; font-size: 0.95rem; }}
         .mission-statement {{
             font-size: 0.85rem !important;
             color: var(--text-muted) !important;
@@ -516,7 +524,6 @@ def generer_html():
             padding-left: 14px;
             text-align: left;
         }}
-
         .card {{
             background-color: var(--card-bg);
             border-radius: 12px;
@@ -525,7 +532,6 @@ def generer_html():
             border: 1px solid var(--border-color);
             box-shadow: 0 8px 16px rgba(0,0,0,0.4);
         }}
-
         .card-title {{
             color: var(--accent-orange);
             font-size: 1.1rem;
@@ -536,14 +542,12 @@ def generer_html():
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }}
-
         .form-grid {{
             display: grid;
             grid-template-columns: repeat(2, 1fr);
             gap: 15px;
             margin-bottom: 15px;
         }}
-
         .form-group label {{
             display: block;
             font-size: 0.85rem;
@@ -551,7 +555,6 @@ def generer_html():
             margin-bottom: 5px;
             font-weight: 600;
         }}
-
         .form-group input {{
             width: 100%;
             padding: 10px;
@@ -562,23 +565,14 @@ def generer_html():
             box-sizing: border-box;
             font-size: 0.95rem;
         }}
-        
-        .form-group input::placeholder {{
-            color: #6c757d;
-            font-style: italic;
-        }}
-
+        .form-group input::placeholder {{ color: #6c757d; font-style: italic; }}
         .form-group input[readonly] {{
             background-color: #2a2f3a;
             color: var(--accent-teal);
             font-weight: 600;
             cursor: not-allowed;
         }}
-
-        .full-width {{
-            grid-column: span 2;
-        }}
-
+        .full-width {{ grid-column: span 2; }}
         .balls-container {{
             display: flex;
             gap: 10px;
@@ -586,7 +580,6 @@ def generer_html():
             flex-wrap: wrap;
             align-items: center;
         }}
-
         .ball {{
             width: 38px;
             height: 38px;
@@ -598,21 +591,18 @@ def generer_html():
             font-size: 1rem;
             box-shadow: 0 3px 6px rgba(0,0,0,0.3);
         }}
-
         .ball.orange {{ background-color: var(--accent-orange); color: #000; }}
         .ball.gray {{ background-color: #34495e; color: #fff; }}
         .ball.teal {{ background-color: var(--accent-teal); color: #000; }}
         .ball.white {{ background-color: #f5f6fa; color: #000; }}
         .ball.hit {{ outline: 3px solid var(--accent-teal); outline-offset: 2px; }}
         .ball.miss {{ opacity: 0.4; }}
-
         .grid-partants {{
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(50px, 1fr));
             gap: 10px;
             margin-bottom: 18px;
         }}
-
         .grid-btn {{
             background-color: var(--input-bg);
             border: 1px solid var(--border-color);
@@ -625,18 +615,13 @@ def generer_html():
             text-align: center;
             transition: all 0.2s ease;
         }}
-
-        .grid-btn:hover {{
-            border-color: var(--accent-orange);
-        }}
-
+        .grid-btn:hover {{ border-color: var(--accent-orange); }}
         .grid-btn.active {{
             background-color: var(--accent-orange);
             color: #000000;
             border-color: var(--accent-orange);
             box-shadow: 0 0 12px rgba(243, 156, 18, 0.5);
         }}
-
         .action-btn {{
             width: 100%;
             background-color: var(--accent-teal);
@@ -651,18 +636,13 @@ def generer_html():
             text-transform: uppercase;
             transition: opacity 0.2s;
         }}
-
-        .action-btn:hover {{
-            opacity: 0.9;
-        }}
-
+        .action-btn:hover {{ opacity: 0.9; }}
         .score-box {{
             display: flex;
             justify-content: space-between;
             gap: 15px;
             margin-top: 18px;
         }}
-
         .score-card {{
             flex: 1;
             text-align: center;
@@ -671,7 +651,6 @@ def generer_html():
             border-radius: 8px;
             border: 1px solid var(--border-color);
         }}
-
         .diode-container {{
             display: flex;
             align-items: center;
@@ -689,6 +668,48 @@ def generer_html():
         @keyframes blink {{
             0%, 100% {{ opacity: 1; transform: scale(1); }}
             50% {{ opacity: 0.4; transform: scale(0.8); }}
+        }}
+        
+        /* NOUVEAU : Badge taux de réussite clignotant */
+        .taux-reussite-container {{
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 18px;
+            padding: 12px;
+            background: var(--input-bg);
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+        }}
+        .taux-reussite-badge {{
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 18px;
+            border-radius: 25px;
+            font-weight: bold;
+            font-size: 1.1rem;
+            color: #000;
+            animation: pulse-taux 1.8s ease-in-out infinite;
+            box-shadow: 0 0 15px currentColor;
+        }}
+        .taux-reussite-label {{
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            font-weight: normal;
+        }}
+        @keyframes pulse-taux {{
+            0%, 100% {{ 
+                opacity: 1; 
+                transform: scale(1);
+                box-shadow: 0 0 10px currentColor;
+            }}
+            50% {{ 
+                opacity: 0.75; 
+                transform: scale(1.05);
+                box-shadow: 0 0 25px currentColor;
+            }}
         }}
     </style>
 </head>
@@ -743,7 +764,7 @@ def generer_html():
             <div style="margin-top: 12px;">
                 <div class="diode-container">
                     <span class="diode"></span>
-                    <label style="font-size: 0.85rem; color: var(--text-muted); font-weight: 600;">Inscrivez ici votre combinaison de test en 5 chevaux, elle générera automatiquement la combinaison Pegasus !</label>
+                    <label style="font-size: 0.85rem; color: var(--text-muted); font-weight: 600;">Inscrivez ici votre combinaison de test en 5 ou 8 chevaux, elle générera automatiquement la combinaison Pegasus !</label>
                 </div>
                 <input type="text" id="combinaison-input" name="combinaison" value="{h_comb}" placeholder="{default_values['combinaison']}" style="width:100%; padding:10px; background-color:var(--input-bg); border:1px solid var(--border-color); color:#fff; border-radius:8px; box-sizing:border-box; font-size: 0.95rem;">
             </div>
@@ -755,30 +776,24 @@ def generer_html():
     <div class="card">
         <div class="card-title">2. Synthèse PMU et pronostic Pegasus optimisé pour une grille de {nb_partants} partants au Quinté</div>
         <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: -10px; margin-bottom: 18px; font-style: italic;">
-            Le moteur Pegasus analyse les 220 dernières arrivées pour identifier les axes géométriques récurrents (ex: 1-9, 2-10) et optimiser votre combinaison de 5 chevaux.
+            Le moteur Pegasus analyse les {nb_base} dernières arrivées pour identifier les axes géométriques récurrents (ex: 1-9, 2-10) et optimiser votre combinaison de 5 ou 8 chevaux.
         </p>
 
         <div style="margin-bottom: 18px;">
             <div style="font-size: 0.9rem; color: var(--text-muted);">Synthèse Presse / Favoris :</div>
-            <div class="balls-container">
-                {html_synth_pmu}
-            </div>
+            <div class="balls-container">{html_synth_pmu}</div>
         </div>
 
         <div style="margin-bottom: 18px;">
             <div style="font-size: 0.9rem; color: var(--text-muted);">Pronostic Pegasus calculé automatiquement :</div>
-            <div class="balls-container">
-                {html_prono_balls}
-            </div>
+            <div class="balls-container">{html_prono_balls}</div>
         </div>
 
         {html_bloc_arrivee}
 
         <div style="margin-bottom: 18px;">
             <div style="font-size: 0.9rem; color: var(--text-muted);">Combinaison active / saisie :</div>
-            <div class="balls-container">
-                {html_combi_balls}
-            </div>
+            <div class="balls-container">{html_combi_balls}</div>
         </div>
 
         <div class="score-box">
@@ -796,7 +811,18 @@ def generer_html():
     <div class="card">
         <div class="card-title" style="text-align: center;">3. Test de Vision Géométrique (Grille 1–{nb_partants})</div>
         <p style="text-align: center; color: var(--text-muted); font-size: 0.85rem; margin-top: -8px; margin-bottom: 18px;">
-            Cliquez sur les numéros de la grille pour composer instantanément votre combinaison (5 chevaux max)
+            Cliquez sur les numéros de la grille pour composer instantanément votre combinaison (8 chevaux max)
+        </p>
+
+        <!-- NOUVEAU : Badge taux de réussite clignotant -->
+        <div class="taux-reussite-container">
+            <span class="taux-reussite-label"> Taux de réussite historique de votre sélection :</span>
+            <span class="taux-reussite-badge" style="background-color: {taux_couleur};">
+                {taux_reussite}% — {taux_label}
+            </span>
+        </div>
+        <p style="text-align: center; font-size: 0.75rem; color: var(--text-muted); margin-top: -12px; margin-bottom: 18px; font-style: italic;">
+            (Basé sur l'analyse de {nb_base} courses — % de courses contenant au moins 1 cheval de votre sélection dans le top 5)
         </p>
 
         <div class="grid-partants">
@@ -809,30 +835,28 @@ def generer_html():
 
 <script>
     const selectedNumbers = [];
-    const MAX_PARTANTS = {nb_partants};
+    const MAX_SELECTION = 8;
 
     function toggleNum(num) {{
         const btn = document.getElementById(`btn-${{num}}`);
         const index = selectedNumbers.indexOf(num);
-
         if (index > -1) {{
             selectedNumbers.splice(index, 1);
             btn.classList.remove('active');
         }} else {{
-            if (selectedNumbers.length >= 5) {{
-                alert("Vous ne pouvez sélectionner que 5 chevaux maximum.");
+            if (selectedNumbers.length >= MAX_SELECTION) {{
+                alert("Vous ne pouvez sélectionner que 8 chevaux maximum.");
                 return;
             }}
             selectedNumbers.push(num);
             btn.classList.add('active');
         }}
-
         document.getElementById('combinaison-input').value = selectedNumbers.join(' - ');
     }}
 
     function resetSelection() {{
         selectedNumbers.length = 0;
-        for (let i = 1; i <= MAX_PARTANTS; i++) {{
+        for (let i = 1; i <= {nb_partants}; i++) {{
             const btn = document.getElementById(`btn-${{i}}`);
             if (btn) btn.classList.remove('active');
         }}
