@@ -192,28 +192,16 @@ def generer_prono_automatique(combinaison_ref):
     return scores_candidats[0][1] if scores_candidats else valides[:taille_cible]
 
 # ==============================================================================
-# NOUVELLE FONCTION : Taux de réussite historique (Moyenne de chevaux trouvés)
+# FRÉQUENCES PAR CHEVAL (pour calcul temps réel en JS)
 # ==============================================================================
-def calculer_taux_couverture_historique(nums_saisis):
-    if not nums_saisis:
-        return 0.0, "Faible", "#e74c3c"
-    
-    nums_set = set(nums_saisis)
-    total_hits = 0
-    
+def calculer_frequences_par_cheval():
+    freq = Counter()
     for course in HISTORIQUE_COMPLET:
-        arrivee_set = set(course["arrivee"])
-        hits = len(nums_set & arrivee_set)
-        total_hits += hits
-    
-    moyenne_hits = total_hits / len(HISTORIQUE_COMPLET)
-    
-    if moyenne_hits >= 3:
-        return round(moyenne_hits, 2), "Très bon", "#2ecc71"
-    elif moyenne_hits >= 2:
-        return round(moyenne_hits, 2), "Bon", "#1abc9c"
-    else:
-        return round(moyenne_hits, 2), "Faible", "#e74c3c"
+        for num in course["arrivee"]:
+            freq[num] += 1
+    return dict(freq)
+
+FREQUENCES_CHEVAUX = calculer_frequences_par_cheval()
 
 # ==============================================================================
 # 3. ÉTAT DE L'APPLICATION
@@ -274,12 +262,13 @@ def _date_fr(iso):
         return ""
 
 def appliquer_donnees_auto(data):
-    global HISTORIQUE_COMPLET, POIDS_AXES_HISTORIQUE
+    global HISTORIQUE_COMPLET, POIDS_AXES_HISTORIQUE, FREQUENCES_CHEVAUX
     course = data.get("course_du_jour") or {}
     date_course = str(course.get("date") or "")
     nouvelles = [{"id": str(a.get("id", "")), "arrivee": a["arrivee"]} for a in data.get("nouvelles_arrivees", []) if _arrivee_valide(a.get("arrivee"), 20) and str(a.get("id", "")) != date_course]
     HISTORIQUE_COMPLET = HISTORIQUE_SGE_DATA + nouvelles
     POIDS_AXES_HISTORIQUE = calculer_poids_axes(HISTORIQUE_COMPLET)
+    FREQUENCES_CHEVAUX = calculer_frequences_par_cheval()
     if course.get("course_nom"):
         arr = course.get("arrivee")
         course_info["arrivee"] = list(arr) if _arrivee_affichable(arr) else []
@@ -333,11 +322,10 @@ def generer_html():
     score_prono = calculer_score_pegasus(nums_prono)
 
     nb_partants = int(course_info.get("partants") or 16)
-    nums_combi_grid = [n for n in nums_saisis if 1 <= n <= nb_partants][:8]
-    score_combi = calculer_score_pegasus(nums_combi_grid) if len(nums_combi_grid) >= 5 else 0
+    score_combi = calculer_score_pegasus(nums_saisis[:5]) if len(nums_saisis) >= 5 else 0
 
-    # NOUVEAU : Calcul du taux de réussite (tuple)
-    taux_reussite, taux_label, taux_couleur = calculer_taux_couverture_historique(nums_combi_grid)
+    # Exporter les fréquences en JSON pour le JavaScript
+    freq_json = json.dumps(FREQUENCES_CHEVAUX)
 
     arrivee = course_info.get("arrivee") or []
     date_txt = _date_fr(course_info.get("date"))
@@ -442,9 +430,8 @@ def generer_html():
         .diode-container {{ display: flex; align-items: center; margin-bottom: 5px; }}
         .diode {{ width: 8px; height: 8px; background-color: #2ecc71; border-radius: 50%; margin-right: 10px; box-shadow: 0 0 6px #2ecc71, 0 0 10px #2ecc71; animation: blink 1.5s ease-in-out infinite; }}
         @keyframes blink {{ 0%, 100% {{ opacity: 1; transform: scale(1); }} 50% {{ opacity: 0.4; transform: scale(0.8); }} }}
-        
         .taux-reussite-container {{ display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 18px; padding: 12px; background: var(--input-bg); border-radius: 10px; border: 1px solid var(--border-color); flex-wrap: wrap; }}
-        .taux-reussite-badge {{ display: inline-flex; align-items: center; gap: 8px; padding: 8px 18px; border-radius: 25px; font-weight: bold; font-size: 1.1rem; color: #000; animation: pulse-taux 1.8s ease-in-out infinite; box-shadow: 0 0 15px currentColor; }}
+        .taux-reussite-badge {{ display: inline-flex; align-items: center; gap: 8px; padding: 8px 18px; border-radius: 25px; font-weight: bold; font-size: 1.1rem; color: #000; animation: pulse-taux 1.8s ease-in-out infinite; box-shadow: 0 0 15px currentColor; transition: all 0.3s ease; }}
         .taux-reussite-label {{ font-size: 0.85rem; color: var(--text-muted); font-weight: normal; }}
         @keyframes pulse-taux {{ 0%, 100% {{ opacity: 1; transform: scale(1); box-shadow: 0 0 10px currentColor; }} 50% {{ opacity: 0.75; transform: scale(1.05); box-shadow: 0 0 25px currentColor; }} }}
     </style>
@@ -505,13 +492,13 @@ def generer_html():
     <div class="card">
         <div class="card-title" style="text-align: center;">3. Test de Vision Géométrique (Grille 1–{nb_partants})</div>
         <p style="text-align: center; color: var(--text-muted); font-size: 0.85rem; margin-top: -8px; margin-bottom: 18px;">
-            Cliquez sur les numéros de la grille pour composer instantanément votre combinaison (8 chevaux max)
+            Cliquez sur les numéros de la grille pour composer instantanément votre combinaison (8 chevaux max) — outil de test indépendant
         </p>
 
         <div class="taux-reussite-container">
-            <span class="taux-reussite-label"> Chevaux trouvés en moyenne dans le top 5 historique :</span>
-            <span class="taux-reussite-badge" style="background-color: {taux_couleur};">
-                {taux_reussite} chevaux — {taux_label}
+            <span class="taux-reussite-label">📊 Chevaux trouvés en moyenne dans le top 5 historique :</span>
+            <span id="taux-badge" class="taux-reussite-badge" style="background-color: #e74c3c;">
+                0.00 chevaux — Faible
             </span>
         </div>
         <p style="text-align: center; font-size: 0.75rem; color: var(--text-muted); margin-top: -12px; margin-bottom: 18px; font-style: italic;">
@@ -528,6 +515,40 @@ def generer_html():
 <script>
     const selectedNumbers = [];
     const MAX_SELECTION = 8;
+    const NB_COURSES = {nb_base};
+    
+    // Fréquences de chaque cheval dans le top 5 historique
+    const FREQUENCES = {freq_json};
+    
+    // Calcul du taux en temps réel (indépendant du formulaire)
+    function calculerTauxReussite() {{
+        if (selectedNumbers.length === 0) {{
+            return {{ valeur: "0.00", label: "Faible", couleur: "#e74c3c" }};
+        }}
+        let totalHits = 0;
+        selectedNumbers.forEach(num => {{
+            totalHits += FREQUENCES[num] || 0;
+        }});
+        const moyenne = totalHits / NB_COURSES;
+        
+        if (moyenne >= 3) {{
+            return {{ valeur: moyenne.toFixed(2), label: "Très bon", couleur: "#2ecc71" }};
+        }} else if (moyenne >= 2) {{
+            return {{ valeur: moyenne.toFixed(2), label: "Bon", couleur: "#1abc9c" }};
+        }} else {{
+            return {{ valeur: moyenne.toFixed(2), label: "Faible", couleur: "#e74c3c" }};
+        }}
+    }}
+    
+    // Met à jour le badge en temps réel
+    function mettreAJourBadge() {{
+        const resultat = calculerTauxReussite();
+        const badge = document.getElementById('taux-badge');
+        if (badge) {{
+            badge.style.backgroundColor = resultat.couleur;
+            badge.textContent = resultat.valeur + ' chevaux — ' + resultat.label;
+        }}
+    }}
 
     function toggleNum(num) {{
         const btn = document.getElementById(`btn-${{num}}`);
@@ -543,7 +564,10 @@ def generer_html():
             selectedNumbers.push(num);
             btn.classList.add('active');
         }}
+        // Met à jour le champ combinaison (pour info seulement)
         document.getElementById('combinaison-input').value = selectedNumbers.join(' - ');
+        // Met à jour le badge de la grille (indépendant)
+        mettreAJourBadge();
     }}
 
     function resetSelection() {{
@@ -553,6 +577,7 @@ def generer_html():
             if (btn) btn.classList.remove('active');
         }}
         document.getElementById('combinaison-input').value = '';
+        mettreAJourBadge();  // Réinitialise le badge à "0.00 chevaux — Faible"
     }}
 
     function formaterAvecTirets(e) {{
