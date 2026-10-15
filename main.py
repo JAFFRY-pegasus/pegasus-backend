@@ -422,12 +422,11 @@ def generer_html():
     }}
     </script>
     <style>
-        :root {{ --bg-color: #0d0f12; --card-bg: #161920; --accent-orange: #f39c12; --accent-teal: #1abc9c; --text-main: #f5f6fa; --text-muted: #95a5a6; --border-color: #2c3e50; --input-bg: #1e222b; }}
+        :root {{ --bg-color: #0d0f12; --card-bg: rgba(22, 25, 32, 0.92); --accent-orange: #f39c12; --accent-teal: #1abc9c; --text-main: #f5f6fa; --text-muted: #c0c8d0; --border-color: #2c3e50; --input-bg: rgba(30, 34, 43, 0.95); }}
         
-        /* NOUVEAU : Fond d'image de course hippique */
+        /* NOUVEAU : Fond d'image avec chevaux sur les côtés, centre libre */
         body {{
             font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--bg-color);
             color: var(--text-main);
             margin: 0;
             padding: 30px 15px;
@@ -436,9 +435,17 @@ def generer_html():
             flex-direction: column;
             align-items: center;
             position: relative;
+            min-height: 100vh;
+            background-color: var(--bg-color);
+            /* Image de course hippique avec chevaux sur les côtés et centre libre */
+            background-image: url('https://images.unsplash.com/photo-1534068590799-09895a701e3e?w=1920&q=80');
+            background-size: cover;
+            background-position: center bottom;
+            background-attachment: fixed;
+            background-repeat: no-repeat;
         }}
         
-        /* Overlay sombre pour la lisibilité */
+        /* Overlay sombre pour la lisibilité — réduit pour mieux voir l'image */
         body::before {{
             content: '';
             position: fixed;
@@ -446,20 +453,21 @@ def generer_html():
             left: 0;
             width: 100%;
             height: 100%;
-            background-image: url('https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?w=1920&q=80');
-            background-size: cover;
-            background-position: center;
-            background-attachment: fixed;
-            opacity: 0.15;
+            background: linear-gradient(
+                to bottom,
+                rgba(13, 15, 18, 0.55) 0%,
+                rgba(13, 15, 18, 0.45) 50%,
+                rgba(13, 15, 18, 0.60) 100%
+            );
             z-index: -1;
         }}
         
         .container {{ width: 100%; max-width: 820px; position: relative; z-index: 1; }}
         header {{ text-align: center; margin-bottom: 30px; }}
-        header h1 {{ color: var(--accent-orange); margin: 0; font-size: 2.2rem; letter-spacing: 1.5px; text-transform: uppercase; }}
-        header p {{ color: var(--text-muted); margin-top: 8px; font-size: 0.95rem; }}
-        .mission-statement {{ font-size: 0.85rem !important; color: var(--text-muted) !important; font-style: italic; margin-top: 12px !important; max-width: 620px; margin-left: auto; margin-right: auto; line-height: 1.5; border-left: 3px solid var(--accent-orange); padding-left: 14px; text-align: left; }}
-        .card {{ background-color: var(--card-bg); border-radius: 12px; padding: 24px; margin-bottom: 22px; border: 1px solid var(--border-color); box-shadow: 0 8px 16px rgba(0,0,0,0.4); }}
+        header h1 {{ color: var(--accent-orange); margin: 0; font-size: 2.2rem; letter-spacing: 1.5px; text-transform: uppercase; text-shadow: 2px 2px 10px rgba(0,0,0,0.9); }}
+        header p {{ color: var(--text-main); margin-top: 8px; font-size: 0.95rem; text-shadow: 1px 1px 5px rgba(0,0,0,0.9); }}
+        .mission-statement {{ font-size: 0.85rem !important; color: var(--text-main) !important; font-style: italic; margin-top: 12px !important; max-width: 620px; margin-left: auto; margin-right: auto; line-height: 1.5; border-left: 3px solid var(--accent-orange); padding-left: 14px; text-align: left; text-shadow: 1px 1px 5px rgba(0,0,0,0.9); }}
+        .card {{ background-color: var(--card-bg); border-radius: 12px; padding: 24px; margin-bottom: 22px; border: 1px solid var(--border-color); box-shadow: 0 8px 24px rgba(0,0,0,0.6); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }}
         .card-title {{ color: var(--accent-orange); font-size: 1.1rem; font-weight: 700; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 18px; text-transform: uppercase; letter-spacing: 0.5px; }}
         .form-grid {{ display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 15px; }}
         .form-group label {{ display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 5px; font-weight: 600; }}
@@ -492,7 +500,7 @@ def generer_html():
         @keyframes pulse-taux {{ 0%, 100% {{ opacity: 1; transform: scale(1); box-shadow: 0 0 10px currentColor; }} 50% {{ opacity: 0.75; transform: scale(1.05); box-shadow: 0 0 25px currentColor; }} }}
         
         .top3-info {{
-            background: linear-gradient(135deg, rgba(243, 156, 18, 0.08), rgba(26, 188, 156, 0.08));
+            background: linear-gradient(135deg, rgba(243, 156, 18, 0.15), rgba(26, 188, 156, 0.15));
             border: 1px solid var(--border-color);
             border-left: 4px solid var(--accent-orange);
             border-radius: 10px;
@@ -500,7 +508,7 @@ def generer_html():
             margin-bottom: 18px;
             text-align: center;
         }}
-        .top3-label {{ display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 10px; font-style: italic; }}
+        .top3-label {{ display: block; font-size: 0.85rem; color: var(--text-main); margin-bottom: 10px; font-style: italic; }}
         .top3-balls {{ display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; }}
         .top3-ball {{
             background-color: var(--accent-orange);
@@ -518,15 +526,18 @@ def generer_html():
             margin-top: 40px;
             padding: 25px 20px;
             border-top: 1px solid var(--border-color);
-            color: var(--text-muted);
+            color: var(--text-main);
             font-size: 0.8rem;
             width: 100%;
             max-width: 820px;
+            background: rgba(13, 15, 18, 0.85);
+            border-radius: 12px;
+            backdrop-filter: blur(10px);
         }}
         .footer-prevention strong {{ color: #e74c3c; }}
         .footer-prevention a {{ color: var(--accent-teal); text-decoration: none; font-weight: 600; }}
         .footer-prevention a:hover {{ text-decoration: underline; }}
-        .footer-disclaimer {{ font-size: 0.75rem; opacity: 0.7; margin-top: 12px; font-style: italic; }}
+        .footer-disclaimer {{ font-size: 0.75rem; opacity: 0.8; margin-top: 12px; font-style: italic; }}
     </style>
 </head>
 <body>
