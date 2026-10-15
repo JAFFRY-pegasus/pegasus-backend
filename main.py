@@ -342,7 +342,7 @@ def generer_html():
         p3 = round(100 * f3 / nb_base, 1)
         html_top3 = f"""
         <div class="top3-info">
-            <span class="top3-label">📊 À ce jour, la base de données des quintés nous indique que les chevaux les plus fréquemment présents dans le top 5 sont :</span>
+            <span class="top3-label"> À ce jour, la base de données des quintés nous indique que les chevaux les plus fréquemment présents dans le top 5 sont :</span>
             <div class="top3-balls">
                 <span class="top3-ball">n°{n1} <small>({f1} fois — {p1}%)</small></span>
                 <span class="top3-ball">n°{n2} <small>({f2} fois — {p2}%)</small></span>
@@ -424,7 +424,6 @@ def generer_html():
     <style>
         :root {{ --bg-color: #0d0f12; --card-bg: rgba(22, 25, 32, 0.92); --accent-orange: #f39c12; --accent-teal: #1abc9c; --text-main: #f5f6fa; --text-muted: #c0c8d0; --border-color: #2c3e50; --input-bg: rgba(30, 34, 43, 0.95); }}
         
-        /* NOUVEAU : Fond d'image avec chevaux sur les côtés, centre libre */
         body {{
             font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             color: var(--text-main);
@@ -437,15 +436,13 @@ def generer_html():
             position: relative;
             min-height: 100vh;
             background-color: var(--bg-color);
-            /* Image de course hippique avec chevaux sur les côtés et centre libre */
-            background-image: url('https://images.unsplash.com/photo-1534068590799-09895a701e3e?w=1920&q=80');
+            background-image: url('https://images.unsplash.com/photo-1509914398892-963f53e6e2f4?w=1920&q=80');
             background-size: cover;
             background-position: center bottom;
             background-attachment: fixed;
             background-repeat: no-repeat;
         }}
         
-        /* Overlay sombre pour la lisibilité — réduit pour mieux voir l'image */
         body::before {{
             content: '';
             position: fixed;
