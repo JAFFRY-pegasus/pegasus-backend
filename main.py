@@ -304,14 +304,37 @@ def page_visiteur():
     rafraichir_donnees()
     return generer_html()
 
-# ==============================================================================
-# NOUVEL ENDPOINT : FORCER L'ACTUALISATION
-# ==============================================================================
 @app.get("/refresh", response_class=HTMLResponse)
 def forcer_actualisation():
-    """Force le rechargement des données depuis GitHub puis affiche la page"""
     rafraichir_donnees(force=True)
     return generer_html()
+
+# ==============================================================================
+# NOUVEL ENDPOINT : DÉCLENCHER LE WORKFLOW GITHUB
+# ==============================================================================
+@app.get("/trigger-workflow", response_class=HTMLResponse)
+def declencher_robot():
+    """Déclenche le workflow GitHub Actions 'quinte.yml' via l'API GitHub"""
+    token = os.getenv("GITHUB_TOKEN")
+    repo = os.getenv("GITHUB_REPOSITORY", "JAFFRY-pegasus/pegasus-backend")
+    
+    if not token:
+        return generer_html(message="❌ Erreur : La variable GITHUB_TOKEN n'est pas configurée sur Vercel.")
+
+    url = f"https://api.github.com/repos/{repo}/actions/workflows/quinte.yml/dispatches"
+    headers = {
+        "Authorization": f"token {token}",
+        "Accept": "application/vnd.github.v3+json"
+    }
+    payload = {"ref": "main"}
+
+    try:
+        r = requests.post(url, headers=headers, json=payload, timeout=10)
+        r.raise_for_status()
+        rafraichir_donnees(force=True)
+        return generer_html(message="✅ Le robot Pegasus a été déclenché avec succès ! Les nouvelles données seront disponibles dans 1 à 2 minutes.")
+    except Exception as e:
+        return generer_html(message=f"❌ Erreur lors du déclenchement du robot : {e}")
 
 @app.post("/update", response_class=HTMLResponse)
 def mettre_a_jour(hippodrome: str = Form(""), discipline: str = Form(""), course_nom: str = Form(""), distance: str = Form(""), partants: str = Form(""), heure: str = Form(""), synthesis_pmu: str = Form(""), combinaison: str = Form("")):
@@ -326,7 +349,7 @@ def mettre_a_jour(hippodrome: str = Form(""), discipline: str = Form(""), course
     if combinaison.strip(): course_info["combinaison"] = combinaison
     return generer_html()
 
-def generer_html():
+def generer_html(message=None):
     raw_str = course_info["combinaison"]
     maj_txt = str(donnees_auto["derniere_maj"] or "jamais").replace("T", " ")[:16]
     nb_base = len(HISTORIQUE_COMPLET)
@@ -361,6 +384,18 @@ def generer_html():
         """
     else:
         html_top3 = ""
+
+    # Gestion du message de confirmation/erreur
+    html_message = ""
+    if message:
+        is_error = "❌" in message
+        bg_color = "rgba(231, 76, 60, 0.2)" if is_error else "rgba(46, 204, 113, 0.2)"
+        border_color = "#e74c3c" if is_error else "#2ecc71"
+        html_message = f"""
+        <div class="status-banner" style="background: {bg_color}; border: 1px solid {border_color}; color: var(--text-main); padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; text-align: center; font-weight: bold; backdrop-filter: blur(5px);">
+            {message}
+        </div>
+        """
 
     arrivee = course_info.get("arrivee") or []
     date_txt = _date_fr(course_info.get("date"))
@@ -527,12 +562,17 @@ def generer_html():
         }}
         .top3-ball small {{ font-weight: normal; font-size: 0.75rem; opacity: 0.85; margin-left: 4px; }}
         
-        /* NOUVEAU : Bouton d'actualisation dans le header */
+        .header-actions {{
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }}
         .refresh-btn {{
             display: inline-flex;
             align-items: center;
             gap: 8px;
-            margin-top: 15px;
             padding: 10px 22px;
             background: linear-gradient(135deg, var(--accent-teal), #16a085);
             color: #000;
@@ -549,13 +589,31 @@ def generer_html():
             transform: translateY(-2px);
             box-shadow: 0 6px 16px rgba(26, 188, 156, 0.6);
         }}
-        .refresh-btn .icon {{
-            display: inline-block;
-            transition: transform 0.5s ease;
+        .refresh-btn .icon {{ display: inline-block; transition: transform 0.5s ease; }}
+        .refresh-btn:hover .icon {{ transform: rotate(180deg); }}
+        
+        .robot-btn {{
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 22px;
+            background: linear-gradient(135deg, #8e44ad, #9b59b6);
+            color: #fff;
+            border: none;
+            border-radius: 25px;
+            font-size: 0.9rem;
+            font-weight: bold;
+            cursor: pointer;
+            text-decoration: none;
+            box-shadow: 0 4px 12px rgba(142, 68, 173, 0.4);
+            transition: all 0.3s ease;
         }}
-        .refresh-btn:hover .icon {{
-            transform: rotate(180deg);
+        .robot-btn:hover {{
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(142, 68, 173, 0.6);
         }}
+        .robot-btn .icon {{ display: inline-block; transition: transform 0.5s ease; }}
+        .robot-btn:hover .icon {{ transform: rotate(360deg); }}
         
         .footer-prevention {{
             text-align: center;
@@ -585,11 +643,17 @@ def generer_html():
         <p class="mission-statement">"{mission}"</p>
         <p style="font-size:0.8rem;">Base : {nb_base} quintés (dont {nb_auto} ajoutés automatiquement) · Dernière mise à jour PMU : {maj_txt}</p>
         
-        <!-- NOUVEAU : Bouton d'actualisation manuelle -->
-        <a href="/refresh" class="refresh-btn" title="Forcer le rechargement des données depuis GitHub">
-            <span class="icon">🔄</span> Actualiser les données
-        </a>
+        <div class="header-actions">
+            <a href="/refresh" class="refresh-btn" title="Forcer le rechargement des données depuis GitHub">
+                <span class="icon">🔄</span> Actualiser les données
+            </a>
+            <a href="/trigger-workflow" class="robot-btn" title="Déclencher le robot GitHub pour aller chercher les nouvelles courses">
+                <span class="icon">🤖</span> Relancer le robot
+            </a>
+        </div>
     </header>
+
+    {html_message}
 
     <form action="/update" method="post">
         <div class="card">
@@ -641,7 +705,7 @@ def generer_html():
         </p>
 
         <div class="taux-reussite-container">
-            <span class="taux-reussite-label"> Chevaux trouvés en moyenne dans le top 5 historique :</span>
+            <span class="taux-reussite-label">📊 Chevaux trouvés en moyenne dans le top 5 historique :</span>
             <span id="taux-badge" class="taux-reussite-badge" style="background-color: #e74c3c;">
                 0.00 chevaux — Faible
             </span>
