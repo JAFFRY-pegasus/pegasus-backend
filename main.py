@@ -191,9 +191,6 @@ def generer_prono_automatique(combinaison_ref):
     scores_candidats.sort(key=lambda x: x[0], reverse=True)
     return scores_candidats[0][1] if scores_candidats else valides[:taille_cible]
 
-# ==============================================================================
-# FRÉQUENCES PAR CHEVAL
-# ==============================================================================
 def calculer_frequences_par_cheval():
     freq = Counter()
     for course in HISTORIQUE_COMPLET:
@@ -460,7 +457,7 @@ def generer_html(message=None):
     <style>
         :root {{ --bg-color: #0d0f12; --card-bg: rgba(22, 25, 32, 0.92); --accent-orange: #f39c12; --accent-teal: #1abc9c; --text-main: #f5f6fa; --text-muted: #c0c8d0; --border-color: #2c3e50; --input-bg: rgba(30, 34, 43, 0.95); }}
         
-        /* NOUVEAU : Vidéo de fond en boucle */
+        /* Vidéo de fond en boucle */
         .bg-video {{
             position: fixed;
             top: 50%;
@@ -472,8 +469,22 @@ def generer_html(message=None):
             transform: translateX(-50%) translateY(-50%);
             z-index: -2;
             object-fit: cover;
-            opacity: 0.25;
-            filter: brightness(0.4) contrast(1.1);
+            opacity: 0.30;
+            filter: brightness(0.5) contrast(1.1);
+        }}
+        
+        /* Image de fond de secours (si la vidéo ne charge pas) */
+        .bg-fallback {{
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -3;
+            background-image: url('https://images.unsplash.com/photo-1509914398892-963f53e6e2f4?w=1920&q=80');
+            background-size: cover;
+            background-position: center bottom;
+            background-repeat: no-repeat;
         }}
         
         body {{
@@ -500,9 +511,9 @@ def generer_html(message=None):
             height: 100%;
             background: linear-gradient(
                 to bottom,
-                rgba(13, 15, 18, 0.75) 0%,
-                rgba(13, 15, 18, 0.65) 50%,
-                rgba(13, 15, 18, 0.80) 100%
+                rgba(13, 15, 18, 0.70) 0%,
+                rgba(13, 15, 18, 0.60) 50%,
+                rgba(13, 15, 18, 0.75) 100%
             );
             z-index: -1;
         }}
@@ -640,9 +651,14 @@ def generer_html(message=None):
 </head>
 <body>
 
-<!-- NOUVEAU : Vidéo de fond en boucle -->
-<video autoplay muted loop playsinline class="bg-video">
-    <source src="https://videos.pexels.com/video-files/854638/854638-hd_1920_1080_25fps.mp4" type="video/mp4">
+<!-- Image de fond de secours (toujours chargée en premier) -->
+<div class="bg-fallback"></div>
+
+<!-- Vidéo de fond en boucle avec plusieurs sources -->
+<video autoplay muted loop playsinline class="bg-video" poster="https://images.unsplash.com/photo-1509914398892-963f53e6e2f4?w=1920&q=80">
+    <source src="https://cdn.pixabay.com/video/2020/05/25/40130-424933632_large.mp4" type="video/mp4">
+    <source src="https://cdn.pixabay.com/video/2019/10/07/27924-364579643_large.mp4" type="video/mp4">
+    Votre navigateur ne supporte pas la lecture de vidéos.
 </video>
 
 <div class="container">
