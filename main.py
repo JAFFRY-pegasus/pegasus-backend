@@ -309,25 +309,18 @@ def forcer_actualisation():
     rafraichir_donnees(force=True)
     return generer_html()
 
-# ==============================================================================
-# NOUVEL ENDPOINT : DÉCLENCHER LE WORKFLOW GITHUB
-# ==============================================================================
 @app.get("/trigger-workflow", response_class=HTMLResponse)
 def declencher_robot():
-    """Déclenche le workflow GitHub Actions 'quinte.yml' via l'API GitHub"""
     token = os.getenv("GITHUB_TOKEN")
     repo = os.getenv("GITHUB_REPOSITORY", "JAFFRY-pegasus/pegasus-backend")
-    
     if not token:
         return generer_html(message="❌ Erreur : La variable GITHUB_TOKEN n'est pas configurée sur Vercel.")
-
     url = f"https://api.github.com/repos/{repo}/actions/workflows/quinte.yml/dispatches"
     headers = {
         "Authorization": f"token {token}",
         "Accept": "application/vnd.github.v3+json"
     }
     payload = {"ref": "main"}
-
     try:
         r = requests.post(url, headers=headers, json=payload, timeout=10)
         r.raise_for_status()
@@ -385,7 +378,6 @@ def generer_html(message=None):
     else:
         html_top3 = ""
 
-    # Gestion du message de confirmation/erreur
     html_message = ""
     if message:
         is_error = "❌" in message
@@ -468,6 +460,22 @@ def generer_html(message=None):
     <style>
         :root {{ --bg-color: #0d0f12; --card-bg: rgba(22, 25, 32, 0.92); --accent-orange: #f39c12; --accent-teal: #1abc9c; --text-main: #f5f6fa; --text-muted: #c0c8d0; --border-color: #2c3e50; --input-bg: rgba(30, 34, 43, 0.95); }}
         
+        /* NOUVEAU : Vidéo de fond en boucle */
+        .bg-video {{
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            min-width: 100%;
+            min-height: 100%;
+            width: auto;
+            height: auto;
+            transform: translateX(-50%) translateY(-50%);
+            z-index: -2;
+            object-fit: cover;
+            opacity: 0.25;
+            filter: brightness(0.4) contrast(1.1);
+        }}
+        
         body {{
             font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             color: var(--text-main);
@@ -480,13 +488,9 @@ def generer_html(message=None):
             position: relative;
             min-height: 100vh;
             background-color: var(--bg-color);
-            background-image: url('https://images.unsplash.com/photo-1509914398892-963f53e6e2f4?w=1920&q=80');
-            background-size: cover;
-            background-position: center bottom;
-            background-attachment: fixed;
-            background-repeat: no-repeat;
         }}
         
+        /* Overlay sombre par-dessus la vidéo */
         body::before {{
             content: '';
             position: fixed;
@@ -496,9 +500,9 @@ def generer_html(message=None):
             height: 100%;
             background: linear-gradient(
                 to bottom,
-                rgba(13, 15, 18, 0.55) 0%,
-                rgba(13, 15, 18, 0.45) 50%,
-                rgba(13, 15, 18, 0.60) 100%
+                rgba(13, 15, 18, 0.75) 0%,
+                rgba(13, 15, 18, 0.65) 50%,
+                rgba(13, 15, 18, 0.80) 100%
             );
             z-index: -1;
         }}
@@ -635,6 +639,11 @@ def generer_html(message=None):
     </style>
 </head>
 <body>
+
+<!-- NOUVEAU : Vidéo de fond en boucle -->
+<video autoplay muted loop playsinline class="bg-video">
+    <source src="https://videos.pexels.com/video-files/854638/854638-hd_1920_1080_25fps.mp4" type="video/mp4">
+</video>
 
 <div class="container">
     <header>
