@@ -304,6 +304,15 @@ def page_visiteur():
     rafraichir_donnees()
     return generer_html()
 
+# ==============================================================================
+# NOUVEL ENDPOINT : FORCER L'ACTUALISATION
+# ==============================================================================
+@app.get("/refresh", response_class=HTMLResponse)
+def forcer_actualisation():
+    """Force le rechargement des données depuis GitHub puis affiche la page"""
+    rafraichir_donnees(force=True)
+    return generer_html()
+
 @app.post("/update", response_class=HTMLResponse)
 def mettre_a_jour(hippodrome: str = Form(""), discipline: str = Form(""), course_nom: str = Form(""), distance: str = Form(""), partants: str = Form(""), heure: str = Form(""), synthesis_pmu: str = Form(""), combinaison: str = Form("")):
     rafraichir_donnees()
@@ -342,7 +351,7 @@ def generer_html():
         p3 = round(100 * f3 / nb_base, 1)
         html_top3 = f"""
         <div class="top3-info">
-            <span class="top3-label"> À ce jour, la base de données des quintés nous indique que les chevaux les plus fréquemment présents dans le top 5 sont :</span>
+            <span class="top3-label">📊 À ce jour, la base de données des quintés nous indique que les chevaux les plus fréquemment présents dans le top 5 sont :</span>
             <div class="top3-balls">
                 <span class="top3-ball">n°{n1} <small>({f1} fois — {p1}%)</small></span>
                 <span class="top3-ball">n°{n2} <small>({f2} fois — {p2}%)</small></span>
@@ -518,6 +527,36 @@ def generer_html():
         }}
         .top3-ball small {{ font-weight: normal; font-size: 0.75rem; opacity: 0.85; margin-left: 4px; }}
         
+        /* NOUVEAU : Bouton d'actualisation dans le header */
+        .refresh-btn {{
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 15px;
+            padding: 10px 22px;
+            background: linear-gradient(135deg, var(--accent-teal), #16a085);
+            color: #000;
+            border: none;
+            border-radius: 25px;
+            font-size: 0.9rem;
+            font-weight: bold;
+            cursor: pointer;
+            text-decoration: none;
+            box-shadow: 0 4px 12px rgba(26, 188, 156, 0.4);
+            transition: all 0.3s ease;
+        }}
+        .refresh-btn:hover {{
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(26, 188, 156, 0.6);
+        }}
+        .refresh-btn .icon {{
+            display: inline-block;
+            transition: transform 0.5s ease;
+        }}
+        .refresh-btn:hover .icon {{
+            transform: rotate(180deg);
+        }}
+        
         .footer-prevention {{
             text-align: center;
             margin-top: 40px;
@@ -545,6 +584,11 @@ def generer_html():
         <p>Analyseur Géométrique d'Axes & Stratégie Quinté+</p>
         <p class="mission-statement">"{mission}"</p>
         <p style="font-size:0.8rem;">Base : {nb_base} quintés (dont {nb_auto} ajoutés automatiquement) · Dernière mise à jour PMU : {maj_txt}</p>
+        
+        <!-- NOUVEAU : Bouton d'actualisation manuelle -->
+        <a href="/refresh" class="refresh-btn" title="Forcer le rechargement des données depuis GitHub">
+            <span class="icon">🔄</span> Actualiser les données
+        </a>
     </header>
 
     <form action="/update" method="post">
@@ -597,7 +641,7 @@ def generer_html():
         </p>
 
         <div class="taux-reussite-container">
-            <span class="taux-reussite-label">📊 Chevaux trouvés en moyenne dans le top 5 historique :</span>
+            <span class="taux-reussite-label"> Chevaux trouvés en moyenne dans le top 5 historique :</span>
             <span id="taux-badge" class="taux-reussite-badge" style="background-color: #e74c3c;">
                 0.00 chevaux — Faible
             </span>
