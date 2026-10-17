@@ -1,5 +1,5 @@
 {
-  "derniere_maj": "2026-10-17T13:42:09+02:00",
+  "derniere_maj": "2026-10-17T14:16:58+02:00",
   "course_du_jour": {
     "date": "2026-10-17",
     "hippodrome": "AUTEUIL",
@@ -11,22 +11,22 @@
     "favoris_cotes": [
       6,
       2,
-      19,
       12,
+      19,
       11,
       5,
-      1,
-      7
+      7,
+      1
     ],
     "synthese_pmu": [
       6,
       2,
-      19,
       12,
+      19,
       11,
       5,
-      1,
-      7
+      7,
+      1
     ],
     "combinaison": [],
     "arrivee": [],
