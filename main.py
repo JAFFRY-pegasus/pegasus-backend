@@ -608,4 +608,197 @@ def generer_html(message=None):
         .top3-ball {{ background-color: var(--accent-orange); color: #000; padding: 6px 14px; border-radius: 20px; font-weight: bold; font-size: 0.95rem; box-shadow: 0 2px 6px rgba(243, 156, 18, 0.3); }}
         .top3-ball small {{ font-weight: normal; font-size: 0.75rem; opacity: 0.85; margin-left: 4px; }}
         .header-actions {{ display: flex; justify-content: center; gap: 15px; margin-top: 20px; flex-wrap: wrap; }}
-        .refresh-btn {{ display: inline-flex; align-items: center; gap: 8px; padding: 10px 22px; background: linear-gradient(135deg, var(--accent-teal), #16a085); color: #000; border: none; border-radius: 25px; font-size: 0.9rem; font-weight: bold;
+        .refresh-btn {{ display: inline-flex; align-items: center; gap: 8px; padding: 10px 22px; background: linear-gradient(135deg, var(--accent-teal), #16a085); color: #000; border: none; border-radius: 25px; font-size: 0.9rem; font-weight: bold; cursor: pointer; text-decoration: none; box-shadow: 0 4px 12px rgba(26, 188, 156, 0.4); transition: all 0.3s ease; }}
+        .refresh-btn:hover {{ transform: translateY(-2px); box-shadow: 0 6px 16px rgba(26, 188, 156, 0.6); }}
+        .refresh-btn .icon {{ display: inline-block; transition: transform 0.5s ease; }}
+        .refresh-btn:hover .icon {{ transform: rotate(180deg); }}
+        .robot-btn {{ display: inline-flex; align-items: center; gap: 8px; padding: 10px 22px; background: linear-gradient(135deg, #8e44ad, #9b59b6); color: #fff; border: none; border-radius: 25px; font-size: 0.9rem; font-weight: bold; cursor: pointer; text-decoration: none; box-shadow: 0 4px 12px rgba(142, 68, 173, 0.4); transition: all 0.3s ease; }}
+        .robot-btn:hover {{ transform: translateY(-2px); box-shadow: 0 6px 16px rgba(142, 68, 173, 0.6); }}
+        .robot-btn .icon {{ display: inline-block; transition: transform 0.5s ease; }}
+        .robot-btn:hover .icon {{ transform: rotate(360deg); }}
+        .footer-prevention {{ text-align: center; margin-top: 40px; padding: 25px 20px; border-top: 1px solid var(--border-color); color: var(--text-main); font-size: 0.8rem; width: 100%; max-width: 820px; background: rgba(13, 15, 18, 0.85); border-radius: 12px; backdrop-filter: blur(10px); }}
+        .footer-prevention strong {{ color: #e74c3c; }}
+        .footer-prevention a {{ color: var(--accent-teal); text-decoration: none; font-weight: 600; }}
+        .footer-prevention a:hover {{ text-decoration: underline; }}
+        .footer-disclaimer {{ font-size: 0.75rem; opacity: 0.8; margin-top: 12px; font-style: italic; }}
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>PEGASUS QUINTÉ</h1>
+        <p>Analyseur Géométrique d'Axes & Stratégie Quinté+</p>
+        <p class="mission-statement">"{mission}"</p>
+        <p style="font-size:0.8rem;">Base : {nb_base} quintés (dont {nb_auto} ajoutés automatiquement) · Dernière mise à jour PMU : {maj_txt}</p>
+        <div class="header-actions">
+            <a href="/refresh" class="refresh-btn" title="Forcer le rechargement des données depuis GitHub">
+                <span class="icon">🔄</span> Actualiser les données
+            </a>
+            <a href="/trigger-workflow" class="robot-btn" title="Déclencher le robot GitHub">
+                <span class="icon">🤖</span> Relancer le robot
+            </a>
+        </div>
+    </header>
+
+    {html_message}
+
+    <form action="/update" method="post">
+        <div class="card">
+            <div class="card-title">1. Informations sur le Quinté du Jour</div>
+            {html_non_partants_auto}
+            <div class="form-grid">
+                <div class="form-group full-width">
+                    <label> Date de la course (automatique) :</label>
+                    <input type="text" value="{h_date}" placeholder="{default_values['date']}" readonly>
+                </div>
+                <div class="form-group"><label>Hippodrome :</label><input type="text" name="hippodrome" value="{h_hippo}" placeholder="{default_values['hippodrome']}"></div>
+                <div class="form-group"><label>Discipline :</label><input type="text" name="discipline" value="{h_disc}" placeholder="{default_values['discipline']}"></div>
+                <div class="form-group"><label>Nom de la course :</label><input type="text" name="course_nom" value="{h_nom}" placeholder="{default_values['course_nom']}"></div>
+                <div class="form-group"><label>Distance :</label><input type="text" name="distance" value="{h_dist}" placeholder="{default_values['distance']}"></div>
+                <div class="form-group"><label>Nombre de partants déclarés :</label><input type="text" name="partants" value="{h_part}" placeholder="{default_values['partants']}"></div>
+                <div class="form-group"><label>Heure de départ :</label><input type="text" name="heure" value="{h_heure}" placeholder="{default_values['heure']}"></div>
+                <div class="form-group full-width"><label>Synthèse Presse / Favoris (séparés par tirets) :</label><input type="text" id="synthesis-input" name="synthesis_pmu" value="{h_synth}" placeholder="{default_values['synthesis_pmu']}"></div>
+            </div>
+            <div style="margin-top: 12px;">
+                <div class="diode-container">
+                    <span class="diode"></span>
+                    <label style="font-size: 0.85rem; color: var(--text-muted); font-weight: 600;">Inscrivez ici la combinaison de votre choix de 5 à 8 chevaux, elle générera automatiquement la combinaison optimisée de PEGASUS !</label>
+                </div>
+                <input type="text" id="combinaison-input" name="combinaison" value="{h_comb}" placeholder="{default_values['combinaison']}" style="width:100%; padding:10px; background-color:var(--input-bg); border:1px solid var(--border-color); color:#fff; border-radius:8px; box-sizing:border-box; font-size: 0.95rem;">
+            </div>
+            <button type="submit" class="action-btn">Mettre à jour & Recalculer</button>
+        </div>
+    </form>
+
+    <div class="card">
+        <div class="card-title">2. Synthèse PMU et pronostic Pegasus optimisé pour {nb_partants_reels} partant(s) réel(s) au Quinté</div>
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: -10px; margin-bottom: 18px; font-style: italic;">
+            Le moteur Pegasus analyse les {nb_base} dernières arrivées pour identifier les axes géométriques récurrents et optimiser votre combinaison de 5 ou 8 chevaux.
+        </p>
+        <div style="margin-bottom: 18px;"><div style="font-size: 0.9rem; color: var(--text-muted);">Synthèse Presse / Favoris :</div><div class="balls-container">{html_synth_pmu}</div></div>
+        <div style="margin-bottom: 18px;"><div style="font-size: 0.9rem; color: var(--text-muted);">Pronostic Pegasus calculé automatiquement :</div><div class="balls-container">{html_prono_balls}</div></div>
+        {html_bloc_arrivee}
+        <div style="margin-bottom: 18px;"><div style="font-size: 0.9rem; color: var(--text-muted);">Combinaison active / saisie :</div><div class="balls-container">{html_combi_balls}</div></div>
+        <div class="score-box">
+            <div class="score-card"><div style="font-size:0.85em; color:var(--text-muted);">Pondération Pronostic Pegasus</div><div style="font-size:1.5em; font-weight:bold; color:var(--accent-orange); margin-top:6px;">{score_prono} pts</div></div>
+            <div class="score-card"><div style="font-size:0.85em; color:var(--text-muted);">Pondération Combinaison</div><div style="font-size:1.5em; font-weight:bold; color:var(--accent-teal); margin-top:6px;">{score_combi} pts</div></div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-title" style="text-align: center;">3. Test de Vision Géométrique (Grille 1–{nb_partants_declares})</div>
+        <p style="text-align: center; color: var(--text-muted); font-size: 0.85rem; margin-top: -8px; margin-bottom: 18px;">
+            Cliquez sur les numéros de la grille pour composer instantanément votre combinaison (8 chevaux max) — outil de test indépendant
+        </p>
+        <div class="taux-reussite-container">
+            <span class="taux-reussite-label"> Chevaux trouvés en moyenne dans le top 5 historique :</span>
+            <span id="taux-badge" class="taux-reussite-badge" style="background-color: #e74c3c;">0.00 chevaux — Faible</span>
+        </div>
+        {html_top3}
+        <p style="text-align: center; font-size: 0.75rem; color: var(--text-muted); margin-top: -12px; margin-bottom: 18px; font-style: italic;">
+            (Moyenne sur {nb_base} courses — 3 chevaux ou plus = Très bon, 1 cheval = Faible)
+        </p>
+        <div class="grid-partants" style="grid-template-columns: repeat({nb_colonnes}, 1fr);">
+            {''.join([f'<div class="grid-btn {"non-partant" if i in non_partants_liste else ""}" id="btn-{i}" onclick="{"toggleNum(" + str(i) + ")" if i not in non_partants_liste else "void(0)"}" title="{"Non-partant" if i in non_partants_liste else "Cliquer pour sélectionner"}">{i}</div>' for i in range(1, nb_partants_declares + 1)])}
+        </div>
+        <button class="action-btn" style="background-color: #34495e; color: #fff; margin-top: 0;" onclick="resetSelection()">Réinitialiser la grille</button>
+    </div>
+</div>
+
+<footer class="footer-prevention">
+    <p style="margin-bottom: 8px;">
+        <strong>⚠️ Jouer comporte des risques : endettement, isolement, dépendance.</strong><br>
+        Pour être aidé, appelez le <a href="tel:0974751313">09 74 75 13 13</a> (appel non surtaxé) ou visitez 
+        <a href="https://www.joueurs-info-service.fr/" target="_blank" rel="noopener">joueurs-info-service.fr</a>
+    </p>
+    <p class="footer-disclaimer">
+        PEGASUS est un outil d'analyse statistique et géométrique à titre purement indicatif. Il ne garantit aucun gain. Jouez avec modération.
+    </p>
+</footer>
+
+<script>
+    const selectedNumbers = [];
+    const MAX_SELECTION = 8;
+    const NB_COURSES = {nb_base};
+    const FREQUENCES = {freq_json};
+    const NON_PARTANTS = {json.dumps(non_partants_liste)};
+    
+    function calculerTauxReussite() {{
+        if (selectedNumbers.length === 0) {{
+            return {{ valeur: "0.00", label: "Faible", couleur: "#e74c3c" }};
+        }}
+        let totalHits = 0;
+        selectedNumbers.forEach(num => {{
+            totalHits += FREQUENCES[num] || 0;
+        }});
+        const moyenne = totalHits / NB_COURSES;
+        if (moyenne >= 3) {{
+            return {{ valeur: moyenne.toFixed(2), label: "Très bon", couleur: "#2ecc71" }};
+        }} else if (moyenne >= 2) {{
+            return {{ valeur: moyenne.toFixed(2), label: "Bon", couleur: "#1abc9c" }};
+        }} else {{
+            return {{ valeur: moyenne.toFixed(2), label: "Faible", couleur: "#e74c3c" }};
+        }}
+    }}
+    
+    function mettreAJourBadge() {{
+        const resultat = calculerTauxReussite();
+        const badge = document.getElementById('taux-badge');
+        if (badge) {{
+            badge.style.backgroundColor = resultat.couleur;
+            badge.textContent = resultat.valeur + ' chevaux — ' + resultat.label;
+        }}
+    }}
+
+    function toggleNum(num) {{
+        if (NON_PARTANTS.includes(num)) {{
+            alert("Ce cheval est non-partant et ne peut pas être sélectionné.");
+            return;
+        }}
+        const btn = document.getElementById(`btn-${{num}}`);
+        const index = selectedNumbers.indexOf(num);
+        if (index > -1) {{
+            selectedNumbers.splice(index, 1);
+            btn.classList.remove('active');
+        }} else {{
+            if (selectedNumbers.length >= MAX_SELECTION) {{
+                alert("Vous ne pouvez sélectionner que 8 chevaux maximum.");
+                return;
+            }}
+            selectedNumbers.push(num);
+            btn.classList.add('active');
+        }}
+        document.getElementById('combinaison-input').value = selectedNumbers.join(' - ');
+        mettreAJourBadge();
+    }}
+
+    function resetSelection() {{
+        selectedNumbers.length = 0;
+        for (let i = 1; i <= {nb_partants_declares}; i++) {{
+            const btn = document.getElementById(`btn-${{i}}`);
+            if (btn && !btn.classList.contains('non-partant')) btn.classList.remove('active');
+        }}
+        document.getElementById('combinaison-input').value = '';
+        mettreAJourBadge();
+    }}
+
+    function formaterAvecTirets(e) {{
+        const input = e.target;
+        const cursorPosition = input.selectionStart;
+        const nums = input.value.match(/\\d+/g);
+        if (!nums) {{ input.value = ''; return; }}
+        let res = nums.join(' - ');
+        const suppression = e.inputType && e.inputType.indexOf('delete') === 0;
+        if (!suppression && /\\D$/.test(input.value)) {{ res += ' - '; }}
+        input.value = res;
+        const newPos = Math.min(cursorPosition, input.value.length);
+        input.setSelectionRange(newPos, newPos);
+    }}
+    ['synthesis-input', 'combinaison-input'].forEach(function(id) {{
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('input', formaterAvecTirets);
+    }});
+</script>
+</body>
+</html>"""
