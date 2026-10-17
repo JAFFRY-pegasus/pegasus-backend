@@ -3,7 +3,7 @@ import json
 import os
 import time
 from collections import Counter
-from datetime import date as _date
+from datetime import date as _date, datetime as _datetime
 from itertools import combinations
 from pathlib import Path
 
@@ -142,34 +142,34 @@ course_info = {
     "course_nom": "PRIX DU QUINTÉ+",
     "distance": "2700m",
     "partants": "20",
+    "non_partants_auto": [],
     "non_partants": "",
     "heure": "13:50",
     "synthesis_pmu": "13 - 8 - 10 - 4 - 16 - 6 - 5 - 12",
     "combinaison": "13 - 6 - 5 - 12 - 11",
     "arrivee": [],
-    "date": ""
+    "date": "",
+    "derniere_verif_non_partants": ""
 }
 
 def get_nb_partants_declares():
-    """Retourne le nombre de partants déclarés"""
     return int(course_info.get("partants") or 16)
 
 def get_non_partants_liste():
-    """Retourne la liste des numéros non-partants"""
+    auto = course_info.get("non_partants_auto", []) or []
     raw = course_info.get("non_partants", "")
-    if not raw.strip():
-        return []
-    return [int(n.strip()) for n in raw.replace(",", " ").replace("-", " ").split() if n.strip().isdigit()]
+    manuel = []
+    if raw.strip():
+        manuel = [int(n.strip()) for n in raw.replace(",", " ").replace("-", " ").split() if n.strip().isdigit()]
+    return sorted(list(set(auto + manuel)))
 
 def get_nb_partants_reels():
-    """Retourne le nombre réel de partants (déclarés - non-partants)"""
     return get_nb_partants_declares() - len(get_non_partants_liste())
 
 # ==============================================================================
 # 3. MOTEUR PEGASUS
 # ==============================================================================
 def generer_oppositions(nb_partants):
-    """Génère les oppositions verticales selon le nombre de partants"""
     oppositions = {}
     moitie = nb_partants // 2
     for i in range(1, moitie + 1):
@@ -287,6 +287,23 @@ def _arrivee_valide(arr, max_partants=20):
 def _arrivee_affichable(arr):
     return (isinstance(arr, list) and len(arr) == 5 and all(isinstance(n, int) and not isinstance(n, bool) for n in arr) and len(set(arr)) == 5)
 
+def _extraire_non_partants(data):
+    """Extrait les non-partants depuis le JSON (plusieurs formats supportés)"""
+    non_partants = []
+    course = data.get("course_du_jour") or {}
+    
+    # Format 1 : course_du_jour.non_partants (liste)
+    if isinstance(course.get("non_partants"), list):
+        non_partants = [int(n) for n in course["non_partants"] if isinstance(n, (int, float)) and 1 <= int(n) <= 20]
+    # Format 2 : non_partants à la racine
+    elif isinstance(data.get("non_partants"), list):
+        non_partants = [int(n) for n in data["non_partants"] if isinstance(n, (int, float)) and 1 <= int(n) <= 20]
+    # Format 3 : string "3-7-12"
+    elif isinstance(course.get("non_partants"), str) and course["non_partants"].strip():
+        non_partants = [int(n.strip()) for n in course["non_partants"].replace(",", " ").replace("-", " ").split() if n.strip().isdigit()]
+    
+    return sorted(non_partants)
+
 _JOURS_FR = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
 _MOIS_FR = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"]
 
@@ -295,6 +312,12 @@ def _date_fr(iso):
         d = _date.fromisoformat(str(iso))
         return f"{_JOURS_FR[d.weekday()]} {d.day} {_MOIS_FR[d.month - 1]} {d.year}"
     except ValueError:
+        return ""
+
+def _heure_actuelle_fr():
+    try:
+        return _datetime.now().strftime("%H:%M")
+    except Exception:
         return ""
 
 def appliquer_donnees_auto(data):
@@ -314,6 +337,10 @@ def appliquer_donnees_auto(data):
             if course.get(cle): course_info[cle] = str(course[cle])
         if course.get("synthese_pmu"): course_info["synthesis_pmu"] = _liste_en_texte(course["synthese_pmu"])
         if course.get("combinaison"): course_info["combinaison"] = _liste_en_texte(course["combinaison"])
+        # Extraction automatique des non-partants
+        non_partants_extraits = _extraire_non_partants(data)
+        course_info["non_partants_auto"] = non_partants_extraits
+        course_info["derniere_verif_non_partants"] = _heure_actuelle_fr()
     donnees_auto["nb_arrivees"] = len(nouvelles)
     donnees_auto["derniere_maj"] = data.get("derniere_maj")
 
@@ -345,7 +372,7 @@ def declencher_robot():
     token = os.getenv("GITHUB_TOKEN")
     repo = os.getenv("GITHUB_REPOSITORY", "JAFFRY-pegasus/pegasus-backend")
     if not token:
-        return generer_html(message="❌ Erreur : La variable GITHUB_TOKEN n'est pas configurée sur Render.")
+        return generer_html(message=" Erreur : La variable GITHUB_TOKEN n'est pas configurée sur Render.")
     url = f"https://api.github.com/repos/{repo}/actions/workflows/quinte.yml/dispatches"
     headers = {
         "Authorization": f"token {token}",
@@ -386,11 +413,12 @@ def generer_html(message=None):
 
     nb_partants_declares = get_nb_partants_declares()
     non_partants_liste = get_non_partants_liste()
+    non_partants_auto = course_info.get("non_partants_auto", []) or []
     nb_partants_reels = get_nb_partants_reels()
     score_combi = calculer_score_pegasus(nums_saisis[:5]) if len(nums_saisis) >= 5 else 0
     freq_json = json.dumps(FREQUENCES_CHEVAUX)
+    derniere_verif = course_info.get("derniere_verif_non_partants", "")
 
-    # Calcul du nombre de colonnes pour la grille à 2 lignes
     nb_colonnes = (nb_partants_declares + 1) // 2
 
     top3_chevaux = obtenir_top3_chevaux_frequents()
@@ -416,7 +444,7 @@ def generer_html(message=None):
 
     html_message = ""
     if message:
-        is_error = "" in message
+        is_error = "❌" in message
         bg_color = "rgba(231, 76, 60, 0.2)" if is_error else "rgba(46, 204, 113, 0.2)"
         border_color = "#e74c3c" if is_error else "#2ecc71"
         html_message = f"""
@@ -470,13 +498,24 @@ def generer_html(message=None):
     default_values = {"hippodrome": "PARIS-VINCENNES", "discipline": "TROT ATTELE", "course_nom": "PRIX DU QUINTÉ+", "distance": "2700m", "partants": "20", "non_partants": "", "heure": "13:50", "synthesis_pmu": "13 - 8 - 10 - 4 - 16 - 6 - 5 - 12", "combinaison": "13 - 6 - 5 - 12 - 11", "date": "mercredi 14 octobre 2026"}
     mission = "Le but de PEGASUS est de donner des ailes à l'intuition du parieur en transformant des données historiques brutes en une stratégie géométrique claire, automatisée et optimisée."
 
-    # Information sur les non-partants
-    html_non_partants_info = ""
-    if non_partants_liste:
-        nums_non_part = ", ".join(str(n) for n in sorted(non_partants_liste))
-        html_non_partants_info = f"""
-        <div style="margin-top: 12px; padding: 10px 14px; background: rgba(231, 76, 60, 0.15); border-left: 4px solid #e74c3c; border-radius: 6px; font-size: 0.85rem; color: var(--text-main);">
-            ⚠️ <strong>Non-partant(s) déclaré(s) :</strong> n°{nums_non_part} — {nb_partants_reels} partant(s) réel(s) sur {nb_partants_declares} déclaré(s). Les calculs Pegasus tiennent compte de cette exclusion.
+    # Bloc d'information sur les non-partants automatiques
+    html_non_partants_auto = ""
+    if non_partants_auto:
+        nums_auto = ", ".join(f"<strong>n°{n}</strong>" for n in sorted(non_partants_auto))
+        html_non_partants_auto = f"""
+        <div style="margin-bottom: 15px; padding: 12px 16px; background: linear-gradient(135deg, rgba(52, 152, 219, 0.15), rgba(41, 128, 185, 0.15)); border-left: 4px solid #3498db; border-radius: 8px; font-size: 0.9rem; color: var(--text-main);">
+            <div style="margin-bottom: 6px;">
+                <strong>ℹ️ Non-partant(s) détecté(s) automatiquement :</strong> {nums_auto}
+            </div>
+            <div style="font-size: 0.8rem; color: var(--text-muted);">
+                💡 Partants réels : <strong style="color: var(--accent-orange);">{nb_partants_reels}</strong> sur {nb_partants_declares} déclarés • Dernière vérification : <strong>{derniere_verif}</strong> • Cliquez sur 🔄 Actualiser pour re-vérifier
+            </div>
+        </div>
+        """
+    else:
+        html_non_partants_auto = f"""
+        <div style="margin-bottom: 15px; padding: 12px 16px; background: linear-gradient(135deg, rgba(46, 204, 113, 0.1), rgba(39, 174, 96, 0.1)); border-left: 4px solid #2ecc71; border-radius: 8px; font-size: 0.85rem; color: var(--text-main);">
+            ✅ <strong>Aucun non-partant détecté</strong> à ce stade • {nb_partants_declares} partants confirmés • Dernière vérification : <strong>{derniere_verif or 'en attente'}</strong>
         </div>
         """
 
@@ -692,7 +731,7 @@ def generer_html(message=None):
         <p style="font-size:0.8rem;">Base : {nb_base} quintés (dont {nb_auto} ajoutés automatiquement) · Dernière mise à jour PMU : {maj_txt}</p>
         
         <div class="header-actions">
-            <a href="/refresh" class="refresh-btn" title="Forcer le rechargement des données depuis GitHub">
+            <a href="/refresh" class="refresh-btn" title="Forcer le rechargement des données depuis GitHub (y compris les non-partants)">
                 <span class="icon">🔄</span> Actualiser les données
             </a>
             <a href="/trigger-workflow" class="robot-btn" title="Déclencher le robot GitHub pour aller chercher les nouvelles courses">
@@ -706,6 +745,9 @@ def generer_html(message=None):
     <form action="/update" method="post">
         <div class="card">
             <div class="card-title">1. Informations sur le Quinté du Jour</div>
+            
+            {html_non_partants_auto}
+            
             <div class="form-grid">
                 <div class="form-group full-width">
                     <label>📅 Date de la course (automatique) :</label>
@@ -717,13 +759,6 @@ def generer_html(message=None):
                 <div class="form-group"><label>Distance :</label><input type="text" name="distance" value="{h_dist}" placeholder="{default_values['distance']}"></div>
                 <div class="form-group"><label>Nombre de partants déclarés :</label><input type="text" name="partants" value="{h_part}" placeholder="{default_values['partants']}"></div>
                 <div class="form-group"><label>Heure de départ :</label><input type="text" name="heure" value="{h_heure}" placeholder="{default_values['heure']}"></div>
-                <div class="form-group full-width">
-                    <label>️ Non-partant(s) (séparés par tirets, actualisable avant le départ) :</label>
-                    <input type="text" id="non-partants-input" name="non_partants" value="{h_non_part}" placeholder="Ex: 3 - 7 - 12" style="border-color: #e74c3c;">
-                    <small style="color: var(--text-muted); font-size: 0.75rem; margin-top: 4px; display: block;">
-                        💡 Partants réels : <strong style="color: var(--accent-orange);">{nb_partants_reels}</strong> sur {nb_partants_declares} déclarés. Les non-partants sont exclus des calculs Pegasus.
-                    </small>
-                </div>
                 <div class="form-group full-width"><label>Synthèse Presse / Favoris (séparés par tirets) :</label><input type="text" id="synthesis-input" name="synthesis_pmu" value="{h_synth}" placeholder="{default_values['synthesis_pmu']}"></div>
             </div>
 
@@ -743,7 +778,6 @@ def generer_html(message=None):
         <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: -10px; margin-bottom: 18px; font-style: italic;">
             Le moteur Pegasus analyse les {nb_base} dernières arrivées pour identifier les axes géométriques récurrents et optimiser votre combinaison de 5 ou 8 chevaux.
         </p>
-        {html_non_partants_info}
         <div style="margin-bottom: 18px;"><div style="font-size: 0.9rem; color: var(--text-muted);">Synthèse Presse / Favoris :</div><div class="balls-container">{html_synth_pmu}</div></div>
         <div style="margin-bottom: 18px;"><div style="font-size: 0.9rem; color: var(--text-muted);">Pronostic Pegasus calculé automatiquement :</div><div class="balls-container">{html_prono_balls}</div></div>
         {html_bloc_arrivee}
@@ -782,7 +816,7 @@ def generer_html(message=None):
 
 <footer class="footer-prevention">
     <p style="margin-bottom: 8px;">
-        <strong>️ Jouer comporte des risques : endettement, isolement, dépendance.</strong><br>
+        <strong>⚠️ Jouer comporte des risques : endettement, isolement, dépendance.</strong><br>
         Pour être aidé, appelez le <a href="tel:0974751313">09 74 75 13 13</a> (appel non surtaxé) ou visitez 
         <a href="https://www.joueurs-info-service.fr/" target="_blank" rel="noopener">joueurs-info-service.fr</a>
     </p>
@@ -870,7 +904,7 @@ def generer_html(message=None):
         const newPos = Math.min(cursorPosition, input.value.length);
         input.setSelectionRange(newPos, newPos);
     }}
-    ['synthesis-input', 'combinaison-input', 'non-partants-input'].forEach(function(id) {{
+    ['synthesis-input', 'combinaison-input'].forEach(function(id) {{
         const el = document.getElementById(id);
         if (el) el.addEventListener('input', formaterAvecTirets);
     }});
