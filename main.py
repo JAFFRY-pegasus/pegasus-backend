@@ -134,7 +134,7 @@ HISTORIQUE_SGE_DATA = [
 ]
 
 # ==============================================================================
-# 2. ÉTAT DE L'APPLICATION (Défini AVANT les fonctions qui l'utilisent)
+# 2. ÉTAT DE L'APPLICATION
 # ==============================================================================
 course_info = {
     "hippodrome": "PARIS-VINCENNES",
@@ -142,6 +142,7 @@ course_info = {
     "course_nom": "PRIX DU QUINTÉ+",
     "distance": "2700m",
     "partants": "20",
+    "non_partants": "",
     "heure": "13:50",
     "synthesis_pmu": "13 - 8 - 10 - 4 - 16 - 6 - 5 - 12",
     "combinaison": "13 - 6 - 5 - 12 - 11",
@@ -149,12 +150,23 @@ course_info = {
     "date": ""
 }
 
-def get_nb_partants_actuel():
-    """Retourne le nombre de partants actuel"""
+def get_nb_partants_declares():
+    """Retourne le nombre de partants déclarés"""
     return int(course_info.get("partants") or 16)
 
+def get_non_partants_liste():
+    """Retourne la liste des numéros non-partants"""
+    raw = course_info.get("non_partants", "")
+    if not raw.strip():
+        return []
+    return [int(n.strip()) for n in raw.replace(",", " ").replace("-", " ").split() if n.strip().isdigit()]
+
+def get_nb_partants_reels():
+    """Retourne le nombre réel de partants (déclarés - non-partants)"""
+    return get_nb_partants_declares() - len(get_non_partants_liste())
+
 # ==============================================================================
-# 3. MOTEUR PEGASUS - ADAPTÉ POUR 20 PARTANTS
+# 3. MOTEUR PEGASUS
 # ==============================================================================
 def generer_oppositions(nb_partants):
     """Génère les oppositions verticales selon le nombre de partants"""
@@ -184,11 +196,11 @@ def calculer_poids_axes(historique=None, nb_partants=16):
     return {axe: freq // 2 for axe, freq in frequence_axes.items()}
 
 HISTORIQUE_COMPLET = list(HISTORIQUE_SGE_DATA)
-POIDS_AXES_HISTORIQUE = calculer_poids_axes(HISTORIQUE_COMPLET, get_nb_partants_actuel())
+POIDS_AXES_HISTORIQUE = calculer_poids_axes(HISTORIQUE_COMPLET, get_nb_partants_declares())
 
 def calculer_score_pegasus(combinaison, nb_partants=None):
     if nb_partants is None:
-        nb_partants = get_nb_partants_actuel()
+        nb_partants = get_nb_partants_declares()
     oppositions = generer_oppositions(nb_partants)
     poids_axes = calculer_poids_axes(HISTORIQUE_COMPLET, nb_partants)
     score_brut = 0
@@ -206,18 +218,21 @@ def calculer_score_pegasus(combinaison, nb_partants=None):
     return int(score_brut * ponderation)
 
 def generer_prono_automatique(combinaison_ref):
-    nb_partants = get_nb_partants_actuel()
-    valides = [n for n in combinaison_ref if 1 <= n <= nb_partants]
+    nb_partants_declares = get_nb_partants_declares()
+    non_partants = get_non_partants_liste()
+    valides = [n for n in combinaison_ref if 1 <= n <= nb_partants_declares and n not in non_partants]
     taille_cible = 8 if len(combinaison_ref) >= 8 else 5
     if len(valides) < taille_cible:
-        complements = [n for n in range(1, nb_partants + 1) if n not in valides]
+        complements = [n for n in range(1, nb_partants_declares + 1) if n not in valides and n not in non_partants]
         valides = (valides + complements)[:taille_cible]
-    oppositions = generer_oppositions(nb_partants)
-    opposes = [oppositions.get(n) for n in valides if oppositions.get(n) is not None]
+    oppositions = generer_oppositions(nb_partants_declares)
+    opposes = [oppositions.get(n) for n in valides if oppositions.get(n) is not None and oppositions.get(n) not in non_partants]
     candidats = list(dict.fromkeys(valides + opposes))
     scores_candidats = []
     for combo in combinations(candidats, taille_cible):
-        score = calculer_score_pegasus(list(combo), nb_partants)
+        if any(n in non_partants for n in combo):
+            continue
+        score = calculer_score_pegasus(list(combo), nb_partants_declares)
         scores_candidats.append((score, list(combo)))
     scores_candidats.sort(key=lambda x: x[0], reverse=True)
     return scores_candidats[0][1] if scores_candidats else valides[:taille_cible]
@@ -288,7 +303,7 @@ def appliquer_donnees_auto(data):
     date_course = str(course.get("date") or "")
     nouvelles = [{"id": str(a.get("id", "")), "arrivee": a["arrivee"]} for a in data.get("nouvelles_arrivees", []) if _arrivee_valide(a.get("arrivee"), 20) and str(a.get("id", "")) != date_course]
     HISTORIQUE_COMPLET = HISTORIQUE_SGE_DATA + nouvelles
-    nb_partants = get_nb_partants_actuel()
+    nb_partants = get_nb_partants_declares()
     POIDS_AXES_HISTORIQUE = calculer_poids_axes(HISTORIQUE_COMPLET, nb_partants)
     FREQUENCES_CHEVAUX = calculer_frequences_par_cheval()
     if course.get("course_nom"):
@@ -346,13 +361,14 @@ def declencher_robot():
         return generer_html(message=f"❌ Erreur lors du déclenchement du robot : {e}")
 
 @app.post("/update", response_class=HTMLResponse)
-def mettre_a_jour(hippodrome: str = Form(""), discipline: str = Form(""), course_nom: str = Form(""), distance: str = Form(""), partants: str = Form(""), heure: str = Form(""), synthesis_pmu: str = Form(""), combinaison: str = Form("")):
+def mettre_a_jour(hippodrome: str = Form(""), discipline: str = Form(""), course_nom: str = Form(""), distance: str = Form(""), partants: str = Form(""), non_partants: str = Form(""), heure: str = Form(""), synthesis_pmu: str = Form(""), combinaison: str = Form("")):
     rafraichir_donnees()
     if hippodrome.strip(): course_info["hippodrome"] = hippodrome
     if discipline.strip(): course_info["discipline"] = discipline
     if course_nom.strip(): course_info["course_nom"] = course_nom
     if distance.strip(): course_info["distance"] = distance
     if partants.strip(): course_info["partants"] = partants
+    if non_partants.strip(): course_info["non_partants"] = non_partants
     if heure.strip(): course_info["heure"] = heure
     if synthesis_pmu.strip(): course_info["synthesis_pmu"] = synthesis_pmu
     if combinaison.strip(): course_info["combinaison"] = combinaison
@@ -368,12 +384,14 @@ def generer_html(message=None):
     nums_prono = generer_prono_automatique(nums_saisis)
     score_prono = calculer_score_pegasus(nums_prono)
 
-    nb_partants = get_nb_partants_actuel()
+    nb_partants_declares = get_nb_partants_declares()
+    non_partants_liste = get_non_partants_liste()
+    nb_partants_reels = get_nb_partants_reels()
     score_combi = calculer_score_pegasus(nums_saisis[:5]) if len(nums_saisis) >= 5 else 0
     freq_json = json.dumps(FREQUENCES_CHEVAUX)
 
     # Calcul du nombre de colonnes pour la grille à 2 lignes
-    nb_colonnes = (nb_partants + 1) // 2
+    nb_colonnes = (nb_partants_declares + 1) // 2
 
     top3_chevaux = obtenir_top3_chevaux_frequents()
     if len(top3_chevaux) >= 3:
@@ -398,7 +416,7 @@ def generer_html(message=None):
 
     html_message = ""
     if message:
-        is_error = "❌" in message
+        is_error = "" in message
         bg_color = "rgba(231, 76, 60, 0.2)" if is_error else "rgba(46, 204, 113, 0.2)"
         border_color = "#e74c3c" if is_error else "#2ecc71"
         html_message = f"""
@@ -443,13 +461,24 @@ def generer_html(message=None):
     h_nom = html.escape(course_info['course_nom'])
     h_dist = html.escape(course_info['distance'])
     h_part = html.escape(course_info['partants'])
+    h_non_part = html.escape(course_info.get('non_partants', ''))
     h_heure = html.escape(course_info['heure'])
     h_synth = html.escape(course_info['synthesis_pmu'])
     h_comb = html.escape(course_info['combinaison'])
     h_date = html.escape(date_txt) if date_txt else ""
 
-    default_values = {"hippodrome": "PARIS-VINCENNES", "discipline": "TROT ATTELE", "course_nom": "PRIX DU QUINTÉ+", "distance": "2700m", "partants": "20", "heure": "13:50", "synthesis_pmu": "13 - 8 - 10 - 4 - 16 - 6 - 5 - 12", "combinaison": "13 - 6 - 5 - 12 - 11", "date": "mercredi 14 octobre 2026"}
+    default_values = {"hippodrome": "PARIS-VINCENNES", "discipline": "TROT ATTELE", "course_nom": "PRIX DU QUINTÉ+", "distance": "2700m", "partants": "20", "non_partants": "", "heure": "13:50", "synthesis_pmu": "13 - 8 - 10 - 4 - 16 - 6 - 5 - 12", "combinaison": "13 - 6 - 5 - 12 - 11", "date": "mercredi 14 octobre 2026"}
     mission = "Le but de PEGASUS est de donner des ailes à l'intuition du parieur en transformant des données historiques brutes en une stratégie géométrique claire, automatisée et optimisée."
+
+    # Information sur les non-partants
+    html_non_partants_info = ""
+    if non_partants_liste:
+        nums_non_part = ", ".join(str(n) for n in sorted(non_partants_liste))
+        html_non_partants_info = f"""
+        <div style="margin-top: 12px; padding: 10px 14px; background: rgba(231, 76, 60, 0.15); border-left: 4px solid #e74c3c; border-radius: 6px; font-size: 0.85rem; color: var(--text-main);">
+            ⚠️ <strong>Non-partant(s) déclaré(s) :</strong> n°{nums_non_part} — {nb_partants_reels} partant(s) réel(s) sur {nb_partants_declares} déclaré(s). Les calculs Pegasus tiennent compte de cette exclusion.
+        </div>
+        """
 
     return f"""<!DOCTYPE html>
 <html lang="fr">
@@ -539,6 +568,14 @@ def generer_html(message=None):
         .grid-btn {{ background-color: var(--input-bg); border: 1px solid var(--border-color); color: var(--text-main); padding: 14px 0; border-radius: 8px; font-size: 1.15rem; font-weight: bold; cursor: pointer; text-align: center; transition: all 0.2s ease; }}
         .grid-btn:hover {{ border-color: var(--accent-orange); }}
         .grid-btn.active {{ background-color: var(--accent-orange); color: #000000; border-color: var(--accent-orange); box-shadow: 0 0 12px rgba(243, 156, 18, 0.5); }}
+        .grid-btn.non-partant {{ 
+            background-color: #2a2f3a; 
+            color: #7f8c8d; 
+            border-color: #e74c3c;
+            text-decoration: line-through;
+            cursor: not-allowed;
+            opacity: 0.5;
+        }}
         .action-btn {{ width: 100%; background-color: var(--accent-teal); color: #000000; border: none; padding: 14px; border-radius: 8px; font-size: 1.05rem; font-weight: bold; cursor: pointer; margin-top: 12px; text-transform: uppercase; transition: opacity 0.2s; }}
         .action-btn:hover {{ opacity: 0.9; }}
         .score-box {{ display: flex; justify-content: space-between; gap: 15px; margin-top: 18px; }}
@@ -678,8 +715,15 @@ def generer_html(message=None):
                 <div class="form-group"><label>Discipline :</label><input type="text" name="discipline" value="{h_disc}" placeholder="{default_values['discipline']}"></div>
                 <div class="form-group"><label>Nom de la course :</label><input type="text" name="course_nom" value="{h_nom}" placeholder="{default_values['course_nom']}"></div>
                 <div class="form-group"><label>Distance :</label><input type="text" name="distance" value="{h_dist}" placeholder="{default_values['distance']}"></div>
-                <div class="form-group"><label>Nombre de partants :</label><input type="text" name="partants" value="{h_part}" placeholder="{default_values['partants']}"></div>
+                <div class="form-group"><label>Nombre de partants déclarés :</label><input type="text" name="partants" value="{h_part}" placeholder="{default_values['partants']}"></div>
                 <div class="form-group"><label>Heure de départ :</label><input type="text" name="heure" value="{h_heure}" placeholder="{default_values['heure']}"></div>
+                <div class="form-group full-width">
+                    <label>️ Non-partant(s) (séparés par tirets, actualisable avant le départ) :</label>
+                    <input type="text" id="non-partants-input" name="non_partants" value="{h_non_part}" placeholder="Ex: 3 - 7 - 12" style="border-color: #e74c3c;">
+                    <small style="color: var(--text-muted); font-size: 0.75rem; margin-top: 4px; display: block;">
+                        💡 Partants réels : <strong style="color: var(--accent-orange);">{nb_partants_reels}</strong> sur {nb_partants_declares} déclarés. Les non-partants sont exclus des calculs Pegasus.
+                    </small>
+                </div>
                 <div class="form-group full-width"><label>Synthèse Presse / Favoris (séparés par tirets) :</label><input type="text" id="synthesis-input" name="synthesis_pmu" value="{h_synth}" placeholder="{default_values['synthesis_pmu']}"></div>
             </div>
 
@@ -695,10 +739,11 @@ def generer_html(message=None):
     </form>
 
     <div class="card">
-        <div class="card-title">2. Synthèse PMU et pronostic Pegasus optimisé pour une grille de {nb_partants} partants au Quinté</div>
+        <div class="card-title">2. Synthèse PMU et pronostic Pegasus optimisé pour {nb_partants_reels} partant(s) réel(s) au Quinté</div>
         <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: -10px; margin-bottom: 18px; font-style: italic;">
             Le moteur Pegasus analyse les {nb_base} dernières arrivées pour identifier les axes géométriques récurrents et optimiser votre combinaison de 5 ou 8 chevaux.
         </p>
+        {html_non_partants_info}
         <div style="margin-bottom: 18px;"><div style="font-size: 0.9rem; color: var(--text-muted);">Synthèse Presse / Favoris :</div><div class="balls-container">{html_synth_pmu}</div></div>
         <div style="margin-bottom: 18px;"><div style="font-size: 0.9rem; color: var(--text-muted);">Pronostic Pegasus calculé automatiquement :</div><div class="balls-container">{html_prono_balls}</div></div>
         {html_bloc_arrivee}
@@ -710,7 +755,7 @@ def generer_html(message=None):
     </div>
 
     <div class="card">
-        <div class="card-title" style="text-align: center;">3. Test de Vision Géométrique (Grille 1–{nb_partants})</div>
+        <div class="card-title" style="text-align: center;">3. Test de Vision Géométrique (Grille 1–{nb_partants_declares})</div>
         <p style="text-align: center; color: var(--text-muted); font-size: 0.85rem; margin-top: -8px; margin-bottom: 18px;">
             Cliquez sur les numéros de la grille pour composer instantanément votre combinaison (8 chevaux max) — outil de test indépendant
         </p>
@@ -729,7 +774,7 @@ def generer_html(message=None):
         </p>
 
         <div class="grid-partants" style="grid-template-columns: repeat({nb_colonnes}, 1fr);">
-            {''.join([f'<div class="grid-btn" id="btn-{i}" onclick="toggleNum({i})">{i}</div>' for i in range(1, nb_partants + 1)])}
+            {''.join([f'<div class="grid-btn {"non-partant" if i in non_partants_liste else ""}" id="btn-{i}" onclick="{"toggleNum(" + str(i) + ")" if i not in non_partants_liste else "void(0)"}" title="{"Non-partant" if i in non_partants_liste else "Cliquer pour sélectionner"}">{i}</div>' for i in range(1, nb_partants_declares + 1)])}
         </div>
         <button class="action-btn" style="background-color: #34495e; color: #fff; margin-top: 0;" onclick="resetSelection()">Réinitialiser la grille</button>
     </div>
@@ -737,7 +782,7 @@ def generer_html(message=None):
 
 <footer class="footer-prevention">
     <p style="margin-bottom: 8px;">
-        <strong>⚠️ Jouer comporte des risques : endettement, isolement, dépendance.</strong><br>
+        <strong>️ Jouer comporte des risques : endettement, isolement, dépendance.</strong><br>
         Pour être aidé, appelez le <a href="tel:0974751313">09 74 75 13 13</a> (appel non surtaxé) ou visitez 
         <a href="https://www.joueurs-info-service.fr/" target="_blank" rel="noopener">joueurs-info-service.fr</a>
     </p>
@@ -751,6 +796,7 @@ def generer_html(message=None):
     const MAX_SELECTION = 8;
     const NB_COURSES = {nb_base};
     const FREQUENCES = {freq_json};
+    const NON_PARTANTS = {json.dumps(non_partants_liste)};
     
     function calculerTauxReussite() {{
         if (selectedNumbers.length === 0) {{
@@ -781,6 +827,10 @@ def generer_html(message=None):
     }}
 
     function toggleNum(num) {{
+        if (NON_PARTANTS.includes(num)) {{
+            alert("Ce cheval est non-partant et ne peut pas être sélectionné.");
+            return;
+        }}
         const btn = document.getElementById(`btn-${{num}}`);
         const index = selectedNumbers.indexOf(num);
         if (index > -1) {{
@@ -800,9 +850,9 @@ def generer_html(message=None):
 
     function resetSelection() {{
         selectedNumbers.length = 0;
-        for (let i = 1; i <= {nb_partants}; i++) {{
+        for (let i = 1; i <= {nb_partants_declares}; i++) {{
             const btn = document.getElementById(`btn-${{i}}`);
-            if (btn) btn.classList.remove('active');
+            if (btn && !btn.classList.contains('non-partant')) btn.classList.remove('active');
         }}
         document.getElementById('combinaison-input').value = '';
         mettreAJourBadge();
@@ -820,7 +870,7 @@ def generer_html(message=None):
         const newPos = Math.min(cursorPosition, input.value.length);
         input.setSelectionRange(newPos, newPos);
     }}
-    ['synthesis-input', 'combinaison-input'].forEach(function(id) {{
+    ['synthesis-input', 'combinaison-input', 'non-partants-input'].forEach(function(id) {{
         const el = document.getElementById(id);
         if (el) el.addEventListener('input', formaterAvecTirets);
     }});
