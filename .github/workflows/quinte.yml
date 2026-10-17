@@ -2,10 +2,12 @@ name: Mise à jour Quinté+
 
 on:
   schedule:
-    # Exécution à 09h30 et 19h30 (heure de Paris)
-    - cron: '30 7 * * *'   # 09h30 heure de Paris = 07h30 UTC
-    - cron: '30 17 * * *'  # 19h30 heure de Paris = 17h30 UTC
-  workflow_dispatch:       # Permet le déclenchement manuel
+    - cron: '30 7 * * *'
+    - cron: '30 17 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   update-quinte:
@@ -14,6 +16,9 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+          fetch-depth: 0
       
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -28,13 +33,21 @@ jobs:
       - name: Create data directory
         run: mkdir -p data
       
-      - name: Fetch PMU data with non-partants
+      - name: Fetch PMU data
         run: python scripts/fetch_quinte.py
+      
+      - name: Configure Git
+        run: |
+          git config --global user.email "action@github.com"
+          git config --global user.name "GitHub Action"
+          git config --global --add safe.directory '*'
       
       - name: Commit and push if changed
         run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
           git add data/quinte.json
-          git diff --staged --quiet || git commit -m " Auto-update: données Quinté+ avec non-partants et arrivée"
-          git push
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "🤖 Auto-update: données Quinté+ $(date '+%Y-%m-%d %H:%M')"
+            git push
+          fi
