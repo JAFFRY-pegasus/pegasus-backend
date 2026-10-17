@@ -1,43 +1,37 @@
 {
-  "derniere_maj": "2026-10-16T21:59:43+02:00",
+  "derniere_maj": "2026-10-17T09:28:51+02:00",
   "course_du_jour": {
-    "date": "2026-10-16",
-    "hippodrome": "VINCENNES",
-    "discipline": "ATTELE",
-    "course_nom": "PRIX THEMIS",
-    "distance": "2850m",
-    "partants": "15",
-    "heure": "20:15",
+    "date": "2026-10-17",
+    "hippodrome": "AUTEUIL",
+    "discipline": "HAIE",
+    "course_nom": "PRIX PRINCE D'ECOUEN - GRAND HANDICAP D'AUTOMNE",
+    "distance": "4300m",
+    "partants": "18",
+    "heure": "15:15",
     "favoris_cotes": [
-      3,
       6,
-      4,
-      7,
-      12,
       11,
-      13,
-      1
+      2,
+      19,
+      12,
+      5,
+      1,
+      7
     ],
     "synthese_pmu": [
-      3,
       6,
-      4,
-      7,
-      12,
       11,
-      13,
-      1
+      2,
+      19,
+      12,
+      5,
+      1,
+      7
     ],
     "combinaison": [],
-    "arrivee": [
-      4,
-      11,
-      7,
-      6,
-      13
-    ],
+    "arrivee": [],
     "reunion": 1,
-    "course": 4
+    "course": 3
   },
   "nouvelles_arrivees": [
     {
