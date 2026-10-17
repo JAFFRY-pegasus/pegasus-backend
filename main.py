@@ -534,7 +534,7 @@ def generer_html(message=None):
     <style>
         :root {{ --bg-color: #0d0f12; --card-bg: rgba(22, 25, 32, 0.92); --accent-orange: #f39c12; --accent-teal: #1abc9c; --text-main: #f5f6fa; --text-muted: #c0c8d0; --border-color: #2c3e50; --input-bg: rgba(30, 34, 43, 0.95); }}
         
-        /* NOUVEAU : Image de fond course hippique */
+        /* Image de fond course hippique personnalisée */
         body {{
             font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             color: var(--text-main);
@@ -546,7 +546,7 @@ def generer_html(message=None):
             align-items: center;
             position: relative;
             min-height: 100vh;
-            background-image: url('https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?w=1920&q=80');
+            background-image: url('https://raw.githubusercontent.com/JAFFRY-pegasus/pegasus-backend/main/course.jpg');
             background-size: cover;
             background-position: center center;
             background-repeat: no-repeat;
@@ -708,7 +708,7 @@ def generer_html(message=None):
 
 <footer class="footer-prevention">
     <p style="margin-bottom: 8px;">
-        <strong>⚠️ Jouer comporte des risques : endettement, isolement, dépendance.</strong><br>
+        <strong>️ Jouer comporte des risques : endettement, isolement, dépendance.</strong><br>
         Pour être aidé, appelez le <a href="tel:0974751313">09 74 75 13 13</a> (appel non surtaxé) ou visitez 
         <a href="https://www.joueurs-info-service.fr/" target="_blank" rel="noopener">joueurs-info-service.fr</a>
     </p>
