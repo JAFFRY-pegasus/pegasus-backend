@@ -134,59 +134,75 @@ HISTORIQUE_SGE_DATA = [
 ]
 
 # ==============================================================================
-# 2. MOTEUR PEGASUS
+# 2. MOTEUR PEGASUS - ADAPTÉ POUR 20 PARTANTS
 # ==============================================================================
-OPPOSITIONS_VERTICALES = {
-    1: 9, 2: 10, 3: 11, 4: 12, 5: 13, 6: 14, 7: 15, 8: 16,
-    9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 6, 15: 7, 16: 8,
-    17: 9, 18: 10, 19: 11, 20: 12
-}
 
-COEFFICIENTS_RESONANCE = {0: 0.5, 1: 1.0, 2: 1.5, 3: 2.0}
+def generer_oppositions(nb_partants):
+    """Génère les oppositions verticales selon le nombre de partants"""
+    oppositions = {}
+    moitie = nb_partants // 2
+    for i in range(1, moitie + 1):
+        oppose = i + moitie
+        if oppose <= nb_partants:
+            oppositions[i] = oppose
+            oppositions[oppose] = i
+    return oppositions
 
-def calculer_poids_axes(historique=None):
+COEFFICIENTS_RESONANCE = {0: 0.5, 1: 1.0, 2: 1.5, 3: 2.0, 4: 2.5, 5: 3.0}
+
+def calculer_poids_axes(historique=None, nb_partants=16):
     if historique is None:
         historique = HISTORIQUE_SGE_DATA
+    oppositions = generer_oppositions(nb_partants)
     frequence_axes = Counter()
     for course in historique:
         arr = course["arrivee"]
         for num in arr:
-            oppose = OPPOSITIONS_VERTICALES.get(num)
+            oppose = oppositions.get(num)
             if oppose and oppose in arr:
                 axe = tuple(sorted([num, oppose]))
                 frequence_axes[axe] += 1
     return {axe: freq // 2 for axe, freq in frequence_axes.items()}
 
 HISTORIQUE_COMPLET = list(HISTORIQUE_SGE_DATA)
-POIDS_AXES_HISTORIQUE = calculer_poids_axes(HISTORIQUE_COMPLET)
 
-def calculer_score_pegasus(combinaison):
+def get_nb_partants_actuel():
+    return int(course_info.get("partants") or 16)
+
+POIDS_AXES_HISTORIQUE = calculer_poids_axes(HISTORIQUE_COMPLET, get_nb_partants_actuel())
+
+def calculer_score_pegasus(combinaison, nb_partants=None):
+    if nb_partants is None:
+        nb_partants = get_nb_partants_actuel()
+    oppositions = generer_oppositions(nb_partants)
+    poids_axes = calculer_poids_axes(HISTORIQUE_COMPLET, nb_partants)
     score_brut = 0
     axes_touches = set()
     for i in range(len(combinaison)):
         for j in range(i + 1, len(combinaison)):
             a, b = combinaison[i], combinaison[j]
-            if a in OPPOSITIONS_VERTICALES and OPPOSITIONS_VERTICALES[a] == b:
+            if a in oppositions and oppositions[a] == b:
                 axe = tuple(sorted([a, b]))
                 axes_touches.add(axe)
-                if axe in POIDS_AXES_HISTORIQUE:
-                    score_brut += POIDS_AXES_HISTORIQUE[axe]
+                if axe in poids_axes:
+                    score_brut += poids_axes[axe]
     nombre_axes = len(axes_touches)
-    ponderation = COEFFICIENTS_RESONANCE.get(nombre_axes, 2.0)
+    ponderation = COEFFICIENTS_RESONANCE.get(nombre_axes, 3.0)
     return int(score_brut * ponderation)
 
 def generer_prono_automatique(combinaison_ref):
-    nb_partants = int(course_info.get("partants") or 16)
+    nb_partants = get_nb_partants_actuel()
     valides = [n for n in combinaison_ref if 1 <= n <= nb_partants]
     taille_cible = 8 if len(combinaison_ref) >= 8 else 5
     if len(valides) < taille_cible:
         complements = [n for n in range(1, nb_partants + 1) if n not in valides]
         valides = (valides + complements)[:taille_cible]
-    opposes = [OPPOSITIONS_VERTICALES.get(n) for n in valides if OPPOSITIONS_VERTICALES.get(n) is not None]
+    oppositions = generer_oppositions(nb_partants)
+    opposes = [oppositions.get(n) for n in valides if oppositions.get(n) is not None]
     candidats = list(dict.fromkeys(valides + opposes))
     scores_candidats = []
     for combo in combinations(candidats, taille_cible):
-        score = calculer_score_pegasus(list(combo))
+        score = calculer_score_pegasus(list(combo), nb_partants)
         scores_candidats.append((score, list(combo)))
     scores_candidats.sort(key=lambda x: x[0], reverse=True)
     return scores_candidats[0][1] if scores_candidats else valides[:taille_cible]
@@ -214,7 +230,7 @@ course_info = {
     "discipline": "TROT ATTELE",
     "course_nom": "PRIX DU QUINTÉ+",
     "distance": "2700m",
-    "partants": "16",
+    "partants": "20",
     "heure": "13:50",
     "synthesis_pmu": "13 - 8 - 10 - 4 - 16 - 6 - 5 - 12",
     "combinaison": "13 - 6 - 5 - 12 - 11",
@@ -270,7 +286,8 @@ def appliquer_donnees_auto(data):
     date_course = str(course.get("date") or "")
     nouvelles = [{"id": str(a.get("id", "")), "arrivee": a["arrivee"]} for a in data.get("nouvelles_arrivees", []) if _arrivee_valide(a.get("arrivee"), 20) and str(a.get("id", "")) != date_course]
     HISTORIQUE_COMPLET = HISTORIQUE_SGE_DATA + nouvelles
-    POIDS_AXES_HISTORIQUE = calculer_poids_axes(HISTORIQUE_COMPLET)
+    nb_partants = get_nb_partants_actuel()
+    POIDS_AXES_HISTORIQUE = calculer_poids_axes(HISTORIQUE_COMPLET, nb_partants)
     FREQUENCES_CHEVAUX = calculer_frequences_par_cheval()
     if course.get("course_nom"):
         arr = course.get("arrivee")
@@ -349,10 +366,15 @@ def generer_html(message=None):
     nums_prono = generer_prono_automatique(nums_saisis)
     score_prono = calculer_score_pegasus(nums_prono)
 
-    nb_partants = int(course_info.get("partants") or 16)
+    nb_partants = get_nb_partants_actuel()
     score_combi = calculer_score_pegasus(nums_saisis[:5]) if len(nums_saisis) >= 5 else 0
 
     freq_json = json.dumps(FREQUENCES_CHEVAUX)
+
+    # NOUVEAU : Calcul du nombre de colonnes pour la grille à 2 lignes
+    # Pair : nb_partants / 2 colonnes (ex: 20 → 10 colonnes, 2 lignes de 10)
+    # Impair : (nb_partants + 1) / 2 colonnes (ex: 15 → 8 colonnes, 1ère ligne de 8, 2e de 7)
+    nb_colonnes = (nb_partants + 1) // 2
 
     top3_chevaux = obtenir_top3_chevaux_frequents()
     if len(top3_chevaux) >= 3:
@@ -427,7 +449,7 @@ def generer_html(message=None):
     h_comb = html.escape(course_info['combinaison'])
     h_date = html.escape(date_txt) if date_txt else ""
 
-    default_values = {"hippodrome": "PARIS-VINCENNES", "discipline": "TROT ATTELE", "course_nom": "PRIX DU QUINTÉ+", "distance": "2700m", "partants": "16", "heure": "13:50", "synthesis_pmu": "13 - 8 - 10 - 4 - 16 - 6 - 5 - 12", "combinaison": "13 - 6 - 5 - 12 - 11", "date": "mercredi 14 octobre 2026"}
+    default_values = {"hippodrome": "PARIS-VINCENNES", "discipline": "TROT ATTELE", "course_nom": "PRIX DU QUINTÉ+", "distance": "2700m", "partants": "20", "heure": "13:50", "synthesis_pmu": "13 - 8 - 10 - 4 - 16 - 6 - 5 - 12", "combinaison": "13 - 6 - 5 - 12 - 11", "date": "mercredi 14 octobre 2026"}
     mission = "Le but de PEGASUS est de donner des ailes à l'intuition du parieur en transformant des données historiques brutes en une stratégie géométrique claire, automatisée et optimisée."
 
     return f"""<!DOCTYPE html>
@@ -514,7 +536,7 @@ def generer_html(message=None):
         .ball.white {{ background-color: #f5f6fa; color: #000; }}
         .ball.hit {{ outline: 3px solid var(--accent-teal); outline-offset: 2px; }}
         .ball.miss {{ opacity: 0.4; }}
-        .grid-partants {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(50px, 1fr)); gap: 10px; margin-bottom: 18px; }}
+        .grid-partants {{ display: grid; gap: 10px; margin-bottom: 18px; }}
         .grid-btn {{ background-color: var(--input-bg); border: 1px solid var(--border-color); color: var(--text-main); padding: 14px 0; border-radius: 8px; font-size: 1.15rem; font-weight: bold; cursor: pointer; text-align: center; transition: all 0.2s ease; }}
         .grid-btn:hover {{ border-color: var(--accent-orange); }}
         .grid-btn.active {{ background-color: var(--accent-orange); color: #000000; border-color: var(--accent-orange); box-shadow: 0 0 12px rgba(243, 156, 18, 0.5); }}
@@ -635,7 +657,7 @@ def generer_html(message=None):
         
         <div class="header-actions">
             <a href="/refresh" class="refresh-btn" title="Forcer le rechargement des données depuis GitHub">
-                <span class="icon">🔄</span> Actualiser les données
+                <span class="icon"></span> Actualiser les données
             </a>
             <a href="/trigger-workflow" class="robot-btn" title="Déclencher le robot GitHub pour aller chercher les nouvelles courses">
                 <span class="icon">🤖</span> Relancer le robot
@@ -676,7 +698,7 @@ def generer_html(message=None):
     <div class="card">
         <div class="card-title">2. Synthèse PMU et pronostic Pegasus optimisé pour une grille de {nb_partants} partants au Quinté</div>
         <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: -10px; margin-bottom: 18px; font-style: italic;">
-            Le moteur Pegasus analyse les {nb_base} dernières arrivées pour identifier les axes géométriques récurrents (ex: 1-9, 2-10) et optimiser votre combinaison de 5 ou 8 chevaux.
+            Le moteur Pegasus analyse les {nb_base} dernières arrivées pour identifier les axes géométriques récurrents et optimiser votre combinaison de 5 ou 8 chevaux.
         </p>
         <div style="margin-bottom: 18px;"><div style="font-size: 0.9rem; color: var(--text-muted);">Synthèse Presse / Favoris :</div><div class="balls-container">{html_synth_pmu}</div></div>
         <div style="margin-bottom: 18px;"><div style="font-size: 0.9rem; color: var(--text-muted);">Pronostic Pegasus calculé automatiquement :</div><div class="balls-container">{html_prono_balls}</div></div>
@@ -707,7 +729,7 @@ def generer_html(message=None):
             (Moyenne sur {nb_base} courses — 3 chevaux ou plus = Très bon, 1 cheval = Faible)
         </p>
 
-        <div class="grid-partants">
+        <div class="grid-partants" style="grid-template-columns: repeat({nb_colonnes}, 1fr);">
             {''.join([f'<div class="grid-btn" id="btn-{i}" onclick="toggleNum({i})">{i}</div>' for i in range(1, nb_partants + 1)])}
         </div>
         <button class="action-btn" style="background-color: #34495e; color: #fff; margin-top: 0;" onclick="resetSelection()">Réinitialiser la grille</button>
