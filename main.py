@@ -134,9 +134,28 @@ HISTORIQUE_SGE_DATA = [
 ]
 
 # ==============================================================================
-# 2. MOTEUR PEGASUS - ADAPTÉ POUR 20 PARTANTS
+# 2. ÉTAT DE L'APPLICATION (Défini AVANT les fonctions qui l'utilisent)
 # ==============================================================================
+course_info = {
+    "hippodrome": "PARIS-VINCENNES",
+    "discipline": "TROT ATTELE",
+    "course_nom": "PRIX DU QUINTÉ+",
+    "distance": "2700m",
+    "partants": "20",
+    "heure": "13:50",
+    "synthesis_pmu": "13 - 8 - 10 - 4 - 16 - 6 - 5 - 12",
+    "combinaison": "13 - 6 - 5 - 12 - 11",
+    "arrivee": [],
+    "date": ""
+}
 
+def get_nb_partants_actuel():
+    """Retourne le nombre de partants actuel"""
+    return int(course_info.get("partants") or 16)
+
+# ==============================================================================
+# 3. MOTEUR PEGASUS - ADAPTÉ POUR 20 PARTANTS
+# ==============================================================================
 def generer_oppositions(nb_partants):
     """Génère les oppositions verticales selon le nombre de partants"""
     oppositions = {}
@@ -165,10 +184,6 @@ def calculer_poids_axes(historique=None, nb_partants=16):
     return {axe: freq // 2 for axe, freq in frequence_axes.items()}
 
 HISTORIQUE_COMPLET = list(HISTORIQUE_SGE_DATA)
-
-def get_nb_partants_actuel():
-    return int(course_info.get("partants") or 16)
-
 POIDS_AXES_HISTORIQUE = calculer_poids_axes(HISTORIQUE_COMPLET, get_nb_partants_actuel())
 
 def calculer_score_pegasus(combinaison, nb_partants=None):
@@ -223,21 +238,8 @@ def obtenir_top3_chevaux_frequents():
     return tries[:3]
 
 # ==============================================================================
-# 3. ÉTAT DE L'APPLICATION
+# 4. GESTION DES DONNÉES ET ROUTES
 # ==============================================================================
-course_info = {
-    "hippodrome": "PARIS-VINCENNES",
-    "discipline": "TROT ATTELE",
-    "course_nom": "PRIX DU QUINTÉ+",
-    "distance": "2700m",
-    "partants": "20",
-    "heure": "13:50",
-    "synthesis_pmu": "13 - 8 - 10 - 4 - 16 - 6 - 5 - 12",
-    "combinaison": "13 - 6 - 5 - 12 - 11",
-    "arrivee": [],
-    "date": ""
-}
-
 DATA_FILE = Path(__file__).resolve().parent / "data" / "quinte.json"
 QUINTE_JSON_URL = os.getenv("QUINTE_JSON_URL", "").strip()
 RECHARGEMENT_SECONDES = 300
@@ -368,12 +370,9 @@ def generer_html(message=None):
 
     nb_partants = get_nb_partants_actuel()
     score_combi = calculer_score_pegasus(nums_saisis[:5]) if len(nums_saisis) >= 5 else 0
-
     freq_json = json.dumps(FREQUENCES_CHEVAUX)
 
     # NOUVEAU : Calcul du nombre de colonnes pour la grille à 2 lignes
-    # Pair : nb_partants / 2 colonnes (ex: 20 → 10 colonnes, 2 lignes de 10)
-    # Impair : (nb_partants + 1) / 2 colonnes (ex: 15 → 8 colonnes, 1ère ligne de 8, 2e de 7)
     nb_colonnes = (nb_partants + 1) // 2
 
     top3_chevaux = obtenir_top3_chevaux_frequents()
@@ -657,7 +656,7 @@ def generer_html(message=None):
         
         <div class="header-actions">
             <a href="/refresh" class="refresh-btn" title="Forcer le rechargement des données depuis GitHub">
-                <span class="icon"></span> Actualiser les données
+                <span class="icon">🔄</span> Actualiser les données
             </a>
             <a href="/trigger-workflow" class="robot-btn" title="Déclencher le robot GitHub pour aller chercher les nouvelles courses">
                 <span class="icon">🤖</span> Relancer le robot
