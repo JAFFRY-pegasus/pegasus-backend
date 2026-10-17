@@ -288,20 +288,14 @@ def _arrivee_affichable(arr):
     return (isinstance(arr, list) and len(arr) == 5 and all(isinstance(n, int) and not isinstance(n, bool) for n in arr) and len(set(arr)) == 5)
 
 def _extraire_non_partants(data):
-    """Extrait les non-partants depuis le JSON (plusieurs formats supportés)"""
     non_partants = []
     course = data.get("course_du_jour") or {}
-    
-    # Format 1 : course_du_jour.non_partants (liste)
     if isinstance(course.get("non_partants"), list):
         non_partants = [int(n) for n in course["non_partants"] if isinstance(n, (int, float)) and 1 <= int(n) <= 20]
-    # Format 2 : non_partants à la racine
     elif isinstance(data.get("non_partants"), list):
         non_partants = [int(n) for n in data["non_partants"] if isinstance(n, (int, float)) and 1 <= int(n) <= 20]
-    # Format 3 : string "3-7-12"
     elif isinstance(course.get("non_partants"), str) and course["non_partants"].strip():
         non_partants = [int(n.strip()) for n in course["non_partants"].replace(",", " ").replace("-", " ").split() if n.strip().isdigit()]
-    
     return sorted(non_partants)
 
 _JOURS_FR = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
@@ -337,7 +331,6 @@ def appliquer_donnees_auto(data):
             if course.get(cle): course_info[cle] = str(course[cle])
         if course.get("synthese_pmu"): course_info["synthesis_pmu"] = _liste_en_texte(course["synthese_pmu"])
         if course.get("combinaison"): course_info["combinaison"] = _liste_en_texte(course["combinaison"])
-        # Extraction automatique des non-partants
         non_partants_extraits = _extraire_non_partants(data)
         course_info["non_partants_auto"] = non_partants_extraits
         course_info["derniere_verif_non_partants"] = _heure_actuelle_fr()
@@ -372,7 +365,7 @@ def declencher_robot():
     token = os.getenv("GITHUB_TOKEN")
     repo = os.getenv("GITHUB_REPOSITORY", "JAFFRY-pegasus/pegasus-backend")
     if not token:
-        return generer_html(message=" Erreur : La variable GITHUB_TOKEN n'est pas configurée sur Render.")
+        return generer_html(message="❌ Erreur : La variable GITHUB_TOKEN n'est pas configurée sur Render.")
     url = f"https://api.github.com/repos/{repo}/actions/workflows/quinte.yml/dispatches"
     headers = {
         "Authorization": f"token {token}",
@@ -498,18 +491,13 @@ def generer_html(message=None):
     default_values = {"hippodrome": "PARIS-VINCENNES", "discipline": "TROT ATTELE", "course_nom": "PRIX DU QUINTÉ+", "distance": "2700m", "partants": "20", "non_partants": "", "heure": "13:50", "synthesis_pmu": "13 - 8 - 10 - 4 - 16 - 6 - 5 - 12", "combinaison": "13 - 6 - 5 - 12 - 11", "date": "mercredi 14 octobre 2026"}
     mission = "Le but de PEGASUS est de donner des ailes à l'intuition du parieur en transformant des données historiques brutes en une stratégie géométrique claire, automatisée et optimisée."
 
-    # Bloc d'information sur les non-partants automatiques
     html_non_partants_auto = ""
     if non_partants_auto:
         nums_auto = ", ".join(f"<strong>n°{n}</strong>" for n in sorted(non_partants_auto))
         html_non_partants_auto = f"""
         <div style="margin-bottom: 15px; padding: 12px 16px; background: linear-gradient(135deg, rgba(52, 152, 219, 0.15), rgba(41, 128, 185, 0.15)); border-left: 4px solid #3498db; border-radius: 8px; font-size: 0.9rem; color: var(--text-main);">
-            <div style="margin-bottom: 6px;">
-                <strong>ℹ️ Non-partant(s) détecté(s) automatiquement :</strong> {nums_auto}
-            </div>
-            <div style="font-size: 0.8rem; color: var(--text-muted);">
-                💡 Partants réels : <strong style="color: var(--accent-orange);">{nb_partants_reels}</strong> sur {nb_partants_declares} déclarés • Dernière vérification : <strong>{derniere_verif}</strong> • Cliquez sur 🔄 Actualiser pour re-vérifier
-            </div>
+            <div style="margin-bottom: 6px;"><strong>ℹ️ Non-partant(s) détecté(s) automatiquement :</strong> {nums_auto}</div>
+            <div style="font-size: 0.8rem; color: var(--text-muted);">💡 Partants réels : <strong style="color: var(--accent-orange);">{nb_partants_reels}</strong> sur {nb_partants_declares} déclarés • Dernière vérification : <strong>{derniere_verif}</strong> • Cliquez sur 🔄 Actualiser pour re-vérifier</div>
         </div>
         """
     else:
@@ -546,6 +534,7 @@ def generer_html(message=None):
     <style>
         :root {{ --bg-color: #0d0f12; --card-bg: rgba(22, 25, 32, 0.92); --accent-orange: #f39c12; --accent-teal: #1abc9c; --text-main: #f5f6fa; --text-muted: #c0c8d0; --border-color: #2c3e50; --input-bg: rgba(30, 34, 43, 0.95); }}
         
+        /* NOUVEAU : Image de fond course hippique */
         body {{
             font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             color: var(--text-main);
@@ -557,20 +546,14 @@ def generer_html(message=None):
             align-items: center;
             position: relative;
             min-height: 100vh;
-            background: linear-gradient(135deg, 
-                #1a0f2e 0%, #2d1b4e 15%, #4a2c6e 30%, #8b4a7a 45%, 
-                #c97b5a 60%, #e8a87c 75%, #f4c27a 90%, #1a0f2e 100%
-            );
-            background-size: 400% 400%;
-            animation: sunsetShift 20s ease infinite;
+            background-image: url('https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?w=1920&q=80');
+            background-size: cover;
+            background-position: center center;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
         }}
         
-        @keyframes sunsetShift {{
-            0% {{ background-position: 0% 50%; }}
-            50% {{ background-position: 100% 50%; }}
-            100% {{ background-position: 0% 50%; }}
-        }}
-        
+        /* Overlay sombre pour lisibilité */
         body::before {{
             content: '';
             position: fixed;
@@ -578,7 +561,7 @@ def generer_html(message=None):
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(13, 15, 18, 0.55);
+            background: rgba(13, 15, 18, 0.65);
             z-index: -1;
         }}
         
@@ -607,14 +590,7 @@ def generer_html(message=None):
         .grid-btn {{ background-color: var(--input-bg); border: 1px solid var(--border-color); color: var(--text-main); padding: 14px 0; border-radius: 8px; font-size: 1.15rem; font-weight: bold; cursor: pointer; text-align: center; transition: all 0.2s ease; }}
         .grid-btn:hover {{ border-color: var(--accent-orange); }}
         .grid-btn.active {{ background-color: var(--accent-orange); color: #000000; border-color: var(--accent-orange); box-shadow: 0 0 12px rgba(243, 156, 18, 0.5); }}
-        .grid-btn.non-partant {{ 
-            background-color: #2a2f3a; 
-            color: #7f8c8d; 
-            border-color: #e74c3c;
-            text-decoration: line-through;
-            cursor: not-allowed;
-            opacity: 0.5;
-        }}
+        .grid-btn.non-partant {{ background-color: #2a2f3a; color: #7f8c8d; border-color: #e74c3c; text-decoration: line-through; cursor: not-allowed; opacity: 0.5; }}
         .action-btn {{ width: 100%; background-color: var(--accent-teal); color: #000000; border: none; padding: 14px; border-radius: 8px; font-size: 1.05rem; font-weight: bold; cursor: pointer; margin-top: 12px; text-transform: uppercase; transition: opacity 0.2s; }}
         .action-btn:hover {{ opacity: 0.9; }}
         .score-box {{ display: flex; justify-content: space-between; gap: 15px; margin-top: 18px; }}
@@ -626,95 +602,21 @@ def generer_html(message=None):
         .taux-reussite-badge {{ display: inline-flex; align-items: center; gap: 8px; padding: 8px 18px; border-radius: 25px; font-weight: bold; font-size: 1.1rem; color: #000; animation: pulse-taux 1.8s ease-in-out infinite; box-shadow: 0 0 15px currentColor; transition: all 0.3s ease; }}
         .taux-reussite-label {{ font-size: 0.85rem; color: var(--text-muted); font-weight: normal; }}
         @keyframes pulse-taux {{ 0%, 100% {{ opacity: 1; transform: scale(1); box-shadow: 0 0 10px currentColor; }} 50% {{ opacity: 0.75; transform: scale(1.05); box-shadow: 0 0 25px currentColor; }} }}
-        
-        .top3-info {{
-            background: linear-gradient(135deg, rgba(243, 156, 18, 0.15), rgba(26, 188, 156, 0.15));
-            border: 1px solid var(--border-color);
-            border-left: 4px solid var(--accent-orange);
-            border-radius: 10px;
-            padding: 14px 18px;
-            margin-bottom: 18px;
-            text-align: center;
-        }}
+        .top3-info {{ background: linear-gradient(135deg, rgba(243, 156, 18, 0.15), rgba(26, 188, 156, 0.15)); border: 1px solid var(--border-color); border-left: 4px solid var(--accent-orange); border-radius: 10px; padding: 14px 18px; margin-bottom: 18px; text-align: center; }}
         .top3-label {{ display: block; font-size: 0.85rem; color: var(--text-main); margin-bottom: 10px; font-style: italic; }}
         .top3-balls {{ display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; }}
-        .top3-ball {{
-            background-color: var(--accent-orange);
-            color: #000;
-            padding: 6px 14px;
-            border-radius: 20px;
-            font-weight: bold;
-            font-size: 0.95rem;
-            box-shadow: 0 2px 6px rgba(243, 156, 18, 0.3);
-        }}
+        .top3-ball {{ background-color: var(--accent-orange); color: #000; padding: 6px 14px; border-radius: 20px; font-weight: bold; font-size: 0.95rem; box-shadow: 0 2px 6px rgba(243, 156, 18, 0.3); }}
         .top3-ball small {{ font-weight: normal; font-size: 0.75rem; opacity: 0.85; margin-left: 4px; }}
-        
-        .header-actions {{
-            display: flex;
-            justify-content: center;
-            gap: 15px;
-            margin-top: 20px;
-            flex-wrap: wrap;
-        }}
-        .refresh-btn {{
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: 10px 22px;
-            background: linear-gradient(135deg, var(--accent-teal), #16a085);
-            color: #000;
-            border: none;
-            border-radius: 25px;
-            font-size: 0.9rem;
-            font-weight: bold;
-            cursor: pointer;
-            text-decoration: none;
-            box-shadow: 0 4px 12px rgba(26, 188, 156, 0.4);
-            transition: all 0.3s ease;
-        }}
-        .refresh-btn:hover {{
-            transform: translateY(-2px);
-            box-shadow: 0 6px 16px rgba(26, 188, 156, 0.6);
-        }}
+        .header-actions {{ display: flex; justify-content: center; gap: 15px; margin-top: 20px; flex-wrap: wrap; }}
+        .refresh-btn {{ display: inline-flex; align-items: center; gap: 8px; padding: 10px 22px; background: linear-gradient(135deg, var(--accent-teal), #16a085); color: #000; border: none; border-radius: 25px; font-size: 0.9rem; font-weight: bold; cursor: pointer; text-decoration: none; box-shadow: 0 4px 12px rgba(26, 188, 156, 0.4); transition: all 0.3s ease; }}
+        .refresh-btn:hover {{ transform: translateY(-2px); box-shadow: 0 6px 16px rgba(26, 188, 156, 0.6); }}
         .refresh-btn .icon {{ display: inline-block; transition: transform 0.5s ease; }}
         .refresh-btn:hover .icon {{ transform: rotate(180deg); }}
-        
-        .robot-btn {{
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: 10px 22px;
-            background: linear-gradient(135deg, #8e44ad, #9b59b6);
-            color: #fff;
-            border: none;
-            border-radius: 25px;
-            font-size: 0.9rem;
-            font-weight: bold;
-            cursor: pointer;
-            text-decoration: none;
-            box-shadow: 0 4px 12px rgba(142, 68, 173, 0.4);
-            transition: all 0.3s ease;
-        }}
-        .robot-btn:hover {{
-            transform: translateY(-2px);
-            box-shadow: 0 6px 16px rgba(142, 68, 173, 0.6);
-        }}
+        .robot-btn {{ display: inline-flex; align-items: center; gap: 8px; padding: 10px 22px; background: linear-gradient(135deg, #8e44ad, #9b59b6); color: #fff; border: none; border-radius: 25px; font-size: 0.9rem; font-weight: bold; cursor: pointer; text-decoration: none; box-shadow: 0 4px 12px rgba(142, 68, 173, 0.4); transition: all 0.3s ease; }}
+        .robot-btn:hover {{ transform: translateY(-2px); box-shadow: 0 6px 16px rgba(142, 68, 173, 0.6); }}
         .robot-btn .icon {{ display: inline-block; transition: transform 0.5s ease; }}
         .robot-btn:hover .icon {{ transform: rotate(360deg); }}
-        
-        .footer-prevention {{
-            text-align: center;
-            margin-top: 40px;
-            padding: 25px 20px;
-            border-top: 1px solid var(--border-color);
-            color: var(--text-main);
-            font-size: 0.8rem;
-            width: 100%;
-            max-width: 820px;
-            background: rgba(13, 15, 18, 0.85);
-            border-radius: 12px;
-            backdrop-filter: blur(10px);
-        }}
+        .footer-prevention {{ text-align: center; margin-top: 40px; padding: 25px 20px; border-top: 1px solid var(--border-color); color: var(--text-main); font-size: 0.8rem; width: 100%; max-width: 820px; background: rgba(13, 15, 18, 0.85); border-radius: 12px; backdrop-filter: blur(10px); }}
         .footer-prevention strong {{ color: #e74c3c; }}
         .footer-prevention a {{ color: var(--accent-teal); text-decoration: none; font-weight: 600; }}
         .footer-prevention a:hover {{ text-decoration: underline; }}
@@ -729,12 +631,11 @@ def generer_html(message=None):
         <p>Analyseur Géométrique d'Axes & Stratégie Quinté+</p>
         <p class="mission-statement">"{mission}"</p>
         <p style="font-size:0.8rem;">Base : {nb_base} quintés (dont {nb_auto} ajoutés automatiquement) · Dernière mise à jour PMU : {maj_txt}</p>
-        
         <div class="header-actions">
-            <a href="/refresh" class="refresh-btn" title="Forcer le rechargement des données depuis GitHub (y compris les non-partants)">
+            <a href="/refresh" class="refresh-btn" title="Forcer le rechargement des données depuis GitHub">
                 <span class="icon">🔄</span> Actualiser les données
             </a>
-            <a href="/trigger-workflow" class="robot-btn" title="Déclencher le robot GitHub pour aller chercher les nouvelles courses">
+            <a href="/trigger-workflow" class="robot-btn" title="Déclencher le robot GitHub">
                 <span class="icon">🤖</span> Relancer le robot
             </a>
         </div>
@@ -745,9 +646,7 @@ def generer_html(message=None):
     <form action="/update" method="post">
         <div class="card">
             <div class="card-title">1. Informations sur le Quinté du Jour</div>
-            
             {html_non_partants_auto}
-            
             <div class="form-grid">
                 <div class="form-group full-width">
                     <label>📅 Date de la course (automatique) :</label>
@@ -761,7 +660,6 @@ def generer_html(message=None):
                 <div class="form-group"><label>Heure de départ :</label><input type="text" name="heure" value="{h_heure}" placeholder="{default_values['heure']}"></div>
                 <div class="form-group full-width"><label>Synthèse Presse / Favoris (séparés par tirets) :</label><input type="text" id="synthesis-input" name="synthesis_pmu" value="{h_synth}" placeholder="{default_values['synthesis_pmu']}"></div>
             </div>
-
             <div style="margin-top: 12px;">
                 <div class="diode-container">
                     <span class="diode"></span>
@@ -793,20 +691,14 @@ def generer_html(message=None):
         <p style="text-align: center; color: var(--text-muted); font-size: 0.85rem; margin-top: -8px; margin-bottom: 18px;">
             Cliquez sur les numéros de la grille pour composer instantanément votre combinaison (8 chevaux max) — outil de test indépendant
         </p>
-
         <div class="taux-reussite-container">
             <span class="taux-reussite-label">📊 Chevaux trouvés en moyenne dans le top 5 historique :</span>
-            <span id="taux-badge" class="taux-reussite-badge" style="background-color: #e74c3c;">
-                0.00 chevaux — Faible
-            </span>
+            <span id="taux-badge" class="taux-reussite-badge" style="background-color: #e74c3c;">0.00 chevaux — Faible</span>
         </div>
-
         {html_top3}
-
         <p style="text-align: center; font-size: 0.75rem; color: var(--text-muted); margin-top: -12px; margin-bottom: 18px; font-style: italic;">
             (Moyenne sur {nb_base} courses — 3 chevaux ou plus = Très bon, 1 cheval = Faible)
         </p>
-
         <div class="grid-partants" style="grid-template-columns: repeat({nb_colonnes}, 1fr);">
             {''.join([f'<div class="grid-btn {"non-partant" if i in non_partants_liste else ""}" id="btn-{i}" onclick="{"toggleNum(" + str(i) + ")" if i not in non_partants_liste else "void(0)"}" title="{"Non-partant" if i in non_partants_liste else "Cliquer pour sélectionner"}">{i}</div>' for i in range(1, nb_partants_declares + 1)])}
         </div>
@@ -841,7 +733,6 @@ def generer_html(message=None):
             totalHits += FREQUENCES[num] || 0;
         }});
         const moyenne = totalHits / NB_COURSES;
-        
         if (moyenne >= 3) {{
             return {{ valeur: moyenne.toFixed(2), label: "Très bon", couleur: "#2ecc71" }};
         }} else if (moyenne >= 2) {{
