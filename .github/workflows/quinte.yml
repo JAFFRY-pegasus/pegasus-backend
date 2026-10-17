@@ -2,48 +2,39 @@ name: Mise à jour Quinté+
 
 on:
   schedule:
-    # Cron en UTC (Paris = UTC+2 en heure d'été, UTC+1 en heure d'hiver).
-    # 07:30 UTC = 09:30 (été) / 08:30 (hiver) à Paris : programme du jour
-    - cron: "30 7 * * *"
-    # 08:30 UTC = 10:30 (été) / 09:30 (hiver) à Paris : exécution de secours (GitHub saute parfois un déclenchement)
-    - cron: "30 8 * * *"
-    # 17:30 UTC = 19:30 (été) / 18:30 (hiver) à Paris : arrivée du jour
-    - cron: "30 17 * * *"
-  workflow_dispatch:
-
-permissions:
-  contents: write
-
-concurrency:
-  group: quinte
-  cancel-in-progress: false
+    # Exécution à 09h30 et 19h30 (heure de Paris)
+    - cron: '30 7 * * *'   # 09h30 heure de Paris = 07h30 UTC
+    - cron: '30 17 * * *'  # 19h30 heure de Paris = 17h30 UTC
+  workflow_dispatch:       # Permet le déclenchement manuel
 
 jobs:
-  update:
+  update-quinte:
     runs-on: ubuntu-latest
+    
     steps:
-      - name: Récupérer le dépôt
+      - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Installer Python
+      
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
-
-      - name: Installer les dépendances
-        run: pip install requests
-
-      - name: Récupérer les données PMU
-        run: python scripts/fetch_quinte.py
-
-      - name: Commit si changement
+          python-version: '3.11'
+      
+      - name: Install dependencies
         run: |
-          if [ -n "$(git status --porcelain data/quinte.json)" ]; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add data/quinte.json
-            git commit -m "chore: mise à jour Quinté+ $(date -u +%F)"
-            git push
-          else
-            echo "Aucun changement."
-          fi
+          python -m pip install --upgrade pip
+          pip install requests
+      
+      - name: Create data directory
+        run: mkdir -p data
+      
+      - name: Fetch PMU data with non-partants
+        run: python fetch_quinte.py
+      
+      - name: Commit and push if changed
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add data/quinte.json
+          git diff --staged --quiet || git commit -m "🤖 Auto-update: données Quinté+ avec non-partants"
+          git push
