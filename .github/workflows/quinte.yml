@@ -29,12 +29,12 @@ jobs:
         run: mkdir -p data
       
       - name: Fetch PMU data with non-partants
-        run: python fetch_quinte.py
+        run: python scripts/fetch_quinte.py
       
       - name: Commit and push if changed
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add data/quinte.json
-          git diff --staged --quiet || git commit -m "🤖 Auto-update: données Quinté+ avec non-partants"
+          git diff --staged --quiet || git commit -m " Auto-update: données Quinté+ avec non-partants et arrivée"
           git push
