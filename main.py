@@ -372,7 +372,7 @@ def generer_html(message=None):
     score_combi = calculer_score_pegasus(nums_saisis[:5]) if len(nums_saisis) >= 5 else 0
     freq_json = json.dumps(FREQUENCES_CHEVAUX)
 
-    # NOUVEAU : Calcul du nombre de colonnes pour la grille à 2 lignes
+    # Calcul du nombre de colonnes pour la grille à 2 lignes
     nb_colonnes = (nb_partants + 1) // 2
 
     top3_chevaux = obtenir_top3_chevaux_frequents()
@@ -686,7 +686,7 @@ def generer_html(message=None):
             <div style="margin-top: 12px;">
                 <div class="diode-container">
                     <span class="diode"></span>
-                    <label style="font-size: 0.85rem; color: var(--text-muted); font-weight: 600;">Inscrivez ici votre combinaison de test en 5 ou 8 chevaux, elle générera automatiquement la combinaison Pegasus !</label>
+                    <label style="font-size: 0.85rem; color: var(--text-muted); font-weight: 600;">Inscrivez ici la combinaison de votre choix de 5 à 8 chevaux, elle générera automatiquement la combinaison optimisée de PEGASUS !</label>
                 </div>
                 <input type="text" id="combinaison-input" name="combinaison" value="{h_comb}" placeholder="{default_values['combinaison']}" style="width:100%; padding:10px; background-color:var(--input-bg); border:1px solid var(--border-color); color:#fff; border-radius:8px; box-sizing:border-box; font-size: 0.95rem;">
             </div>
