@@ -1,101 +1,52 @@
 """
-Script DEBUG : Affiche TOUS les champs d'une course pour trouver où est stocké "Quinté+"
+Script d'inspection : Affiche les champs 'paris' et 'poolIds' du 17 octobre
 """
 import json
-import os
-import sys
-from datetime import date, datetime, timedelta
-from pathlib import Path
+import requests
 
-try:
-    import requests
-except ImportError:
-    print("Erreur : requests n'est pas installé.")
-    sys.exit(1)
-
-DATA_DIR = Path(__file__).resolve().parent.parent / "data"
-DATA_DIR.mkdir(exist_ok=True)
-DATA_FILE = DATA_DIR / "quinte.json"
-
-def format_date_iso(d):
-    return d.strftime("%Y-%m-%d")
-
-def fetch_programme_complet(date_obj):
-    date_str = format_date_iso(date_obj)
-    url = f"https://online.turfinfo.api.pmu.fr/rest/client/1/programme/{date_str}"
-    try:
-        print(f"[info] Récupération du programme complet du {date_str}...")
-        r = requests.get(url, timeout=15, headers={"User-Agent": "Pegasus/1.0"})
-        if r.status_code == 200:
-            return r.json(), date_obj
-        else:
-            print(f"[warn] Erreur {r.status_code} pour {date_str}")
-            return None, None
-    except Exception as e:
-        print(f"[warn] Exception pour {date_str} : {e}")
-        return None, None
-
-def analyser_tous_les_champs(data, date_str):
+def main():
+    # On force la date d'hier (17 octobre) car on sait que R1/C3 était le Quinté+
+    url = "https://online.turfinfo.api.pmu.fr/rest/client/1/programme/2026-10-17"
+    
+    print(f"[info] Récupération du programme du 2026-10-17...")
+    r = requests.get(url, timeout=15, headers={"User-Agent": "Pegasus/1.0"})
+    
+    if r.status_code != 200:
+        print(f"[error] Erreur {r.status_code}")
+        return
+        
+    data = r.json()
     programme = data.get('programme', {})
     reunions = programme.get('reunions', [])
     
     print(f"\n{'='*70}")
-    print(f"ANALYSE COMPLÈTE DES CHAMPS POUR LE {date_str}")
+    print(f"INSPECTION DES CHAMPS 'paris' ET 'poolIds' (17 octobre)")
     print(f"{'='*70}")
     
     for reunion in reunions:
-        num_reunion = reunion.get('numExterne') or reunion.get('numOfficiel', '?')
-        hippodrome_info = reunion.get('hippodrome', {})
-        hippodrome = hippodrome_info.get('libelle', hippodrome_info.get('code', 'Inconnu')) if isinstance(hippodrome_info, dict) else str(hippodrome_info)
+        num_reu = reunion.get('numExterne')
         
-        courses = reunion.get('courses', [])
-        print(f"\n Réunion {num_reunion} - {hippodrome}")
-        print(f"{'─'*70}")
-        
-        for i, course in enumerate(courses[:3]): # On regarde les 3 premières courses
-            num_course = course.get('numExterne') or course.get('numOfficiel', course.get('numCourse', '?'))
-            libelle = course.get('libelle', 'N/A')
+        # On regarde toutes les réunions, mais on se concentre sur la 1
+        if num_reu == 1:
+            print(f"\n📍 RÉUNION {num_reu} (Celle qui contient le Quinté+ d'hier)")
+            print(f"{'─'*70}")
             
-            print(f"\n  Course R{num_reunion}/C{num_course} : {libelle}")
-            print(f"  {'─'*70}")
-            print(f"  TOUS LES CHAMPS DE CETTE COURSE :")
-            
-            for cle, valeur in course.items():
-                if isinstance(valeur, (dict, list)):
-                    print(f"    {cle}: {type(valeur).__name__}")
-                else:
-                    print(f"    {cle}: {valeur}")
-            
-            print(f"\n  🔍 Recherche de 'QUINTE' dans tous les champs...")
-            trouve = False
-            for cle, valeur in course.items():
-                if isinstance(valeur, str) and 'QUINTE' in str(valeur).upper():
-                    print(f"    ✅✅✅ TROUVÉ dans '{cle}' = '{valeur}' ✅✅✅")
-                    trouve = True
-                elif isinstance(valeur, dict):
-                    for sous_cle, sous_valeur in valeur.items():
-                        if isinstance(sous_valeur, str) and 'QUINTE' in str(sous_valeur).upper():
-                            print(f"    ✅✅✅ TROUVÉ dans '{cle}.{sous_cle}' = '{sous_valeur}' ✅✅✅")
-                            trouve = True
-            
-            if not trouve:
-                print(f"    ❌ 'QUINTE' non trouvé dans cette course")
-        
-        if len(courses) > 3:
-            print(f"\n  ... (affichage limité aux 3 premières courses pour ne pas surcharger)")
-        break # On s'arrête à la première réunion pour aller vite
-    
-    print(f"\n{'='*70}\n")
-
-def main():
-    date_jour = date.today()
-    print(f"[{datetime.now().isoformat()}] Analyse complète des champs de l'API PMU...")
-    
-    data, date_trouvee = fetch_programme_complet(date_jour)
-    if data:
-        analyser_tous_les_champs(data, format_date_iso(date_jour))
-    else:
-        print("[error] Impossible de récupérer le programme du jour.")
+            for course in reunion.get('courses', []):
+                num_co = course.get('numExterne')
+                libelle = course.get('libelle')
+                
+                # On extrait les champs mystères
+                paris = course.get('paris', [])
+                pool_ids = course.get('poolIds', [])
+                
+                print(f"\nCourse R1/C{num_co} : {libelle}")
+                # On utilise json.dumps pour bien afficher les listes/objets
+                print(f"  ️  paris   : {json.dumps(paris, ensure_ascii=False)}")
+                print(f"  ➡️  poolIds : {json.dumps(pool_ids, ensure_ascii=False)}")
+                
+    print(f"\n{'='*70}")
+    print(f"Regardez la différence entre la C3 (Quinté) et les autres !")
+    print(f"{'='*70}\n")
 
 if __name__ == "__main__":
     main()
