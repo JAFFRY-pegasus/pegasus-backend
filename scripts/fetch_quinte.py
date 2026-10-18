@@ -1,6 +1,6 @@
 """
 Script de récupération des données du Quinté+ depuis l'API PMU
-Version avec fallback sur les jours précédents
+Version ULTIME : Recherche dynamique du Quinté dans le programme du jour
 """
 import json
 import os
@@ -19,85 +19,55 @@ DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 DATA_DIR.mkdir(exist_ok=True)
 DATA_FILE = DATA_DIR / "quinte.json"
 
-def get_date_jour():
-    return date.today()
-
-def format_date_fr(d):
-    return d.strftime("%d-%m-%Y")
-
 def format_date_iso(d):
     return d.strftime("%Y-%m-%d")
 
-def fetch_programme(date_obj):
-    """Récupère le programme pour une date donnée"""
-    date_str_iso = format_date_iso(date_obj)
-    date_str_fr = format_date_fr(date_obj)
+def fetch_programme_complet(date_obj):
+    """Récupère le programme COMPLET d'une journée"""
+    date_str = format_date_iso(date_obj)
+    url = f"https://online.turfinfo.api.pmu.fr/rest/client/1/programme/{date_str}"
+    try:
+        print(f"[info] Récupération du programme complet du {date_str}...")
+        r = requests.get(url, timeout=15, headers={"User-Agent": "Pegasus/1.0"})
+        if r.status_code == 200:
+            return r.json(), date_obj
+        else:
+            print(f"[warn] Erreur {r.status_code} pour {date_str}")
+            return None, None
+    except Exception as e:
+        print(f"[warn] Exception pour {date_str} : {e}")
+        return None, None
+
+def trouver_quinte(data):
+    """Parcourt le programme pour trouver la course du Quinté+"""
+    # L'API peut retourner une liste de réunions ou un dictionnaire avec une clé 'reunions'
+    reunions = data.get('reunions', []) if isinstance(data, dict) else data
     
-    urls_to_try = [
-        f"https://online.turfinfo.api.pmu.fr/rest/client/1/programme/{date_str_iso}/R1/C1",
-        f"https://online.turfinfo.api.pmu.fr/rest/client/1/programme/{date_str_fr}/R1/C1",
-        f"https://online.turfinfo.api.pmu.fr/rest/client/2/programme/{date_str_iso}/R1/C1",
-        f"https://online.turfinfo.api.pmu.fr/rest/client/2/programme/{date_str_fr}/R1/C1",
-    ]
-    
-    for url in urls_to_try:
-        try:
-            print(f"[info] Tentative URL : {url}")
-            r = requests.get(url, timeout=15, headers={"User-Agent": "Pegasus/1.0"})
+    for reunion in reunions:
+        courses = reunion.get('courses', [])
+        for course in courses:
+            libelle = str(course.get('libelle', '')).upper()
+            specialite = str(course.get('specialite', '')).upper()
             
-            if r.status_code == 200:
-                print(f"[ok] Succès avec URL : {url}")
-                return r.json(), date_obj
-            elif r.status_code in [400, 404]:
-                print(f"[warn] {r.status_code} - Course non trouvée pour {date_str_iso}")
-                continue
-            else:
-                print(f"[warn] Erreur {r.status_code} pour URL : {url}")
-                continue
-        except Exception as e:
-            print(f"[warn] Exception pour URL {url} : {e}")
-            continue
-    
+            # On cherche le mot QUINTÉ dans le titre ou la spécialité
+            if 'QUINTÉ' in libelle or 'QUINTE' in specialite:
+                return reunion, course
     return None, None
 
-def fetch_arrivee(date_obj):
-    """Récupère l'arrivée officielle"""
-    date_str_iso = format_date_iso(date_obj)
-    date_str_fr = format_date_fr(date_obj)
-    
-    urls_to_try = [
-        f"https://online.turfinfo.api.pmu.fr/rest/client/1/programme/{date_str_iso}/R1/C1/arrivee",
-        f"https://online.turfinfo.api.pmu.fr/rest/client/1/programme/{date_str_fr}/R1/C1/arrivee",
-    ]
-    
-    for url in urls_to_try:
-        try:
-            r = requests.get(url, timeout=15, headers={"User-Agent": "Pegasus/1.0"})
-            if r.status_code == 200:
-                data = r.json()
-                if isinstance(data, dict) and "arrivee" in data:
-                    return [int(c.get("numPmu", 0)) for c in data["arrivee"][:5] if c.get("numPmu")]
-                elif isinstance(data, list):
-                    return [int(c.get("numPmu", 0)) for c in data[:5] if c.get("numPmu")]
-        except:
-            continue
-    return None
-
-def extraire_non_partants(programme):
+def extraire_non_partants(course_data):
     non_partants = []
-    if not programme:
-        return non_partants
-    
-    if isinstance(programme.get("nonPartants"), list):
-        for np in programme["nonPartants"]:
+    # Format 1 : liste directe
+    if isinstance(course_data.get("nonPartants"), list):
+        for np in course_data["nonPartants"]:
             if isinstance(np, dict) and "numPmu" in np:
                 try: non_partants.append(int(np["numPmu"]))
                 except: pass
             elif isinstance(np, (int, float)):
                 non_partants.append(int(np))
-                
-    if isinstance(programme.get("participants"), list):
-        for p in programme["participants"]:
+    
+    # Format 2 : dans les participants
+    if isinstance(course_data.get("participants"), list):
+        for p in course_data["participants"]:
             if isinstance(p, dict):
                 is_np = (p.get("supplement") is True or p.get("nonPartant") is True or str(p.get("statut", "")).lower() in ("non-partant", "supplement", "absent"))
                 if is_np and "numPmu" in p:
@@ -105,11 +75,9 @@ def extraire_non_partants(programme):
                     except: pass
     return sorted(list(set(non_partants)))
 
-def extraire_participants(programme):
+def extraire_participants(course_data):
     participants = []
-    if not programme:
-        return participants
-    source = programme.get("participants") or programme.get("chevaux") or []
+    source = course_data.get("participants", [])
     for p in source:
         if isinstance(p, dict) and "numPmu" in p:
             try:
@@ -117,54 +85,82 @@ def extraire_participants(programme):
             except: pass
     return participants
 
+def fetch_arrivee_dediee(date_obj, num_reunion, num_course):
+    """Tente de récupérer l'arrivée via l'endpoint dédié si elle n'est pas dans le programme"""
+    date_str = format_date_iso(date_obj)
+    url = f"https://online.turfinfo.api.pmu.fr/rest/client/1/programme/{date_str}/R{num_reunion}/C{num_course}/arrivee"
+    try:
+        r = requests.get(url, timeout=15, headers={"User-Agent": "Pegasus/1.0"})
+        if r.status_code == 200:
+            data = r.json()
+            if isinstance(data, dict) and "arrivee" in data:
+                return [int(c.get("numPmu", 0)) for c in data["arrivee"][:5] if c.get("numPmu")]
+            elif isinstance(data, list):
+                return [int(c.get("numPmu", 0)) for c in data[:5] if c.get("numPmu")]
+    except:
+        pass
+    return None
+
 def main():
-    date_jour = get_date_jour()
-    print(f"[{datetime.now().isoformat()}] Recherche programme...")
+    date_jour = date.today()
+    print(f"[{datetime.now().isoformat()}] Démarrage de la recherche du Quinté+...")
+    
+    programme_complet = None
+    date_trouvee = None
+    reunion_data = None
+    course_data = None
     
     # Essayer aujourd'hui, puis hier, puis avant-hier
-    programme = None
-    date_trouvee = None
-    
     for jours_en_arriere in range(3):
         date_test = date_jour - timedelta(days=jours_en_arriere)
-        print(f"\n[info] Essai pour le {format_date_iso(date_test)} ({jours_en_arriere} jour(s) en arrière)")
-        programme, date_trouvee = fetch_programme(date_test)
-        if programme:
-            print(f"[ok] Programme trouvé pour le {format_date_iso(date_trouvee)}")
-            break
+        print(f"\n[info] Exploration du {format_date_iso(date_test)}...")
+        
+        data, date_trouvee = fetch_programme_complet(date_test)
+        if data:
+            reunion_data, course_data = trouver_quinte(data)
+            if course_data:
+                print(f"[ok] Quinté+ trouvé le {format_date_iso(date_trouvee)} !")
+                programme_complet = data
+                break
+            else:
+                print("[warn] Programme trouvé, mais aucune course 'Quinté' identifiée.")
     
-    if not programme:
-        print("[error] Aucune donnée disponible pour les 3 derniers jours")
+    if not course_data:
+        print("[error] Impossible de trouver le Quinté+ sur les 3 derniers jours.")
         sys.exit(1)
     
-    non_partants = extraire_non_partants(programme)
-    participants = extraire_participants(programme)
+    # Extraction des données
+    num_reunion = reunion_data.get('numReunion', 1)
+    num_course = course_data.get('numCourse', 1)
     
-    # Arrivée
+    non_partants = extraire_non_partants(course_data)
+    participants = extraire_participants(course_data)
+    
+    # Arrivée : d'abord dans le programme, sinon via endpoint dédié
     arrivee = []
-    if isinstance(programme, dict) and "arrivee" in programme:
-        arrivee = [int(c.get("numPmu", 0)) for c in programme["arrivee"][:5] if c.get("numPmu")]
+    if isinstance(course_data.get("arrivee"), list):
+        arrivee = [int(c.get("numPmu", 0)) for c in course_data["arrivee"][:5] if c.get("numPmu")]
     
     if not arrivee or len(arrivee) < 5:
-        arrivee_endpoint = fetch_arrivee(date_trouvee)
-        if arrivee_endpoint and len(arrivee_endpoint) == 5:
-            arrivee = arrivee_endpoint
+        print("[info] Arrivée non trouvée dans le programme, tentative via endpoint dédié...")
+        arrivee = fetch_arrivee_dediee(date_trouvee, num_reunion, num_course) or []
 
+    # Construction des infos de la course
     course_info = {
         "date": format_date_iso(date_trouvee),
-        "hippodrome": programme.get("hippodrome", {}).get("libelle", "Inconnu") if isinstance(programme.get("hippodrome"), dict) else "Inconnu",
-        "discipline": programme.get("discipline", {}).get("libelle", "Inconnue") if isinstance(programme.get("discipline"), dict) else "Inconnue",
-        "course_nom": programme.get("libelle", "PRIX DU QUINTÉ+"),
-        "distance": programme.get("distance", "Inconnue"),
+        "hippodrome": reunion_data.get("hippodrome", {}).get("libelle", "Inconnu") if isinstance(reunion_data.get("hippodrome"), dict) else "Inconnu",
+        "discipline": course_data.get("discipline", {}).get("libelle", "Inconnue") if isinstance(course_data.get("discipline"), dict) else "Inconnue",
+        "course_nom": course_data.get("libelle", "PRIX DU QUINTÉ+"),
+        "distance": course_data.get("distance", "Inconnue"),
         "partants": str(len(participants)) if participants else "16",
-        "heure": programme.get("heureDepart", "13:50"),
+        "heure": course_data.get("heureDepart", "13:50"),
         "non_partants": non_partants,
         "participants": participants,
         "arrivee": arrivee if len(arrivee) == 5 else []
     }
     
-    if programme.get("synthese"):
-        course_info["synthese_pmu"] = programme["synthese"]
+    if course_data.get("synthese"):
+        course_info["synthese_pmu"] = course_data["synthese"]
     
     output = {
         "course_du_jour": course_info,
@@ -176,7 +172,8 @@ def main():
     }
     
     DATA_FILE.write_text(json.dumps(output, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"\n[ok] Données sauvegardées pour le {format_date_iso(date_trouvee)}")
+    print(f"\n[ok] ✅ Données sauvegardées avec succès pour le {format_date_iso(date_trouvee)}")
+    print(f"  - Réunion/Course : R{num_reunion}/C{num_course}")
     print(f"  - Partants : {len(participants)}")
     print(f"  - Non-partants : {non_partants}")
     print(f"  - Arrivée : {arrivee}")
