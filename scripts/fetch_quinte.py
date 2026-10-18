@@ -41,10 +41,8 @@ def analyser_structure_json(data, date_str):
     print(f"STRUCTURE DU JSON POUR LE {date_str}")
     print(f"{'='*70}")
     
-    # Afficher le type de données
     print(f"\nType de données : {type(data).__name__}")
     
-    # Si c'est un dictionnaire, afficher les clés
     if isinstance(data, dict):
         print(f"\nClés principales du JSON :")
         for cle in data.keys():
@@ -56,7 +54,6 @@ def analyser_structure_json(data, date_str):
                 print(f" = '{valeur[:50]}'", end="")
             print()
         
-        # Chercher les réunions dans différentes clés possibles
         cles_possibles = ['reunions', 'reunion', 'programme', 'courses', 'data', 'result']
         for cle in cles_possibles:
             if cle in data:
@@ -69,7 +66,6 @@ def analyser_structure_json(data, date_str):
                 elif isinstance(valeur, dict):
                     print(f"   Clés internes: {list(valeur.keys())[:10]}")
     
-    # Si c'est une liste
     elif isinstance(data, list):
         print(f"\nC'est une liste de {len(data)} éléments")
         if len(data) > 0:
@@ -77,7 +73,6 @@ def analyser_structure_json(data, date_str):
             if isinstance(data[0], dict):
                 print(f"Clés du premier élément: {list(data[0].keys())[:10]}")
     
-    # Afficher un extrait du JSON (500 premiers caractères)
     print(f"\n{'='*70}")
     print(f"EXTRAIT DU JSON (500 premiers caractères) :")
     print(f"{'='*70}")
