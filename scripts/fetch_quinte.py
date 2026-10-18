@@ -1,5 +1,5 @@
 """
-Script DEBUG : Affiche TOUTES les courses pour identifier le format exact du Quinté
+Script DEBUG ULTIME : Affiche la structure brute du JSON de l'API PMU
 """
 import json
 import os
@@ -35,99 +35,61 @@ def fetch_programme_complet(date_obj):
         print(f"[warn] Exception pour {date_str} : {e}")
         return None, None
 
-def afficher_toutes_les_courses(data, date_str):
-    """Affiche TOUTES les courses avec leurs titres exacts"""
-    reunions = data.get('reunions', []) if isinstance(data, dict) else data
+def analyser_structure_json(data, date_str):
+    """Analyse et affiche la structure du JSON"""
+    print(f"\n{'='*70}")
+    print(f"STRUCTURE DU JSON POUR LE {date_str}")
+    print(f"{'='*70}")
     
-    print(f"\n{'='*60}")
-    print(f"LISTE COMPLÈTE DES COURSES DU {date_str}")
-    print(f"{'='*60}")
+    # Afficher le type de données
+    print(f"\nType de données : {type(data).__name__}")
     
-    for reunion in reunions:
-        num_reunion = reunion.get('numReunion', '?')
-        hippodrome = reunion.get('hippodrome', {}).get('libelle', 'Inconnu') if isinstance(reunion.get('hippodrome'), dict) else 'Inconnu'
+    # Si c'est un dictionnaire, afficher les clés
+    if isinstance(data, dict):
+        print(f"\nClés principales du JSON :")
+        for cle in data.keys():
+            valeur = data[cle]
+            print(f"  - {cle} : {type(valeur).__name__}", end="")
+            if isinstance(valeur, list):
+                print(f" (liste de {len(valeur)} éléments)", end="")
+            elif isinstance(valeur, str):
+                print(f" = '{valeur[:50]}'", end="")
+            print()
         
-        print(f"\n📍 Réunion {num_reunion} - {hippodrome}")
-        print(f"{'─'*60}")
-        
-        courses = reunion.get('courses', [])
-        for course in courses:
-            num_course = course.get('numCourse', '?')
-            libelle = course.get('libelle', 'N/A')
-            specialite = course.get('specialite', 'N/A')
-            heure = course.get('heureDepart', 'N/A')
-            
-            print(f"  R{num_reunion}/C{num_course} [{heure}]")
-            print(f"    Libellé: {libelle}")
-            print(f"    Spécialité: {specialite}")
-            
-            # Cherche le Quinté avec TOUTES les variantes possibles
-            libelle_upper = str(libelle).upper()
-            specialite_upper = str(specialite).upper()
-            
-            mots_cles = ['QUINTE', 'QUINTÉ', 'QUINTE+', 'QUINTÉ+', 'E.QUINTE', 'E.QUINTÉ']
-            
-            for mot in mots_cles:
-                if mot in libelle_upper or mot in specialite_upper:
-                    print(f"    ✅✅✅ MATCH TROUVÉ avec '{mot}' ✅✅✅")
-                    return reunion, course
+        # Chercher les réunions dans différentes clés possibles
+        cles_possibles = ['reunions', 'reunion', 'programme', 'courses', 'data', 'result']
+        for cle in cles_possibles:
+            if cle in data:
+                print(f"\n🔍 Clé '{cle}' trouvée !")
+                valeur = data[cle]
+                if isinstance(valeur, list):
+                    print(f"   Contient {len(valeur)} éléments")
+                    if len(valeur) > 0:
+                        print(f"   Premier élément type: {type(valeur[0]).__name__}")
+                elif isinstance(valeur, dict):
+                    print(f"   Clés internes: {list(valeur.keys())[:10]}")
     
-    print(f"\n{'='*60}")
-    print(f"Aucun Quinté trouvé le {date_str}")
-    print(f"{'='*60}\n")
-    return None, None
-
-def extraire_non_partants(course_data):
-    non_partants = []
-    if isinstance(course_data.get("nonPartants"), list):
-        for np in course_data["nonPartants"]:
-            if isinstance(np, dict) and "numPmu" in np:
-                try: non_partants.append(int(np["numPmu"]))
-                except: pass
-            elif isinstance(np, (int, float)):
-                non_partants.append(int(np))
-    if isinstance(course_data.get("participants"), list):
-        for p in course_data["participants"]:
-            if isinstance(p, dict):
-                is_np = (p.get("supplement") is True or p.get("nonPartant") is True or str(p.get("statut", "")).lower() in ("non-partant", "supplement", "absent"))
-                if is_np and "numPmu" in p:
-                    try: non_partants.append(int(p["numPmu"]))
-                    except: pass
-    return sorted(list(set(non_partants)))
-
-def extraire_participants(course_data):
-    participants = []
-    source = course_data.get("participants", [])
-    for p in source:
-        if isinstance(p, dict) and "numPmu" in p:
-            try:
-                participants.append({"num": int(p["numPmu"]), "nom": p.get("nom", p.get("nomCheval", ""))})
-            except: pass
-    return participants
-
-def fetch_arrivee_dediee(date_obj, num_reunion, num_course):
-    date_str = format_date_iso(date_obj)
-    url = f"https://online.turfinfo.api.pmu.fr/rest/client/1/programme/{date_str}/R{num_reunion}/C{num_course}/arrivee"
-    try:
-        r = requests.get(url, timeout=15, headers={"User-Agent": "Pegasus/1.0"})
-        if r.status_code == 200:
-            data = r.json()
-            if isinstance(data, dict) and "arrivee" in data:
-                return [int(c.get("numPmu", 0)) for c in data["arrivee"][:5] if c.get("numPmu")]
-            elif isinstance(data, list):
-                return [int(c.get("numPmu", 0)) for c in data[:5] if c.get("numPmu")]
-    except:
-        pass
-    return None
+    # Si c'est une liste
+    elif isinstance(data, list):
+        print(f"\nC'est une liste de {len(data)} éléments")
+        if len(data) > 0:
+            print(f"Type du premier élément: {type(data[0]).__name__}")
+            if isinstance(data[0], dict):
+                print(f"Clés du premier élément: {list(data[0].keys())[:10]}")
+    
+    # Afficher un extrait du JSON (500 premiers caractères)
+    print(f"\n{'='*70}")
+    print(f"EXTRAIT DU JSON (500 premiers caractères) :")
+    print(f"{'='*70}")
+    json_str = json.dumps(data, ensure_ascii=False, indent=2)
+    print(json_str[:500])
+    print("...")
+    
+    print(f"\n{'='*70}\n")
 
 def main():
     date_jour = date.today()
-    print(f"[{datetime.now().isoformat()}] Démarrage de la recherche du Quinté+...")
-    
-    programme_complet = None
-    date_trouvee = None
-    reunion_data = None
-    course_data = None
+    print(f"[{datetime.now().isoformat()}] Analyse de la structure de l'API PMU...")
     
     for jours_en_arriere in range(3):
         date_test = date_jour - timedelta(days=jours_en_arriere)
@@ -135,62 +97,12 @@ def main():
         
         data, date_trouvee = fetch_programme_complet(date_test)
         if data:
-            reunion_data, course_data = afficher_toutes_les_courses(data, format_date_iso(date_test))
-            if course_data:
-                print(f"\n[ok] ✅ Quinté+ trouvé le {format_date_iso(date_trouvee)} !")
-                programme_complet = data
-                break
+            analyser_structure_json(data, format_date_iso(date_test))
+            break
+        else:
+            print(f"[warn] Pas de données pour {format_date_iso(date_test)}")
     
-    if not course_data:
-        print("\n[error] Impossible de trouver le Quinté+ sur les 3 derniers jours.")
-        print("[error] Regardez la liste ci-dessus pour voir comment les courses sont nommées.")
-        sys.exit(1)
-    
-    num_reunion = reunion_data.get('numReunion', 1)
-    num_course = course_data.get('numCourse', 1)
-    
-    non_partants = extraire_non_partants(course_data)
-    participants = extraire_participants(course_data)
-    
-    arrivee = []
-    if isinstance(course_data.get("arrivee"), list):
-        arrivee = [int(c.get("numPmu", 0)) for c in course_data["arrivee"][:5] if c.get("numPmu")]
-    
-    if not arrivee or len(arrivee) < 5:
-        print("[info] Arrivée non trouvée dans le programme, tentative via endpoint dédié...")
-        arrivee = fetch_arrivee_dediee(date_trouvee, num_reunion, num_course) or []
-
-    course_info = {
-        "date": format_date_iso(date_trouvee),
-        "hippodrome": reunion_data.get("hippodrome", {}).get("libelle", "Inconnu") if isinstance(reunion_data.get("hippodrome"), dict) else "Inconnu",
-        "discipline": course_data.get("discipline", {}).get("libelle", "Inconnue") if isinstance(course_data.get("discipline"), dict) else "Inconnue",
-        "course_nom": course_data.get("libelle", "PRIX DU QUINTÉ+"),
-        "distance": course_data.get("distance", "Inconnue"),
-        "partants": str(len(participants)) if participants else "16",
-        "heure": course_data.get("heureDepart", "13:50"),
-        "non_partants": non_partants,
-        "participants": participants,
-        "arrivee": arrivee if len(arrivee) == 5 else []
-    }
-    
-    if course_data.get("synthese"):
-        course_info["synthese_pmu"] = course_data["synthese"]
-    
-    output = {
-        "course_du_jour": course_info,
-        "nouvelles_arrivees": [],
-        "derniere_maj": datetime.now().isoformat(),
-        "non_partants": non_partants,
-        "nb_partants_declares": len(participants),
-        "nb_non_partants": len(non_partants)
-    }
-    
-    DATA_FILE.write_text(json.dumps(output, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"\n[ok] ✅ Données sauvegardées avec succès pour le {format_date_iso(date_trouvee)}")
-    print(f"  - Réunion/Course : R{num_reunion}/C{num_course}")
-    print(f"  - Partants : {len(participants)}")
-    print(f"  - Non-partants : {non_partants}")
-    print(f"  - Arrivée : {arrivee}")
+    print("\n[info] Analyse terminée. Regardez la structure ci-dessus.")
 
 if __name__ == "__main__":
     main()
