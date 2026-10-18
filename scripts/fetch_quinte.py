@@ -1,6 +1,6 @@
 """
 Script de récupération des données du Quinté+ depuis l'API PMU
-Version ULTIME : Recherche dynamique du Quinté dans le programme du jour
+Version CORRIGÉE : Recherche "e.Quinté+" au lieu de juste "Quinté"
 """
 import json
 import os
@@ -14,7 +14,6 @@ except ImportError:
     print("Erreur : requests n'est pas installé.")
     sys.exit(1)
 
-# Configuration
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 DATA_DIR.mkdir(exist_ok=True)
 DATA_FILE = DATA_DIR / "quinte.json"
@@ -23,7 +22,6 @@ def format_date_iso(d):
     return d.strftime("%Y-%m-%d")
 
 def fetch_programme_complet(date_obj):
-    """Récupère le programme COMPLET d'une journée"""
     date_str = format_date_iso(date_obj)
     url = f"https://online.turfinfo.api.pmu.fr/rest/client/1/programme/{date_str}"
     try:
@@ -38,9 +36,8 @@ def fetch_programme_complet(date_obj):
         print(f"[warn] Exception pour {date_str} : {e}")
         return None, None
 
-def trouver_quinte(data):
-    """Parcourt le programme pour trouver la course du Quinté+"""
-    # L'API peut retourner une liste de réunions ou un dictionnaire avec une clé 'reunions'
+def trouver_quinte(data, date_str):
+    """Recherche le Quinté+ en cherchant 'e.Quinté+'"""
     reunions = data.get('reunions', []) if isinstance(data, dict) else data
     
     for reunion in reunions:
@@ -49,14 +46,20 @@ def trouver_quinte(data):
             libelle = str(course.get('libelle', '')).upper()
             specialite = str(course.get('specialite', '')).upper()
             
-            # On cherche le mot QUINTÉ dans le titre ou la spécialité
-            if 'QUINTÉ' in libelle or 'QUINTE' in specialite:
+            # Cherche avec "E.QUINTÉ" ou "E.QUINTE"
+            if any(mot in libelle for mot in ['E.QUINTÉ', 'E.QUINTE', 'E.QUINTÉ+', 'E.QUINTE+']):
+                print(f"[ok] e.Quinté+ trouvé dans: {course.get('libelle')}")
                 return reunion, course
+            
+            if any(mot in specialite for mot in ['E.QUINTÉ', 'E.QUINTE', 'E.QUINTÉ+', 'E.QUINTE+']):
+                print(f"[ok] e.Quinté+ trouvé en spécialité: {specialite}")
+                return reunion, course
+    
+    print(f"[warn] Aucun e.Quinté+ trouvé le {date_str}")
     return None, None
 
 def extraire_non_partants(course_data):
     non_partants = []
-    # Format 1 : liste directe
     if isinstance(course_data.get("nonPartants"), list):
         for np in course_data["nonPartants"]:
             if isinstance(np, dict) and "numPmu" in np:
@@ -64,8 +67,6 @@ def extraire_non_partants(course_data):
                 except: pass
             elif isinstance(np, (int, float)):
                 non_partants.append(int(np))
-    
-    # Format 2 : dans les participants
     if isinstance(course_data.get("participants"), list):
         for p in course_data["participants"]:
             if isinstance(p, dict):
@@ -86,7 +87,6 @@ def extraire_participants(course_data):
     return participants
 
 def fetch_arrivee_dediee(date_obj, num_reunion, num_course):
-    """Tente de récupérer l'arrivée via l'endpoint dédié si elle n'est pas dans le programme"""
     date_str = format_date_iso(date_obj)
     url = f"https://online.turfinfo.api.pmu.fr/rest/client/1/programme/{date_str}/R{num_reunion}/C{num_course}/arrivee"
     try:
@@ -103,40 +103,35 @@ def fetch_arrivee_dediee(date_obj, num_reunion, num_course):
 
 def main():
     date_jour = date.today()
-    print(f"[{datetime.now().isoformat()}] Démarrage de la recherche du Quinté+...")
+    print(f"[{datetime.now().isoformat()}] Démarrage de la recherche du e.Quinté+...")
     
     programme_complet = None
     date_trouvee = None
     reunion_data = None
     course_data = None
     
-    # Essayer aujourd'hui, puis hier, puis avant-hier
     for jours_en_arriere in range(3):
         date_test = date_jour - timedelta(days=jours_en_arriere)
         print(f"\n[info] Exploration du {format_date_iso(date_test)}...")
         
         data, date_trouvee = fetch_programme_complet(date_test)
         if data:
-            reunion_data, course_data = trouver_quinte(data)
+            reunion_data, course_data = trouver_quinte(data, format_date_iso(date_test))
             if course_data:
-                print(f"[ok] Quinté+ trouvé le {format_date_iso(date_trouvee)} !")
+                print(f"[ok] e.Quinté+ trouvé le {format_date_iso(date_trouvee)} !")
                 programme_complet = data
                 break
-            else:
-                print("[warn] Programme trouvé, mais aucune course 'Quinté' identifiée.")
     
     if not course_data:
-        print("[error] Impossible de trouver le Quinté+ sur les 3 derniers jours.")
+        print("[error] Impossible de trouver le e.Quinté+ sur les 3 derniers jours.")
         sys.exit(1)
     
-    # Extraction des données
     num_reunion = reunion_data.get('numReunion', 1)
     num_course = course_data.get('numCourse', 1)
     
     non_partants = extraire_non_partants(course_data)
     participants = extraire_participants(course_data)
     
-    # Arrivée : d'abord dans le programme, sinon via endpoint dédié
     arrivee = []
     if isinstance(course_data.get("arrivee"), list):
         arrivee = [int(c.get("numPmu", 0)) for c in course_data["arrivee"][:5] if c.get("numPmu")]
@@ -145,7 +140,6 @@ def main():
         print("[info] Arrivée non trouvée dans le programme, tentative via endpoint dédié...")
         arrivee = fetch_arrivee_dediee(date_trouvee, num_reunion, num_course) or []
 
-    # Construction des infos de la course
     course_info = {
         "date": format_date_iso(date_trouvee),
         "hippodrome": reunion_data.get("hippodrome", {}).get("libelle", "Inconnu") if isinstance(reunion_data.get("hippodrome"), dict) else "Inconnu",
