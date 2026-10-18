@@ -1,6 +1,5 @@
 """
-Script de récupération des données du Quinté+ depuis l'API PMU
-Version CORRIGÉE : Recherche "e.Quinté+" au lieu de juste "Quinté"
+Script DEBUG : Affiche TOUTES les courses pour identifier le format exact du Quinté
 """
 import json
 import os
@@ -36,26 +35,46 @@ def fetch_programme_complet(date_obj):
         print(f"[warn] Exception pour {date_str} : {e}")
         return None, None
 
-def trouver_quinte(data, date_str):
-    """Recherche le Quinté+ en cherchant 'e.Quinté+'"""
+def afficher_toutes_les_courses(data, date_str):
+    """Affiche TOUTES les courses avec leurs titres exacts"""
     reunions = data.get('reunions', []) if isinstance(data, dict) else data
     
+    print(f"\n{'='*60}")
+    print(f"LISTE COMPLÈTE DES COURSES DU {date_str}")
+    print(f"{'='*60}")
+    
     for reunion in reunions:
+        num_reunion = reunion.get('numReunion', '?')
+        hippodrome = reunion.get('hippodrome', {}).get('libelle', 'Inconnu') if isinstance(reunion.get('hippodrome'), dict) else 'Inconnu'
+        
+        print(f"\n📍 Réunion {num_reunion} - {hippodrome}")
+        print(f"{'─'*60}")
+        
         courses = reunion.get('courses', [])
         for course in courses:
-            libelle = str(course.get('libelle', '')).upper()
-            specialite = str(course.get('specialite', '')).upper()
+            num_course = course.get('numCourse', '?')
+            libelle = course.get('libelle', 'N/A')
+            specialite = course.get('specialite', 'N/A')
+            heure = course.get('heureDepart', 'N/A')
             
-            # Cherche avec "E.QUINTÉ" ou "E.QUINTE"
-            if any(mot in libelle for mot in ['E.QUINTÉ', 'E.QUINTE', 'E.QUINTÉ+', 'E.QUINTE+']):
-                print(f"[ok] e.Quinté+ trouvé dans: {course.get('libelle')}")
-                return reunion, course
+            print(f"  R{num_reunion}/C{num_course} [{heure}]")
+            print(f"    Libellé: {libelle}")
+            print(f"    Spécialité: {specialite}")
             
-            if any(mot in specialite for mot in ['E.QUINTÉ', 'E.QUINTE', 'E.QUINTÉ+', 'E.QUINTE+']):
-                print(f"[ok] e.Quinté+ trouvé en spécialité: {specialite}")
-                return reunion, course
+            # Cherche le Quinté avec TOUTES les variantes possibles
+            libelle_upper = str(libelle).upper()
+            specialite_upper = str(specialite).upper()
+            
+            mots_cles = ['QUINTE', 'QUINTÉ', 'QUINTE+', 'QUINTÉ+', 'E.QUINTE', 'E.QUINTÉ']
+            
+            for mot in mots_cles:
+                if mot in libelle_upper or mot in specialite_upper:
+                    print(f"    ✅✅✅ MATCH TROUVÉ avec '{mot}' ✅✅✅")
+                    return reunion, course
     
-    print(f"[warn] Aucun e.Quinté+ trouvé le {date_str}")
+    print(f"\n{'='*60}")
+    print(f"Aucun Quinté trouvé le {date_str}")
+    print(f"{'='*60}\n")
     return None, None
 
 def extraire_non_partants(course_data):
@@ -103,7 +122,7 @@ def fetch_arrivee_dediee(date_obj, num_reunion, num_course):
 
 def main():
     date_jour = date.today()
-    print(f"[{datetime.now().isoformat()}] Démarrage de la recherche du e.Quinté+...")
+    print(f"[{datetime.now().isoformat()}] Démarrage de la recherche du Quinté+...")
     
     programme_complet = None
     date_trouvee = None
@@ -116,14 +135,15 @@ def main():
         
         data, date_trouvee = fetch_programme_complet(date_test)
         if data:
-            reunion_data, course_data = trouver_quinte(data, format_date_iso(date_test))
+            reunion_data, course_data = afficher_toutes_les_courses(data, format_date_iso(date_test))
             if course_data:
-                print(f"[ok] e.Quinté+ trouvé le {format_date_iso(date_trouvee)} !")
+                print(f"\n[ok] ✅ Quinté+ trouvé le {format_date_iso(date_trouvee)} !")
                 programme_complet = data
                 break
     
     if not course_data:
-        print("[error] Impossible de trouver le e.Quinté+ sur les 3 derniers jours.")
+        print("\n[error] Impossible de trouver le Quinté+ sur les 3 derniers jours.")
+        print("[error] Regardez la liste ci-dessus pour voir comment les courses sont nommées.")
         sys.exit(1)
     
     num_reunion = reunion_data.get('numReunion', 1)
