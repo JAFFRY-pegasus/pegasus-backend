@@ -31,18 +31,21 @@ jobs:
       - name: Create data directory
         run: mkdir -p data
       
+      - name: Pull latest changes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git pull --rebase origin main || echo "Pull failed, continuing..."
+      
       - name: Fetch PMU data
         run: python scripts/fetch_quinte.py
       
       - name: Commit and push if changed
         run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git pull --rebase origin main
           git add data/quinte.json
           if git diff --staged --quiet; then
             echo "No changes to commit"
           else
-            git commit -m "🤖 Auto-update: données Quinté+"
+            git commit -m " Auto-update: données Quinté+"
             git push
           fi
