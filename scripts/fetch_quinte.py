@@ -36,7 +36,6 @@ def fetch_programme_complet(date_obj):
         return None, None
 
 def analyser_tous_les_champs(data, date_str):
-    """Affiche TOUS les champs de chaque course pour trouver où est "Quinté+" """
     programme = data.get('programme', {})
     reunions = programme.get('reunions', [])
     
@@ -53,8 +52,7 @@ def analyser_tous_les_champs(data, date_str):
         print(f"\n Réunion {num_reunion} - {hippodrome}")
         print(f"{'─'*70}")
         
-        # Afficher seulement les 3 premières courses pour ne pas surcharger
-        for i, course in enumerate(courses[:3]):
+        for i, course in enumerate(courses[:3]): # On regarde les 3 premières courses
             num_course = course.get('numExterne') or course.get('numOfficiel', course.get('numCourse', '?'))
             libelle = course.get('libelle', 'N/A')
             
@@ -62,18 +60,16 @@ def analyser_tous_les_champs(data, date_str):
             print(f"  {'─'*70}")
             print(f"  TOUS LES CHAMPS DE CETTE COURSE :")
             
-            # Afficher chaque champ avec sa valeur
             for cle, valeur in course.items():
                 if isinstance(valeur, (dict, list)):
-                    print(f"    {cle}: {type(valeur).__name__} ({len(valeur) if isinstance(valeur, list) else 'dict'})")
+                    print(f"    {cle}: {type(valeur).__name__}")
                 else:
                     print(f"    {cle}: {valeur}")
             
-            # Chercher "QUINTE" dans TOUTES les valeurs
             print(f"\n  🔍 Recherche de 'QUINTE' dans tous les champs...")
             trouve = False
             for cle, valeur in course.items():
-                if isinstance(valeur, str) and 'QUINTE' in valeur.upper():
+                if isinstance(valeur, str) and 'QUINTE' in str(valeur).upper():
                     print(f"    ✅✅✅ TROUVÉ dans '{cle}' = '{valeur}' ✅✅✅")
                     trouve = True
                 elif isinstance(valeur, dict):
@@ -85,10 +81,9 @@ def analyser_tous_les_champs(data, date_str):
             if not trouve:
                 print(f"    ❌ 'QUINTE' non trouvé dans cette course")
         
-        # Si on a trouvé le Quinté, arrêter
-        if i >= 2:
-            print(f"\n  ... (affichage limité aux 3 premières courses)")
-            break
+        if len(courses) > 3:
+            print(f"\n  ... (affichage limité aux 3 premières courses pour ne pas surcharger)")
+        break # On s'arrête à la première réunion pour aller vite
     
     print(f"\n{'='*70}\n")
 
@@ -96,16 +91,11 @@ def main():
     date_jour = date.today()
     print(f"[{datetime.now().isoformat()}] Analyse complète des champs de l'API PMU...")
     
-    for jours_en_arriere in range(1):  # Seulement aujourd'hui pour aller plus vite
-        date_test = date_jour - timedelta(days=jours_en_arriere)
-        print(f"\n[info] Exploration du {format_date_iso(date_test)}...")
-        
-        data, date_trouvee = fetch_programme_complet(date_test)
-        if data:
-            analyser_tous_les_champs(data, format_date_iso(date_test))
-            break
-    
-    print("\n[info] Analyse terminée. Regardez les champs ci-dessus.")
+    data, date_trouvee = fetch_programme_complet(date_jour)
+    if data:
+        analyser_tous_les_champs(data, format_date_iso(date_jour))
+    else:
+        print("[error] Impossible de récupérer le programme du jour.")
 
 if __name__ == "__main__":
     main()
