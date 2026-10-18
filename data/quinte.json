@@ -9,11 +9,17 @@
     "heure": 1792329300000,
     "non_partants": [],
     "participants": [],
-    "arrivee": []
+    "arrivee": [
+      4,
+      5,
+      9,
+      10,
+      11
+    ]
   },
   "nouvelles_arrivees": [],
-  "derniere_maj": "2026-10-18T16:49:57.477692",
+  "derniere_maj": "2026-10-18T18:12:33.664914",
   "non_partants": [],
-  "nb_partants_declares": 0,
+  "nb_partants_declares": 16,
   "nb_non_partants": 0
 }
