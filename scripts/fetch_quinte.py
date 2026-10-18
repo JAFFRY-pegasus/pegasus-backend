@@ -1,5 +1,5 @@
 """
-Script FINAL v3 : Lecture correcte de ordreArrivee et gestion participants vide
+Script FINAL v4 : Avec protection anti-perte de l'arrivée
 """
 import json
 import os
@@ -47,10 +47,9 @@ def est_quinte(course_data):
     return False
 
 def extraire_arrivee(course_data):
-    """Extrait l'arrivée depuis ordreArrivee (liste de listes)"""
     arrivee = []
     
-    # Méthode 1 : champ 'ordreArrivee' (liste de listes comme [[4], [5], [9], ...])
+    # Méthode 1 : ordreArrivee (liste de listes [[4],[5],...] ou liste simple [4,5,...])
     ordre = course_data.get("ordreArrivee", [])
     if isinstance(ordre, list) and len(ordre) >= 5:
         for item in ordre[:5]:
@@ -58,11 +57,13 @@ def extraire_arrivee(course_data):
                 arrivee.append(int(item[0]))
             elif isinstance(item, (int, float)):
                 arrivee.append(int(item))
+            elif isinstance(item, dict) and "numPmu" in item:
+                arrivee.append(int(item["numPmu"]))
         if len(arrivee) == 5:
             print(f"  [ok] Arrivée extraite de ordreArrivee: {arrivee}")
             return arrivee
     
-    # Méthode 2 : champ 'arrivee' (liste d'objets avec numPmu)
+    # Méthode 2 : arrivee (liste d'objets)
     if isinstance(course_data.get("arrivee"), list):
         arrivee = [int(c.get("numPmu", 0)) for c in course_data["arrivee"][:5] if c.get("numPmu")]
         if len(arrivee) == 5:
@@ -72,10 +73,8 @@ def extraire_arrivee(course_data):
     return []
 
 def extraire_participants(course_data):
-    """Extrait les participants, avec fallback sur nombreDeclaresPartants"""
     participants = []
     source = course_data.get("participants", [])
-    
     if isinstance(source, list) and len(source) > 0:
         for p in source:
             if isinstance(p, dict) and "numPmu" in p:
@@ -83,15 +82,21 @@ def extraire_participants(course_data):
                     participants.append({"num": int(p["numPmu"]), "nom": p.get("nom", p.get("nomCheval", ""))})
                 except:
                     pass
-        print(f"  [ok] {len(participants)} participants extraits de 'participants'")
+        print(f"  [ok] {len(participants)} participants extraits")
     else:
-        # Fallback : utiliser nombreDeclaresPartants
-        nb = course_data.get("nombreDeclaresPartants", 0)
-        print(f"  [warn] participants vide, fallback sur nombreDeclaresPartants: {nb}")
-        # On ne peut pas créer de participants fictifs, on retourne juste le nombre
-        participants = []
-    
+        print(f"  [info] participants vide, on utilise nombreDeclaresPartants")
     return participants
+
+def extraire_non_partants(course_data):
+    non_partants = []
+    if isinstance(course_data.get("nonPartants"), list):
+        for np in course_data["nonPartants"]:
+            if isinstance(np, dict) and "numPmu" in np:
+                try: non_partants.append(int(np["numPmu"]))
+                except: pass
+            elif isinstance(np, (int, float)):
+                non_partants.append(int(np))
+    return sorted(list(set(non_partants)))
 
 def trouver_quinte(data, date_str):
     programme = data.get('programme', {})
@@ -119,20 +124,24 @@ def trouver_quinte(data, date_str):
     print(f"[warn] Aucun Quinté+ trouvé le {date_str}")
     return None, None
 
-def extraire_non_partants(course_data):
-    non_partants = []
-    if isinstance(course_data.get("nonPartants"), list):
-        for np in course_data["nonPartants"]:
-            if isinstance(np, dict) and "numPmu" in np:
-                try: non_partants.append(int(np["numPmu"]))
-                except: pass
-            elif isinstance(np, (int, float)):
-                non_partants.append(int(np))
-    return sorted(list(set(non_partants)))
+def charger_donnees_existantes():
+    if DATA_FILE.exists():
+        try:
+            return json.loads(DATA_FILE.read_text(encoding="utf-8"))
+        except:
+            pass
+    return None
 
 def main():
     date_jour = date.today()
     print(f"[{datetime.now().isoformat()}] Recherche du Quinté+ via codePari=QUINTE_PLUS...")
+    
+    # Charger les données existantes (pour protection anti-perte)
+    donnees_existantes = charger_donnees_existantes()
+    arrivee_existante = None
+    if donnees_existantes and donnees_existantes.get("course_du_jour", {}).get("arrivee"):
+        arrivee_existante = donnees_existantes["course_du_jour"]["arrivee"]
+        print(f"[info] Arrivée existante trouvée dans le JSON: {arrivee_existante}")
     
     date_trouvee = None
     reunion_data = None
@@ -160,10 +169,14 @@ def main():
     participants = extraire_participants(course_data)
     arrivee = extraire_arrivee(course_data)
     
+    # 🛡️ PROTECTION ANTI-PERTE : si pas d'arrivée trouvée, garder l'ancienne
+    if not arrivee and arrivee_existante:
+        arrivee = arrivee_existante
+        print(f"  [🛡️] Protection activée : conservation de l'arrivée existante: {arrivee}")
+    
     hippodrome_info = reunion_data.get('hippodrome', {})
     discipline_info = course_data.get('discipline', {})
     
-    # Utiliser nombreDeclaresPartants si participants est vide
     nb_partants = len(participants) if participants else course_data.get("nombreDeclaresPartants", 16)
     
     course_info = {
