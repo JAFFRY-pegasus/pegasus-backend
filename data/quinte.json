@@ -1,104 +1,19 @@
 {
-  "derniere_maj": "2026-10-18T10:40:47.809288",
   "course_du_jour": {
-    "date": "2026-10-17",
-    "hippodrome": "AUTEUIL",
-    "discipline": "HAIE",
-    "course_nom": "PRIX PRINCE D'ECOUEN - GRAND HANDICAP D'AUTOMNE",
-    "distance": "4300m",
-    "partants": "18",
-    "heure": "15:15",
-    "favoris_cotes": [
-      6,
-      2,
-      12,
-      19,
-      11,
-      5,
-      7,
-      1
-    ],
-    "synthese_pmu": [
-      6,
-      2,
-      12,
-      19,
-      11,
-      5,
-      7,
-      1
-    ],
-    "combinaison": [],
-    "arrivee": [],
-    "reunion": 1,
-    "course": 3
+    "date": "2026-10-18",
+    "hippodrome": "LON",
+    "discipline": "Inconnue",
+    "course_nom": "PRIX RIEUSSEC",
+    "distance": 3100,
+    "partants": "16",
+    "heure": 1792329300000,
+    "non_partants": [],
+    "participants": [],
+    "arrivee": []
   },
-  "nouvelles_arrivees": [
-    {
-      "id": "2026-10-11",
-      "course": "PRIX MONTGOMERY (GROUPE III)",
-      "arrivee": [
-        15,
-        2,
-        3,
-        12,
-        1
-      ]
-    },
-    {
-      "id": "2026-10-12",
-      "course": "PRIX JACQUES ROSSI (PRIX JULES MORGAN)",
-      "arrivee": [
-        2,
-        10,
-        14,
-        11,
-        12
-      ]
-    },
-    {
-      "id": "2026-10-13",
-      "course": "PRIX DE LA GALERIE DES VARIETES",
-      "arrivee": [
-        9,
-        16,
-        2,
-        14,
-        1
-      ]
-    },
-    {
-      "id": "2026-10-14",
-      "course": "GRAND NATIONAL DU TROT",
-      "arrivee": [
-        10,
-        15,
-        13,
-        5,
-        9
-      ]
-    },
-    {
-      "id": "2026-10-15",
-      "course": "PRIX DE LA VIERGE DE LORETTE",
-      "arrivee": [
-        12,
-        11,
-        8,
-        9,
-        15
-      ]
-    },
-    {
-      "id": "2026-10-16",
-      "course": "PRIX THEMIS",
-      "arrivee": [
-        4,
-        11,
-        7,
-        6,
-        13
-      ]
-    }
-  ]
+  "nouvelles_arrivees": [],
+  "derniere_maj": "2026-10-18T14:29:31.622251",
+  "non_partants": [],
+  "nb_partants_declares": 0,
+  "nb_non_partants": 0
 }
