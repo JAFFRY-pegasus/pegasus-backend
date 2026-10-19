@@ -1,11 +1,12 @@
 """
-Script FINAL v4 : Avec protection anti-perte de l'arrivée
+Script FINAL v5 : Avec conversion automatique du timestamp heureDepart
 """
 import json
 import os
 import sys
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 try:
     import requests
@@ -13,12 +14,27 @@ except ImportError:
     print("Erreur : requests n'est pas installé.")
     sys.exit(1)
 
+# Configuration
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 DATA_DIR.mkdir(exist_ok=True)
 DATA_FILE = DATA_DIR / "quinte.json"
 
 def format_date_iso(d):
     return d.strftime("%Y-%m-%d")
+
+def convertir_timestamp_en_heure(timestamp_ms):
+    """Convertit un timestamp Unix en millisecondes en format HH:MM (heure de Paris)"""
+    if not timestamp_ms:
+        return "13:50"
+    try:
+        # Conversion millisecondes -> secondes
+        timestamp_s = int(timestamp_ms) / 1000.0
+        # Création du datetime en UTC, puis conversion en heure de Paris
+        dt_utc = datetime.fromtimestamp(timestamp_s, tz=timezone.utc)
+        dt_paris = dt_utc.astimezone(ZoneInfo("Europe/Paris"))
+        return dt_paris.strftime("%H:%M")
+    except Exception:
+        return "13:50"
 
 def fetch_programme_complet(date_obj):
     date_str = format_date_iso(date_obj)
@@ -169,7 +185,7 @@ def main():
     participants = extraire_participants(course_data)
     arrivee = extraire_arrivee(course_data)
     
-    # 🛡️ PROTECTION ANTI-PERTE : si pas d'arrivée trouvée, garder l'ancienne
+    # 🛡️ PROTECTION ANTI-PERTE
     if not arrivee and arrivee_existante:
         arrivee = arrivee_existante
         print(f"  [🛡️] Protection activée : conservation de l'arrivée existante: {arrivee}")
@@ -179,6 +195,9 @@ def main():
     
     nb_partants = len(participants) if participants else course_data.get("nombreDeclaresPartants", 16)
     
+    #  CONVERSION AUTOMATIQUE DU TIMESTAMP
+    heure_depart = convertir_timestamp_en_heure(course_data.get("heureDepart"))
+    
     course_info = {
         "date": format_date_iso(date_trouvee),
         "hippodrome": hippodrome_info.get('libelle', hippodrome_info.get('code', 'Inconnu')) if isinstance(hippodrome_info, dict) else 'Inconnu',
@@ -186,7 +205,7 @@ def main():
         "course_nom": course_data.get("libelle", "PRIX DU QUINTÉ+"),
         "distance": course_data.get("distance", "Inconnue"),
         "partants": str(nb_partants),
-        "heure": course_data.get("heureDepart", "13:50"),
+        "heure": heure_depart,
         "non_partants": non_partants,
         "participants": participants,
         "arrivee": arrivee
@@ -208,6 +227,7 @@ def main():
     print(f"\n[ok] ✅✅✅ Données sauvegardées avec succès pour le {format_date_iso(date_trouvee)}")
     print(f"  - Réunion/Course : R{num_reunion}/C{num_course}")
     print(f"  - Hippodrome : {course_info['hippodrome']}")
+    print(f"  - Heure de départ : {heure_depart}")
     print(f"  - Partants : {nb_partants}")
     print(f"  - Non-partants : {non_partants}")
     print(f"  - Arrivée : {arrivee}")
