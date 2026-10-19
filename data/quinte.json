@@ -6,7 +6,7 @@
     "course_nom": "PRIX DE LA FORET DE LYONS",
     "distance": 1900,
     "partants": "16",
-    "heure": 1792410900000,
+    "heure": "13:55",
     "non_partants": [],
     "participants": [],
     "arrivee": [
@@ -18,7 +18,7 @@
     ]
   },
   "nouvelles_arrivees": [],
-  "derniere_maj": "2026-10-19T08:40:19.406909",
+  "derniere_maj": "2026-10-19T08:52:11.358917",
   "non_partants": [],
   "nb_partants_declares": 16,
   "nb_non_partants": 0
