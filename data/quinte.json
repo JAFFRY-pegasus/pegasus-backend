@@ -1,12 +1,12 @@
 {
   "course_du_jour": {
-    "date": "2026-10-18",
-    "hippodrome": "LON",
+    "date": "2026-10-19",
+    "hippodrome": "DEA",
     "discipline": "Inconnue",
-    "course_nom": "PRIX RIEUSSEC",
-    "distance": 3100,
+    "course_nom": "PRIX DE LA FORET DE LYONS",
+    "distance": 1900,
     "partants": "16",
-    "heure": 1792329300000,
+    "heure": 1792410900000,
     "non_partants": [],
     "participants": [],
     "arrivee": [
@@ -18,7 +18,7 @@
     ]
   },
   "nouvelles_arrivees": [],
-  "derniere_maj": "2026-10-18T20:14:18.652293",
+  "derniere_maj": "2026-10-19T07:21:55.054132",
   "non_partants": [],
   "nb_partants_declares": 16,
   "nb_non_partants": 0
