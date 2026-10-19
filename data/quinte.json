@@ -15,10 +15,20 @@
       9,
       10,
       11
+    ],
+    "favoris": [
+      2,
+      13,
+      1,
+      4,
+      10,
+      3,
+      14,
+      8
     ]
   },
   "nouvelles_arrivees": [],
-  "derniere_maj": "2026-10-19T08:55:45.722684",
+  "derniere_maj": "2026-10-19T09:59:09.330081",
   "non_partants": [],
   "nb_partants_declares": 16,
   "nb_non_partants": 0
