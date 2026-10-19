@@ -224,4 +224,32 @@ def main():
     course_info = {
         "date": format_date_iso(date_trouvee),
         "hippodrome": hippodrome_info.get('libelle', hippodrome_info.get('code', 'Inconnu')) if isinstance(hippodrome_info, dict) else 'Inconnu',
-        "discipline": discipline_info.get('libelle', 'Inconnue') if isinstance(discipline_info, dict) else 'Inconnue
+        "discipline": discipline_info.get('libelle', 'Inconnue') if isinstance(discipline_info, dict) else 'Inconnue',
+        "course_nom": course_data.get("libelle", "PRIX DU QUINTÉ+"),
+        "distance": course_data.get("distance", "Inconnue"),
+        "partants": str(nb_partants),
+        "heure": heure_depart,
+        "non_partants": non_partants,
+        "participants": participants,
+        "arrivee": arrivee,
+        "favoris": favoris
+    }
+    
+    output = {
+        "course_du_jour": course_info,
+        "nouvelles_arrivees": [],
+        "derniere_maj": datetime.now().isoformat(),
+        "non_partants": non_partants,
+        "nb_partants_declares": nb_partants,
+        "nb_non_partants": len(non_partants)
+    }
+    
+    DATA_FILE.write_text(json.dumps(output, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"\n[ok] ✅✅✅ Données sauvegardées avec succès !")
+    print(f"  - Date : {format_date_iso(date_trouvee)} | Heure : {heure_depart}")
+    print(f"  - Hippodrome : {course_info['hippodrome']}")
+    print(f"  - Arrivée : {arrivee}")
+    print(f"  - Favoris : {favoris}")
+
+if __name__ == "__main__":
+    main()
