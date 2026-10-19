@@ -1,26 +1,22 @@
 import json
 import requests
 
-url = "https://online.turfinfo.api.pmu.fr/rest/client/1/programme/2026-10-19"
+url = "https://online.turfinfo.api.pmu.fr/rest/client/1/programme/2026-10-19/R1/C1/synthese"
+print(f"🔍 Interrogation de : {url}")
 r = requests.get(url, headers={"User-Agent": "Pegasus/1.0"})
-data = r.json()
 
-for reunion in data.get('programme', {}).get('reunions', []):
-    if reunion.get('numExterne') == 1:
-        for course in reunion.get('courses', []):
-            paris = course.get('paris', [])
-            if any("QUINTE_PLUS" in str(p.get('codePari', '')).upper() for p in paris if isinstance(p, dict)):
-                print("=== COURSE QUINTÉ+ D'AUJOURD'HUI TROUVÉE ===")
-                
-                print("\n🔍 RECHERCHE DES FAVORIS / SYNTHÈSE / COTES :")
-                for cle, valeur in course.items():
-                    cle_lower = cle.lower()
-                    if any(mot in cle_lower for mot in ['synthese', 'pronostic', 'cote', 'favori', 'rapport', 'ordre']):
-                        print(f"  - {cle}: {json.dumps(valeur, ensure_ascii=False)[:400]}")
-                
-                num_co = course.get('numExterne')
-                print(f"\n🔗 URLs à tester pour les favoris :")
-                print(f"  - Synthèse: https://online.turfinfo.api.pmu.fr/rest/client/1/programme/2026-10-19/R1/C{num_co}/synthese")
-                print(f"  - Cotes: https://online.turfinfo.api.pmu.fr/rest/client/1/programme/2026-10-19/R1/C{num_co}/cotes")
-                break
-        break
+if r.status_code == 200:
+    data = r.json()
+    print("\n=== CONTENU DE LA SYNTHÈSE ===")
+    print(json.dumps(data, indent=2, ensure_ascii=False)[:1000]) # Affiche les 1000 premiers caractères
+else:
+    print(f"Erreur {r.status_code}")
+    
+# On teste aussi l'URL des cotes au cas où
+url_cotes = "https://online.turfinfo.api.pmu.fr/rest/client/1/programme/2026-10-19/R1/C1/cotes"
+print(f"\n🔍 Interrogation de : {url_cotes}")
+r2 = requests.get(url_cotes, headers={"User-Agent": "Pegasus/1.0"})
+if r2.status_code == 200:
+    data2 = r2.json()
+    print("\n=== CONTENU DES COTES (début) ===")
+    print(json.dumps(data2, indent=2, ensure_ascii=False)[:500])
