@@ -1,5 +1,5 @@
 """
-Script ULTIME V6.1 : Détection Quinté+, Heure, Arrivée protégée + Favoris (URL corrigée)
+Script ULTIME V6.2 : Détection Quinté+, Heure, Arrivée protégée + Favoris (URL 100% corrigée + DEBUG)
 """
 import json
 import os
@@ -14,6 +14,7 @@ except ImportError:
     print("Erreur : requests n'est pas installé.")
     sys.exit(1)
 
+# Configuration
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 DATA_DIR.mkdir(exist_ok=True)
 DATA_FILE = DATA_DIR / "quinte.json"
@@ -58,9 +59,9 @@ def est_quinte(course_data):
     return False
 
 def recuperer_favoris(date_obj, num_reunion, num_course):
-    """Récupère les 8 favoris via l'API offline du PMU (URL CORRIGÉE)"""
+    """Récupère les favoris via l'API offline du PMU (URL 100% CORRIGÉE + DEBUG)"""
     date_jjmmaa = format_date_jjmmaa(date_obj)
-    # URL CORRECTE de l'API offline
+    # VOICI LA VRAIE URL, PAS CELLE DE L'IA HALLUCINÉE
     url = f"https://offline.turfinfo.api.pmu.fr/rest/client/7/programme/{date_jjmmaa}/R{num_reunion}/C{num_course}/participants"
     
     headers = {
@@ -69,12 +70,23 @@ def recuperer_favoris(date_obj, num_reunion, num_course):
     }
     
     try:
+        print(f"  [DEBUG] Appel API : {url}")
         r = requests.get(url, headers=headers, timeout=10)
+        
         if r.status_code == 200:
             data = r.json()
             participants = data.get("participants", [])
+            print(f"  [DEBUG] {len(participants)} chevaux trouvés dans l'API")
+            
             chevaux_avec_cotes = []
             
+            # On affiche les 3 premiers pour vérifier si Zeloro (N°2) est bien dans la réponse
+            for i, p in enumerate(participants[:3]):
+                num = p.get("numPmu") or p.get("ordre")
+                nom = p.get("nom", "Inconnu")
+                rapport = p.get("dernierRapportDirect", {}).get("rapport") or p.get("dernierRapportReference", {}).get("rapport")
+                print(f"  [DEBUG] Cheval {i+1} dans la liste : N°{num} ({nom}) -> Cote: {rapport}")
+
             for p in participants:
                 num = p.get("numPmu") or p.get("ordre")
                 if not num:
@@ -98,13 +110,13 @@ def recuperer_favoris(date_obj, num_reunion, num_course):
             chevaux_avec_cotes.sort(key=lambda x: x["cote"])
             
             favoris = [cheval["num"] for cheval in chevaux_avec_cotes[:8]]
-            print(f"  [ok] Favoris récupérés : {favoris}")
+            print(f"  [OK] Favoris finaux calculés : {favoris}")
             return favoris
         else:
-            print(f"  [warn] Échec favoris (Code {r.status_code})")
+            print(f"  [WARN] Échec favoris (Code {r.status_code})")
             return []
     except Exception as e:
-        print(f"  [warn] Erreur favoris : {e}")
+        print(f"  [WARN] Erreur favoris : {e}")
         return []
 
 def extraire_arrivee(course_data):
@@ -170,7 +182,7 @@ def charger_donnees_existantes():
 
 def main():
     date_jour = date.today()
-    print(f"[{datetime.now().isoformat()}] Démarrage PEGASUS V6.1...")
+    print(f"[{datetime.now().isoformat()}] Démarrage PEGASUS V6.2...")
     
     donnees_existantes = charger_donnees_existantes()
     arrivee_existante = donnees_existantes.get("course_du_jour", {}).get("arrivee") if donnees_existantes else None
@@ -212,32 +224,4 @@ def main():
     course_info = {
         "date": format_date_iso(date_trouvee),
         "hippodrome": hippodrome_info.get('libelle', hippodrome_info.get('code', 'Inconnu')) if isinstance(hippodrome_info, dict) else 'Inconnu',
-        "discipline": discipline_info.get('libelle', 'Inconnue') if isinstance(discipline_info, dict) else 'Inconnue',
-        "course_nom": course_data.get("libelle", "PRIX DU QUINTÉ+"),
-        "distance": course_data.get("distance", "Inconnue"),
-        "partants": str(nb_partants),
-        "heure": heure_depart,
-        "non_partants": non_partants,
-        "participants": participants,
-        "arrivee": arrivee,
-        "favoris": favoris  # <-- LES VRAIS FAVORIS DU JOUR
-    }
-    
-    output = {
-        "course_du_jour": course_info,
-        "nouvelles_arrivees": [],
-        "derniere_maj": datetime.now().isoformat(),
-        "non_partants": non_partants,
-        "nb_partants_declares": nb_partants,
-        "nb_non_partants": len(non_partants)
-    }
-    
-    DATA_FILE.write_text(json.dumps(output, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"\n[ok] ✅✅✅ Données sauvegardées avec succès !")
-    print(f"  - Date : {format_date_iso(date_trouvee)} | Heure : {heure_depart}")
-    print(f"  - Hippodrome : {course_info['hippodrome']}")
-    print(f"  - Arrivée : {arrivee}")
-    print(f"  - Favoris : {favoris}")
-
-if __name__ == "__main__":
-    main()
+        "discipline": discipline_info.get('libelle', 'Inconnue') if isinstance(discipline_info, dict) else 'Inconnue
