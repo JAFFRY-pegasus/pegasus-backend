@@ -1,34 +1,34 @@
 {
   "course_du_jour": {
-    "date": "2026-10-19",
-    "hippodrome": "DEA",
+    "date": "2026-10-20",
+    "hippodrome": "CLA",
     "discipline": "Inconnue",
-    "course_nom": "PRIX DE LA FORET DE LYONS",
-    "distance": 1900,
+    "course_nom": "PRIX DES EQUIDAYS",
+    "distance": 2400,
     "partants": "16",
     "heure": "13:55",
     "non_partants": [],
     "participants": [],
     "arrivee": [
-      4,
-      2,
-      6,
-      1,
-      13
+      5,
+      13,
+      14,
+      3,
+      15
     ],
     "favoris": [
       2,
-      13,
-      1,
-      4,
-      10,
       3,
+      4,
       14,
-      8
+      9,
+      13,
+      15,
+      11
     ]
   },
   "nouvelles_arrivees": [],
-  "derniere_maj": "2026-10-19T21:37:00.401695",
+  "derniere_maj": "2026-10-20T12:13:15.839142",
   "non_partants": [],
   "nb_partants_declares": 16,
   "nb_non_partants": 0
