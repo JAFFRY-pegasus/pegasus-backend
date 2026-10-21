@@ -191,6 +191,41 @@
             background-color: rgba(244, 67, 54, 0.15);
             color: #e57373;
         }
+
+        /* NOUVEAUX STYLES POUR LES CHAMPS DE SAISIE */
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        .input-group label {
+            display: block;
+            color: var(--accent-orange);
+            font-size: 0.95rem;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+
+        .input-group input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            font-size: 1.1rem;
+            border: 2px solid var(--border-color);
+            border-radius: 6px;
+            background-color: #2a2a2a;
+            color: var(--text-main);
+            box-sizing: border-box;
+            transition: border-color 0.2s;
+        }
+
+        .input-group input[type="text"]:focus {
+            outline: none;
+            border-color: var(--accent-teal);
+        }
+
+        .input-group input[type="text"]::placeholder {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
     </style>
 </head>
 <body>
@@ -252,7 +287,44 @@
         </div>
     </div>
 
-    <!-- CARD 2: ANALYSEUR GÉOMÉTRIQUE -->
+    <!-- CARD 2: SAISIE MANUELLE DES FAVORIS ET COMBINAISON -->
+    <div class="card">
+        <div class="card-title">Saisie des Favoris et Combinaison</div>
+        
+        <!-- Champ 1 : Favoris -->
+        <div class="input-group">
+            <label for="favoris-input">
+                Favoris classés selon votre choix issus de la presse, sites internet hippiques ou sélection personnelle :
+            </label>
+            <input 
+                type="text" 
+                id="favoris-input" 
+                placeholder="Ex: 13-6-5-12-11 (5 à 8 chevaux)" 
+                autocomplete="off"
+                maxlength="30"
+            >
+        </div>
+
+        <!-- Champ 2 : Combinaison Pegasus -->
+        <div class="input-group">
+            <label for="combinaison-input">
+                Inscrivez ici la combinaison de votre choix de 5 à 8 chevaux, elle générera automatiquement la combinaison optimisée de PEGASUS !
+            </label>
+            <input 
+                type="text" 
+                id="combinaison-input" 
+                placeholder="Ex: 13-6-5-12-11 (5 à 8 chevaux)" 
+                autocomplete="off"
+                maxlength="30"
+            >
+        </div>
+
+        <button class="action-btn" onclick="mettreAJourEtRecalculer()">
+            METTRE À JOUR & RECALCULER
+        </button>
+    </div>
+
+    <!-- CARD 3: ANALYSEUR GÉOMÉTRIQUE -->
     <div class="card">
         <div class="card-title" style="text-align: center;">Analyseur Géométrique (1–16)</div>
         <p style="text-align: center; color: var(--text-muted); font-size: 0.85rem; margin-top: -10px; margin-bottom: 15px;">
@@ -383,10 +455,75 @@
         }
     }
 
+    // NOUVELLE FONCTION : Gestion des tirets automatiques
+    function setupAutoTirets(inputId) {
+        const input = document.getElementById(inputId);
+        if (!input) return;
+
+        input.addEventListener('input', function(e) {
+            let value = this.value.replace(/\s+/g, ''); // Enlève tous les espaces
+            value = value.replace(/-+/g, '-'); // Enlève les tirets multiples
+            
+            // Si l'utilisateur tape un espace ou un tiret, on normalise
+            if (e.data === ' ' || e.data === '-') {
+                value = value.replace(/-$/, '') + '-';
+            }
+
+            // Limite à 8 chevaux
+            const parts = value.split('-').filter(n => n !== '');
+            if (parts.length > 8) {
+                value = parts.slice(0, 8).join('-') + '-';
+            }
+
+            this.value = value;
+            
+            // Place le curseur à la fin
+            setTimeout(() => {
+                this.setSelectionRange(this.value.length, this.value.length);
+            }, 0);
+        });
+
+        input.addEventListener('keydown', function(e) {
+            if (e.key === ' ' || e.key === 'Enter') {
+                e.preventDefault();
+                if (!this.value.endsWith('-')) {
+                    this.value = this.value + '-';
+                }
+                setTimeout(() => {
+                    this.setSelectionRange(this.value.length, this.value.length);
+                }, 0);
+            }
+            
+            // Gestion de la touche Retour arrière
+            if (e.key === 'Backspace' && this.value.endsWith('-')) {
+                e.preventDefault();
+                this.value = this.value.slice(0, -1);
+            }
+        });
+    }
+
+    // NOUVELLE FONCTION : Mettre à jour et recalculer
+    function mettreAJourEtRecalculer() {
+        const favoris = document.getElementById('favoris-input').value;
+        const combinaison = document.getElementById('combinaison-input').value;
+        
+        console.log('Favoris saisis:', favoris);
+        console.log('Combinaison saisie:', combinaison);
+        
+        // Ici vous pouvez ajouter la logique pour envoyer ces données au serveur
+        // ou les utiliser pour afficher un résultat
+        
+        alert('Données enregistrées !\nFavoris: ' + favoris + '\nCombinaison: ' + combinaison);
+    }
+
     document.addEventListener("DOMContentLoaded", () => {
         renderGrid();
         loadRaceInfo();
         setInterval(loadRaceInfo, 30000);
+        
+        // Initialiser les champs de saisie avec tirets automatiques
+        setupAutoTirets('favoris-input');
+        setupAutoTirets('combinaison-input');
     });
 </script>
 </body>
