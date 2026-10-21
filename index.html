@@ -192,7 +192,7 @@
             color: #e57373;
         }
 
-        /* NOUVEAUX STYLES POUR LES CHAMPS DE SAISIE */
+        /* STYLES POUR LES CHAMPS DE SAISIE */
         .input-group {
             margin-bottom: 20px;
         }
@@ -294,7 +294,7 @@
         <!-- Champ 1 : Favoris -->
         <div class="input-group">
             <label for="favoris-input">
-                Favoris classés selon votre choix issus de la presse, sites internet hippiques ou sélection personnelle :
+                Saisie manuelle des favoris des médias hippiques (site PMU, autres sites, presse spécialisée...) :
             </label>
             <input 
                 type="text" 
@@ -455,7 +455,7 @@
         }
     }
 
-    // NOUVELLE FONCTION : Gestion des tirets automatiques
+    // GESTION DES TIRETS AUTOMATIQUES
     function setupAutoTirets(inputId) {
         const input = document.getElementById(inputId);
         if (!input) return;
@@ -502,16 +502,13 @@
         });
     }
 
-    // NOUVELLE FONCTION : Mettre à jour et recalculer
+    // ACTION DU BOUTON
     function mettreAJourEtRecalculer() {
         const favoris = document.getElementById('favoris-input').value;
         const combinaison = document.getElementById('combinaison-input').value;
         
         console.log('Favoris saisis:', favoris);
         console.log('Combinaison saisie:', combinaison);
-        
-        // Ici vous pouvez ajouter la logique pour envoyer ces données au serveur
-        // ou les utiliser pour afficher un résultat
         
         alert('Données enregistrées !\nFavoris: ' + favoris + '\nCombinaison: ' + combinaison);
     }
