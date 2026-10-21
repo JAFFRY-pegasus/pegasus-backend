@@ -1,11 +1,11 @@
 {
   "course_du_jour": {
-    "date": "2026-10-20",
-    "hippodrome": "CLA",
+    "date": "2026-10-21",
+    "hippodrome": "CEP",
     "discipline": "Inconnue",
-    "course_nom": "PRIX DES EQUIDAYS",
-    "distance": 2400,
-    "partants": "16",
+    "course_nom": "GRAND PRIX DE LA VILLE ROSE",
+    "distance": 2950,
+    "partants": "13",
     "heure": "13:55",
     "non_partants": [],
     "participants": [],
@@ -17,19 +17,19 @@
       15
     ],
     "favoris": [
-      2,
-      3,
-      4,
-      14,
-      9,
+      12,
+      10,
       13,
-      15,
-      11
+      1,
+      4,
+      7,
+      5,
+      8
     ]
   },
   "nouvelles_arrivees": [],
-  "derniere_maj": "2026-10-20T20:43:58.171989",
+  "derniere_maj": "2026-10-21T07:11:08.039016",
   "non_partants": [],
-  "nb_partants_declares": 16,
+  "nb_partants_declares": 13,
   "nb_non_partants": 0
 }
