@@ -1,5 +1,5 @@
 """
-Script ULTIME V6.2 : Détection Quinté+, Heure, Arrivée protégée + Favoris (URL 100% corrigée + DEBUG)
+Script V6.3 : Détection Quinté+, Heure, Arrivée protégée + Favoris en saisie manuelle
 """
 import json
 import os
@@ -57,67 +57,6 @@ def est_quinte(course_data):
             if "QUINTE_PLUS" in str(code).upper():
                 return True
     return False
-
-def recuperer_favoris(date_obj, num_reunion, num_course):
-    """Récupère les favoris via l'API offline du PMU (URL 100% CORRIGÉE + DEBUG)"""
-    date_jjmmaa = format_date_jjmmaa(date_obj)
-    # VOICI LA VRAIE URL, PAS CELLE DE L'IA HALLUCINÉE
-    url = f"https://offline.turfinfo.api.pmu.fr/rest/client/7/programme/{date_jjmmaa}/R{num_reunion}/C{num_course}/participants"
-    
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "application/json"
-    }
-    
-    try:
-        print(f"  [DEBUG] Appel API : {url}")
-        r = requests.get(url, headers=headers, timeout=10)
-        
-        if r.status_code == 200:
-            data = r.json()
-            participants = data.get("participants", [])
-            print(f"  [DEBUG] {len(participants)} chevaux trouvés dans l'API")
-            
-            chevaux_avec_cotes = []
-            
-            # On affiche les 3 premiers pour vérifier si Zeloro (N°2) est bien dans la réponse
-            for i, p in enumerate(participants[:3]):
-                num = p.get("numPmu") or p.get("ordre")
-                nom = p.get("nom", "Inconnu")
-                rapport = p.get("dernierRapportDirect", {}).get("rapport") or p.get("dernierRapportReference", {}).get("rapport")
-                print(f"  [DEBUG] Cheval {i+1} dans la liste : N°{num} ({nom}) -> Cote: {rapport}")
-
-            for p in participants:
-                num = p.get("numPmu") or p.get("ordre")
-                if not num:
-                    continue
-                
-                # 1. Chercher la cote dans dernierRapportDirect
-                cote = None
-                rapport_direct = p.get("dernierRapportDirect", {})
-                if rapport_direct and "rapport" in rapport_direct:
-                    cote = rapport_direct["rapport"]
-                else:
-                    # 2. Sinon, chercher dans dernierRapportReference (repli)
-                    rapport_ref = p.get("dernierRapportReference", {})
-                    if rapport_ref and "rapport" in rapport_ref:
-                        cote = rapport_ref["rapport"]
-                
-                if cote is not None:
-                    chevaux_avec_cotes.append({"num": int(num), "cote": float(cote)})
-            
-            # Trier par cote croissante (les plus petits chiffres sont les favoris)
-            chevaux_avec_cotes.sort(key=lambda x: x["cote"])
-            
-            favoris = [cheval["num"] for cheval in chevaux_avec_cotes[:8]]
-            print(f"  [OK] Favoris finaux calculés : {favoris}")
-            return favoris
-        else:
-            print(f"  [WARN] Échec favoris (Code {r.status_code})")
-            return []
-    except Exception as e:
-        print(f"  [WARN] Erreur favoris : {e}")
-        return []
 
 def extraire_arrivee(course_data):
     arrivee = []
@@ -182,7 +121,7 @@ def charger_donnees_existantes():
 
 def main():
     date_jour = date.today()
-    print(f"[{datetime.now().isoformat()}] Démarrage PEGASUS V6.2...")
+    print(f"[{datetime.now().isoformat()}] Démarrage PEGASUS V6.3...")
     
     donnees_existantes = charger_donnees_existantes()
     arrivee_existante = donnees_existantes.get("course_du_jour", {}).get("arrivee") if donnees_existantes else None
@@ -213,8 +152,8 @@ def main():
         arrivee = arrivee_existante
         print(f"  [🛡️] Protection activée : conservation de l'arrivée existante")
     
-    # 🌟 Récupération des favoris avec la bonne URL
-    favoris = recuperer_favoris(date_trouvee, num_reunion, num_course)
+    # ❌ PLUS DE RÉCUPÉRATION DES FAVORIS VIA API - Saisie manuelle côté site
+    # favoris = recuperer_favoris(date_trouvee, num_reunion, num_course)
     
     hippodrome_info = reunion_data.get('hippodrome', {})
     discipline_info = course_data.get('discipline', {})
@@ -232,7 +171,7 @@ def main():
         "non_partants": non_partants,
         "participants": participants,
         "arrivee": arrivee,
-        "favoris": favoris
+        "favoris": []  # ← TOUJOURS VIDE : saisie manuelle côté site
     }
     
     output = {
@@ -249,7 +188,7 @@ def main():
     print(f"  - Date : {format_date_iso(date_trouvee)} | Heure : {heure_depart}")
     print(f"  - Hippodrome : {course_info['hippodrome']}")
     print(f"  - Arrivée : {arrivee}")
-    print(f"  - Favoris : {favoris}")
+    print(f"  - Favoris : [] (saisie manuelle)")
 
 if __name__ == "__main__":
     main()
