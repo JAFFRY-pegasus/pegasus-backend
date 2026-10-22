@@ -10,16 +10,16 @@
     "non_partants": [],
     "participants": [],
     "arrivee": [
-      13,
       12,
-      10,
-      4,
-      2
+      5,
+      9,
+      7,
+      3
     ],
     "favoris": []
   },
   "nouvelles_arrivees": [],
-  "derniere_maj": "2026-10-22T08:21:53.974968",
+  "derniere_maj": "2026-10-22T12:07:40.133605",
   "non_partants": [],
   "nb_partants_declares": 16,
   "nb_non_partants": 0
