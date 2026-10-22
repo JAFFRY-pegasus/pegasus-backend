@@ -1,11 +1,11 @@
 {
   "course_du_jour": {
-    "date": "2026-10-21",
-    "hippodrome": "CEP",
+    "date": "2026-10-22",
+    "hippodrome": "AUT",
     "discipline": "Inconnue",
-    "course_nom": "GRAND PRIX DE LA VILLE ROSE",
-    "distance": 2950,
-    "partants": "13",
+    "course_nom": "PRIX ANDRE ADELE",
+    "distance": 3600,
+    "partants": "16",
     "heure": "13:55",
     "non_partants": [],
     "participants": [],
@@ -19,8 +19,8 @@
     "favoris": []
   },
   "nouvelles_arrivees": [],
-  "derniere_maj": "2026-10-21T20:44:09.339135",
+  "derniere_maj": "2026-10-22T07:06:50.851224",
   "non_partants": [],
-  "nb_partants_declares": 13,
+  "nb_partants_declares": 16,
   "nb_non_partants": 0
 }
