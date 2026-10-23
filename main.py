@@ -1,11 +1,8 @@
 import html
 import json
 import os
-import time
 from collections import Counter
-from datetime import date as _date, datetime as _datetime
-from itertools import combinations
-from pathlib import Path
+from datetime import datetime as _datetime
 
 from fastapi import FastAPI, Form
 from fastapi.responses import HTMLResponse
@@ -15,11 +12,12 @@ try:
 except ImportError:
     requests = None
 
+app = FastAPI()
+
 # ==============================================================================
-# UNIQUE FONCTION DE RÉCUPÉRATION DES INFOS PMU (CORRIGÉE ET SÉCURISÉE)
+# RÉCUPÉRATION DES INFOS PMU
 # ==============================================================================
 def recuperer_infos_pmu():
-    """Récupère la discipline, l'hippodrome et les détails du Quinté du jour via l'API PMU."""
     infos = {
         "discipline": "Inconnue", 
         "hippodrome": "Inconnu",
@@ -28,38 +26,24 @@ def recuperer_infos_pmu():
         "partants": 0,
         "heure": "--:--"
     }
-    
     if requests is None:
         return infos
-    
     try:
-        # 1. Gestion stricte du fuseau horaire français pour éviter le décalage de date sur Render
         import zoneinfo
         tz_paris = zoneinfo.ZoneInfo("Europe/Paris")
-        
-        # CORRECTION 1 : Format de date JJMMAAAA requis par l'API PMU (ex: 24102026)
         date_aujourdhui = _datetime.now(tz_paris).strftime("%d%m%Y")
-        
-        # CORRECTION 2 : Utilisation de la VRAIE URL de l'API PMU
-        url_programme = f"https://offline.turfinfo.api.pmu.fr/rest/client/7/programme/{date_aujourdhui}"
-        response = requests.get(url_programme, timeout=7, headers={"User-Agent": "Pegasus/1.0"})
-        
+        url = f"https://offline.turfinfo.api.pmu.fr/rest/client/7/programme/{date_aujourdhui}"
+        response = requests.get(url, timeout=7, headers={"User-Agent": "Pegasus/1.0"})
         if response.status_code == 200:
             data = response.json()
             if "programme" in data and "reunions" in data["programme"]:
-                reunions_liste = data["programme"]["reunions"]
-                
-                # PARCOURS DE TOUTES LES RÉUNIONS POUR TROUVER LE QUINTÉ
-                for reunion in reunions_liste:
+                for reunion in data["programme"]["reunions"]:
                     for course in reunion.get("courses", []):
-                        
-                        # Détection multi-critères ultra-robuste du Quinté+
                         est_quinte = (
                             course.get("isSocieteGeneraleQuinte") == True or 
                             course.get("ordreEquipement") == "QUIN" or
                             "QUINTE" in str(course.get("libelle", "")).upper()
                         )
-                        
                         if est_quinte:
                             hippo_data = reunion.get("hippodrome", {})
                             infos["hippodrome"] = hippo_data.get("libelleLong", hippo_data.get("code", "Inconnu")).title()
@@ -67,155 +51,145 @@ def recuperer_infos_pmu():
                             infos["nom_course"] = course.get("libelle", "Sans nom").title()
                             infos["distance"] = course.get("distance", 0)
                             infos["partants"] = course.get("nombrePartantsDeclared", 0)
-                            
                             ts = course.get("heureDepart")
                             if ts:
                                 infos["heure"] = _datetime.fromtimestamp(ts / 1000, tz_paris).strftime("%H:%M")
-                            return infos  # Quinté trouvé, on renvoie immédiatement le dictionnaire
-                            
-                # 3. Système de secours automatique si la clé Quinté n'est pas explicitement marquée
-                if reunions_liste and len(reunions_liste) > 0:
-                    premiere_reunion = reunions_liste[0]
-                    courses_secours = premiere_reunion.get("courses", [])
-                    if courses_secours and len(courses_secours) > 0:
-                        course_secours = courses_secours[0]
-                        hippo_data = premiere_reunion.get("hippodrome", {})
-                        infos["hippodrome"] = hippo_data.get("libelleLong", hippo_data.get("code", "Inconnu")).title()
-                        infos["discipline"] = course_secours.get("discipline", "Inconnue").replace("_", " ").title()
-                        infos["nom_course"] = course_secours.get("libelle", "Sans nom").title()
-                        infos["distance"] = course_secours.get("distance", 0)
-                        infos["partants"] = course_secours.get("nombrePartantsDeclared", 0)
-                        ts = course_secours.get("heureDepart")
-                        if ts:
-                            infos["heure"] = _datetime.fromtimestamp(ts / 1000, tz_paris).strftime("%H:%M")
-                            
-        return infos
+                            return infos
     except Exception:
-        return infos
+        pass
+    return infos
 
 # ==============================================================================
-# INITIALISATION DE L'APPLICATION
-# ==============================================================================
-app = FastAPI()
-
-# ==============================================================================
-# BASE HISTORIQUE COMPLÈTE (ASSEMBLÉE ET CORRIGÉE)
-# ==============================================================================
-HISTORIQUE_SGE_DATA = [
-  {"id": "1", "arrivee": [11, 4, 15, 6, 12]}, {"id": "2", "arrivee": [8, 14, 5, 13, 2]},
-  {"id": "3", "arrivee": [9, 3, 16, 7, 10]}, {"id": "4", "arrivee": [1, 12, 6, 14, 8]},
-  {"id": "5", "arrivee": [15, 7, 2, 11, 13]}, {"id": "6", "arrivee": [4, 10, 8, 5, 9]},
-  {"id": "7", "arrivee": [13, 6, 14, 3, 1]}, {"id": "8", "arrivee": [2, 11, 7, 12, 16]},
-  {"id": "9", "arrivee": [12, 5, 9, 15, 4]}, {"id": "10", "arrivee": [6, 14, 3, 8, 11]},
-  {"id": "11", "arrivee": [10, 2, 13, 7, 5]}, {"id": "12", "arrivee": [7, 15, 1, 12, 9]},
-  {"id": "13", "arrivee": [3, 8, 11, 14, 6]}, {"id": "14", "arrivee": [16, 4, 12, 9, 2]},
-  {"id": "15", "arrivee": [5, 13, 6, 10, 8]}, {"id": "16", "arrivee": [14, 9, 2, 7, 15]},
-  {"id": "17", "arrivee": [8, 1, 10, 13, 4]}, {"id": "18", "arrivee": [11, 6, 15, 3, 12]},
-  {"id": "19", "arrivee": [2, 12, 5, 14, 7]}, {"id": "20", "arrivee": [9, 7, 4, 8, 11]},
-  {"id": "21", "arrivee": [13, 3, 8, 16, 5]}, {"id": "22", "arrivee": [6, 10, 14, 2, 12]},
-  {"id": "23", "arrivee": [1, 15, 7, 11, 9]}, {"id": "24", "arrivee": [12, 4, 9, 13, 6]},
-  {"id": "25", "arrivee": [8, 11, 2, 5, 14]}, {"id": "26", "arrivee": [15, 6, 13, 10, 3]},
-  {"id": "27", "arrivee": [4, 14, 8, 12, 7]}, {"id": "28", "arrivee": [7, 2, 11, 9, 16]},
-  {"id": "29", "arrivee": [10, 8, 5, 15, 1]}, {"id": "30", "arrivee": [3, 13, 12, 6, 14]},
-  {"id": "31", "arrivee": [16, 5, 9, 4, 11]}, {"id": "32", "arrivee": [11, 9, 3, 7, 2]},
-  {"id": "33", "arrivee": [6, 14, 8, 12, 15]}, {"id": "34", "arrivee": [2, 10, 13, 5, 4]},
-  {"id": "35", "arrivee": [12, 7, 1, 16, 9]}, {"id": "36", "arrivee": [5, 13, 14, 8, 6]},
-  {"id": "37", "arrivee": [9, 3, 6, 11, 10]}, {"id": "38", "arrivee": [14, 8, 10, 2, 7]},
-  {"id": "39", "arrivee": [7, 12, 15, 4, 13]}, {"id": "40", "arrivee": [4, 1, 9, 14, 5]},
-  {"id": "41", "arrivee": [13, 11, 2, 8, 12]}, {"id": "42", "arrivee": [8, 6, 16, 3, 10]},
-  {"id": "43", "arrivee": [10, 15, 5, 7, 14]}, {"id": "44", "arrivee": [1, 4, 12, 9, 6]},
-  {"id": "45", "arrivee": [15, 9, 7, 13, 2]}, {"id": "46", "arrivee": [3, 12, 14, 6, 11]},
-  {"id": "47", "arrivee": [11, 2, 8, 10, 15]}, {"id": "48", "arrivee": [6, 13, 4, 16, 9]},
-  {"id": "49", "arrivee": [14, 5, 10, 1, 7]}, {"id": "50", "arrivee": [9, 8, 3, 12, 13]},
-  {"id": "51", "arrivee": [2, 14, 11, 5, 6]}, {"id": "52", "arrivee": [7, 10, 6, 15, 8]},
-  {"id": "53", "arrivee": [12, 3, 13, 9, 4]}, {"id": "54", "arrivee": [5, 16, 2, 11, 14]},
-  {"id": "55", "arrivee": [13, 7, 9, 4, 10]}, {"id": "56", "arrivee": [8, 12, 15, 6, 1]},
-  {"id": "57", "arrivee": [4, 9, 1, 14, 11]}, {"id": "58", "arrivee": [10, 2, 7, 13, 5]},
-  {"id": "59", "arrivee": [15, 6, 12, 8, 3]}, {"id": "60", "arrivee": [3, 11, 14, 10, 16]},
-  {"id": "61", "arrivee": [11, 4, 8, 5, 12]}, {"id": "62", "arrivee": [6, 13, 2, 9, 7]},
-  {"id": "63", "arrivee": [14, 8, 10, 15, 3]}, {"id": "64", "arrivee": [9, 1, 12, 6, 13]},
-  {"id": "65", "arrivee": [2, 15, 5, 11, 8]}, {"id": "66", "arrivee": [7, 10, 14, 4, 16]},
-  {"id": "67", "arrivee": [12, 3, 9, 13, 6]}, {"id": "68", "arrivee": [5, 11, 7, 2, 10]},
-  {"id": "69", "arrivee": [13, 6, 4, 12, 15]}, {"id": "70", "arrivee": [8, 14, 16, 9, 1]},
-  {"id": "71", "arrivee": [4, 2, 11, 8, 5]}, {"id": "72", "arrivee": [10, 9, 3, 14, 12]},
-  {"id": "73", "arrivee": [15, 7, 12, 6, 2]}, {"id": "74", "arrivee": [1, 13, 8, 10, 4]},
-  {"id": "75", "arrivee": [6, 5, 15, 11, 9]}, {"id": "76", "arrivee": [12, 14, 2, 3, 7]},
-  {"id": "77", "arrivee": [3, 8, 10, 13, 16]}, {"id": "78", "arrivee": [14, 11, 6, 5, 1]},
-  {"id": "79", "arrivee": [9, 4, 13, 7, 12]}, {"id": "80", "arrivee": [2, 16, 9, 8, 15]},
-  {"id": "81", "arrivee": [7, 3, 11, 14, 10]}, {"id": "82", "arrivee": [13, 12, 5, 2, 6]},
-  {"id": "83", "arrivee": [8, 6, 14, 10, 4]}, {"id": "84", "arrivee": [10, 15, 1, 9, 11]},
-  {"id": "85", "arrivee": [5, 2, 8, 12, 13]}, {"id": "86", "arrivee": [16, 9, 4, 7, 3]},
-  {"id": "87", "arrivee": [11, 7, 13, 15, 14]}, {"id": "88", "arrivee": [4, 14, 6, 3, 8]},
-  {"id": "89", "arrivee": [12, 8, 10, 11, 2]}, {"id": "90", "arrivee": [13, 9, 5, 15, 3]},
-  {"id": "91", "arrivee": [15, 10, 12, 13, 7]}, {"id": "92", "arrivee": [3, 5, 9, 2, 16]},
-  {"id": "93", "arrivee": [9, 13, 7, 8, 12]}, {"id": "94", "arrivee": [14, 2, 11, 4, 15]},
-  {"id": "95", "arrivee": [7, 16, 4, 10, 6]}, {"id": "96", "arrivee": [2, 6, 15, 14, 11]},
-  {"id": "97", "arrivee": [10, 11, 8, 1, 5]}, {"id": "98", "arrivee": [1, 4, 13, 9, 12]},
-  {"id": "99", "arrivee": [8, 12, 2, 6, 10]}, {"id": "100", "arrivee": [13, 9, 5, 15, 3]},
-  {"id": "101", "arrivee": [5, 7, 14, 11, 8]}, {"id": "102", "arrivee": [12, 3, 10, 4, 16]},
-  {"id": "103", "arrivee": [6, 15, 1, 8, 13]}, {"id": "104", "arrivee": [11, 2, 9, 12, 7]},
-  {"id": "105", "arrivee": [4, 8, 6, 13, 10]}, {"id": "106", "arrivee": [16, 14, 11, 3, 2]},
-  {"id": "107", "arrivee": [9, 5, 12, 7, 15]}, {"id": "108", "arrivee": [3, 10, 4, 14, 6]},
-  {"id": "109", "arrivee": [7, 13, 8, 2, 11]}, {"id": "110", "arrivee": [14, 1, 15, 9, 5]},
-  {"id": "111", "arrivee": [6, 13, 8, 11, 4]}, {"id": "112", "arrivee": [12, 5, 14, 7, 2]},
-  {"id": "113", "arrivee": [9, 15, 3, 12, 6]}, {"id": "114", "arrivee": [4, 10, 16, 8, 13]},
-  {"id": "115", "arrivee": [15, 7, 11, 2, 9]}, {"id": "116", "arrivee": [3, 14, 6, 10, 15]},
-  {"id": "117", "arrivee": [11, 8, 13, 4, 1]}, {"id": "118", "arrivee": [7, 12, 5, 14, 10]},
-  {"id": "119", "arrivee": [13, 2, 9, 15, 6]}, {"id": "121", "arrivee": [5, 13, 8, 2, 11]},
-  {"id": "122", "arrivee": [12, 4, 15, 7, 3]}, {"id": "123", "arrivee": [9, 16, 5, 14, 6]},
-  {"id": "124", "arrivee": [3, 11, 14, 8, 12]}, {"id": "125", "arrivee": [15, 6, 10, 13, 4]},
-  {"id": "126", "arrivee": [8, 2, 7, 16, 11]}, {"id": "127", "arrivee": [14, 9, 3, 12, 5]},
-  {"id": "128", "arrivee": [1, 13, 6, 10, 15]}, {"id": "130", "arrivee": [6, 4, 3, 13, 9]},
-  {"id": "131", "arrivee": [13, 5, 11, 12, 8]}, {"id": "132", "arrivee": [14, 6, 12, 4, 8]},
-  {"id": "134", "arrivee": [13, 6, 2, 10, 7]}, {"id": "135", "arrivee": [8, 14, 11, 3, 15]},
-  {"id": "136", "arrivee": [12, 4, 7, 9, 16]}, {"id": "137", "arrivee": [5, 13, 8, 2, 11]},
-  {"id": "138", "arrivee": [10, 6, 14, 4, 9]}, {"id": "139", "arrivee": [3, 15, 12, 7, 1]},
-  {"id": "140", "arrivee": [14, 8, 6, 11, 2]}, {"id": "141", "arrivee": [7, 12, 15, 5, 10]},
-  {"id": "142", "arrivee": [11, 3, 9, 14, 6]}, {"id": "144", "arrivee": [14, 9, 7, 3, 12]},
-  {"id": "145", "arrivee": [6, 11, 2, 15, 8]}, {"id": "146", "arrivee": [12, 5, 14, 9, 4]},
-  {"id": "147", "arrivee": [3, 16, 8, 13, 6]}, {"id": "148", "arrivee": [8, 2, 11, 15, 7]},
-  {"id": "149", "arrivee": [5, 13, 10, 4, 14]}, {"id": "150", "arrivee": [9, 15, 6, 12, 3]},
-  {"id": "151", "arrivee": [11, 7, 4, 16, 2]}, {"id": "152", "arrivee": [2, 14, 9, 5, 13]},
-  {"id": "154", "arrivee": [5, 11, 14, 8, 3]}, {"id": "155", "arrivee": [12, 7, 16, 4, 9]},
-  {"id": "156", "arrivee": [10, 3, 13, 6, 15]}, {"id": "157", "arrivee": [4, 14, 8, 11, 2]},
-  {"id": "158", "arrivee": [7, 12, 5, 15, 10]}, {"id": "159", "arrivee": [13, 6, 9, 3, 14]},
-  {"id": "160", "arrivee": [2, 15, 11, 7, 8]}, {"id": "161", "arrivee": [14, 5, 12, 1, 9]},
-  {"id": "162", "arrivee": [8, 13, 4, 10, 15]}, {"id": "163", "arrivee": [11, 9, 2, 14, 6]},
-  {"id": "176", "arrivee": [13, 7, 4, 12, 9]}, {"id": "177", "arrivee": [6, 15, 10, 2, 14]},
-  {"id": "178", "arrivee": [9, 11, 3, 16, 5]}, {"id": "179", "arrivee": [4, 13, 8, 7, 15]},
-  {"id": "180", "arrivee": [11, 5, 14, 6, 2]}, {"id": "181", "arrivee": [3, 12, 9, 10, 16]},
-  {"id": "182", "arrivee": [14, 8, 6, 11, 7]}, {"id": "183", "arrivee": [10, 16, 12, 4, 13]},
-  {"id": "184", "arrivee": []}  # <-- CORRECTION DE L'ERREUR DE SYNTAXE ICI
-]
-
-# ==============================================================================
-# ROUTE PRINCIPALE : LIT LE VRAI FICHIER index.html (Thème sombre + Tirets auto)
+# PAGE D'ACCUEIL (HTML GÉNÉRÉ DYNAMIQUEMENT PAR PYTHON)
 # ==============================================================================
 @app.get("/", response_class=HTMLResponse)
 async def index():
     infos = recuperer_infos_pmu()
+    hippo = html.escape(infos["hippodrome"])
+    discipline = html.escape(infos["discipline"])
     
-    try:
-        # On lit le magnifique fichier index.html que nous avons déjà créé
-        with open("index.html", "r", encoding="utf-8") as f:
-            html_content = f.read()
+    return HTMLResponse(content=f"""
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PEGASUS - Analyse Quinté+</title>
+    <style>
+        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+        body {{
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #121212 0%, #1e1e1e 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: #e0e0e0;
+            padding: 20px;
+        }}
+        .container {{
+            width: 100%;
+            max-width: 600px;
+            background: #1e1e1e;
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.6);
+            border: 1px solid #333;
+        }}
+        h1 {{ text-align: center; color: #ff9800; font-size: 2.2em; margin-bottom: 10px; }}
+        .subtitle {{ text-align: center; color: #aaa; margin-bottom: 25px; font-size: 1.1em; }}
+        .info-box {{
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 25px;
+            border-left: 5px solid #ff9800;
+        }}
+        .info-box h3 {{ color: #ff9800; margin-bottom: 15px; font-size: 1.2em; }}
+        .info-line {{ margin: 10px 0; font-size: 1.05em; display: flex; justify-content: space-between; }}
+        .info-line strong {{ color: #bbb; }}
+        .value {{ color: #ffffff; font-weight: bold; text-align: right; }}
+        .actions {{ display: flex; gap: 10px; margin-bottom: 25px; flex-wrap: wrap; }}
+        .btn-action {{
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: bold;
+            cursor: pointer;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            color: white;
+        }}
+        .btn-refresh {{ background: linear-gradient(135deg, #26a69a 0%, #00897b 100%); }}
+        .btn-robot {{ background: linear-gradient(135deg, #7e57c2 0%, #5e35b1 100%); }}
+        form {{ display: flex; flex-direction: column; gap: 15px; }}
+        label {{ font-weight: bold; color: #ff9800; font-size: 1.1em; }}
+        input[type="text"] {{
+            padding: 15px;
+            border-radius: 8px;
+            border: 2px solid #444;
+            background: #2a2a2a;
+            color: white;
+            font-size: 1.2em;
+            text-align: center;
+        }}
+        input[type="text"]:focus {{ outline: none; border-color: #26a69a; }}
+        .btn-submit {{
+            background: linear-gradient(135deg, #26a69a 0%, #00897b 100%);
+            color: white;
+            padding: 16px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.2em;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 10px;
+        }}
+        .footer {{ margin-top: 30px; text-align: center; color: #666; font-size: 0.85em; }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏇 PEGASUS IA</h1>
+        <p class="subtitle">Votre assistant pronostic Quinté+</p>
         
-        # On injecte les infos PMU dans le HTML pour qu'elles s'affichent dynamiquement
-        html_content = html_content.replace(
-            '<span class="value" id="race-hippo">EN ATTENTE</span>',
-            f'<span class="value" id="race-hippo">{html.escape(infos["hippodrome"])}</span>'
-        )
-        html_content = html_content.replace(
-            '<span class="value" id="race-details">-- (-- m)</span>',
-            f'<span class="value" id="race-details">{html.escape(infos["discipline"])} (-- m)</span>'
-        )
-        
-        return HTMLResponse(content=html_content)
-    except FileNotFoundError:
-        return HTMLResponse(content="<h1 style='color:red; text-align:center;'>Erreur : Le fichier index.html est introuvable à la racine du projet.</h1>")
+        <div class="info-box">
+            <h3> Informations de la course du jour</h3>
+            <div class="info-line">
+                <strong>Hippodrome :</strong> 
+                <span class="value">{hippo}</span>
+            </div>
+            <div class="info-line">
+                <strong>Discipline :</strong> 
+                <span class="value">{discipline}</span>
+            </div>
+        </div>
+
+        <div class="actions">
+            <a href="/" class="btn-action btn-refresh">🔄 Actualiser les données</a>
+            <a href="/" class="btn-action btn-robot">🤖 Relancer le robot</a>
+        </div>
+
+        <form action="/analyser" method="POST">
+            <label for="chevaux">Saisissez vos favoris :</label>
+            <input type="text" id="chevaux" name="chevaux" value="13 - 8 - 10 - 4" required autocomplete="off">
+            <button type="submit" class="btn-submit">🚀 Lancer l'analyse Pegasus</button>
+        </form>
+
+        <div class="footer">
+            <p>© 2026 Pegasus IA - Données en temps réel via API PMU</p>
+            <p style="margin-top: 5px; color: #888;"> Arrivée de la veille intégrée</p>
+        </div>
+    </div>
+</body>
+</html>
+""")
 
 # ==============================================================================
-# ROUTE DE TRAITEMENT (Conservée pour compatibilité avec votre ancien système)
+# ROUTE D'ANALYSE
 # ==============================================================================
 @app.post("/analyser", response_class=HTMLResponse)
 async def analyser(chevaux: str = Form(...)):
@@ -227,23 +201,103 @@ async def analyser(chevaux: str = Form(...)):
     if not numeros_saisis:
         return HTMLResponse(content="<h3>Erreur : Veuillez saisir des numéros valides.</h3><a href='/'>Retour</a>", status_code=400)
 
+    HISTORIQUE_SGE_DATA = [
+      {"id": "1", "arrivee": [11, 4, 15, 6, 12]}, {"id": "2", "arrivee": [8, 14, 5, 13, 2]},
+      {"id": "3", "arrivee": [9, 3, 16, 7, 10]}, {"id": "4", "arrivee": [1, 12, 6, 14, 8]},
+      {"id": "5", "arrivee": [15, 7, 2, 11, 13]}, {"id": "6", "arrivee": [4, 10, 8, 5, 9]},
+      {"id": "7", "arrivee": [13, 6, 14, 3, 1]}, {"id": "8", "arrivee": [2, 11, 7, 12, 16]},
+      {"id": "9", "arrivee": [12, 5, 9, 15, 4]}, {"id": "10", "arrivee": [6, 14, 3, 8, 11]},
+      {"id": "11", "arrivee": [10, 2, 13, 7, 5]}, {"id": "12", "arrivee": [7, 15, 1, 12, 9]},
+      {"id": "13", "arrivee": [3, 8, 11, 14, 6]}, {"id": "14", "arrivee": [16, 4, 12, 9, 2]},
+      {"id": "15", "arrivee": [5, 13, 6, 10, 8]}, {"id": "16", "arrivee": [14, 9, 2, 7, 15]},
+      {"id": "17", "arrivee": [8, 1, 10, 13, 4]}, {"id": "18", "arrivee": [11, 6, 15, 3, 12]},
+      {"id": "19", "arrivee": [2, 12, 5, 14, 7]}, {"id": "20", "arrivee": [9, 7, 4, 8, 11]},
+      {"id": "21", "arrivee": [13, 3, 8, 16, 5]}, {"id": "22", "arrivee": [6, 10, 14, 2, 12]},
+      {"id": "23", "arrivee": [1, 15, 7, 11, 9]}, {"id": "24", "arrivee": [12, 4, 9, 13, 6]},
+      {"id": "25", "arrivee": [8, 11, 2, 5, 14]}, {"id": "26", "arrivee": [15, 6, 13, 10, 3]},
+      {"id": "27", "arrivee": [4, 14, 8, 12, 7]}, {"id": "28", "arrivee": [7, 2, 11, 9, 16]},
+      {"id": "29", "arrivee": [10, 8, 5, 15, 1]}, {"id": "30", "arrivee": [3, 13, 12, 6, 14]},
+      {"id": "31", "arrivee": [16, 5, 9, 4, 11]}, {"id": "32", "arrivee": [11, 9, 3, 7, 2]},
+      {"id": "33", "arrivee": [6, 14, 8, 12, 15]}, {"id": "34", "arrivee": [2, 10, 13, 5, 4]},
+      {"id": "35", "arrivee": [12, 7, 1, 16, 9]}, {"id": "36", "arrivee": [5, 13, 14, 8, 6]},
+      {"id": "37", "arrivee": [9, 3, 6, 11, 10]}, {"id": "38", "arrivee": [14, 8, 10, 2, 7]},
+      {"id": "39", "arrivee": [7, 12, 15, 4, 13]}, {"id": "40", "arrivee": [4, 1, 9, 14, 5]},
+      {"id": "41", "arrivee": [13, 11, 2, 8, 12]}, {"id": "42", "arrivee": [8, 6, 16, 3, 10]},
+      {"id": "43", "arrivee": [10, 15, 5, 7, 14]}, {"id": "44", "arrivee": [1, 4, 12, 9, 6]},
+      {"id": "45", "arrivee": [15, 9, 7, 13, 2]}, {"id": "46", "arrivee": [3, 12, 14, 6, 11]},
+      {"id": "47", "arrivee": [11, 2, 8, 10, 15]}, {"id": "48", "arrivee": [6, 13, 4, 16, 9]},
+      {"id": "49", "arrivee": [14, 5, 10, 1, 7]}, {"id": "50", "arrivee": [9, 8, 3, 12, 13]},
+      {"id": "51", "arrivee": [2, 14, 11, 5, 6]}, {"id": "52", "arrivee": [7, 10, 6, 15, 8]},
+      {"id": "53", "arrivee": [12, 3, 13, 9, 4]}, {"id": "54", "arrivee": [5, 16, 2, 11, 14]},
+      {"id": "55", "arrivee": [13, 7, 9, 4, 10]}, {"id": "56", "arrivee": [8, 12, 15, 6, 1]},
+      {"id": "57", "arrivee": [4, 9, 1, 14, 11]}, {"id": "58", "arrivee": [10, 2, 7, 13, 5]},
+      {"id": "59", "arrivee": [15, 6, 12, 8, 3]}, {"id": "60", "arrivee": [3, 11, 14, 10, 16]},
+      {"id": "61", "arrivee": [11, 4, 8, 5, 12]}, {"id": "62", "arrivee": [6, 13, 2, 9, 7]},
+      {"id": "63", "arrivee": [14, 8, 10, 15, 3]}, {"id": "64", "arrivee": [9, 1, 12, 6, 13]},
+      {"id": "65", "arrivee": [2, 15, 5, 11, 8]}, {"id": "66", "arrivee": [7, 10, 14, 4, 16]},
+      {"id": "67", "arrivee": [12, 3, 9, 13, 6]}, {"id": "68", "arrivee": [5, 11, 7, 2, 10]},
+      {"id": "69", "arrivee": [13, 6, 4, 12, 15]}, {"id": "70", "arrivee": [8, 14, 16, 9, 1]},
+      {"id": "71", "arrivee": [4, 2, 11, 8, 5]}, {"id": "72", "arrivee": [10, 9, 3, 14, 12]},
+      {"id": "73", "arrivee": [15, 7, 12, 6, 2]}, {"id": "74", "arrivee": [1, 13, 8, 10, 4]},
+      {"id": "75", "arrivee": [6, 5, 15, 11, 9]}, {"id": "76", "arrivee": [12, 14, 2, 3, 7]},
+      {"id": "77", "arrivee": [3, 8, 10, 13, 16]}, {"id": "78", "arrivee": [14, 11, 6, 5, 1]},
+      {"id": "79", "arrivee": [9, 4, 13, 7, 12]}, {"id": "80", "arrivee": [2, 16, 9, 8, 15]},
+      {"id": "81", "arrivee": [7, 3, 11, 14, 10]}, {"id": "82", "arrivee": [13, 12, 5, 2, 6]},
+      {"id": "83", "arrivee": [8, 6, 14, 10, 4]}, {"id": "84", "arrivee": [10, 15, 1, 9, 11]},
+      {"id": "85", "arrivee": [5, 2, 8, 12, 13]}, {"id": "86", "arrivee": [16, 9, 4, 7, 3]},
+      {"id": "87", "arrivee": [11, 7, 13, 15, 14]}, {"id": "88", "arrivee": [4, 14, 6, 3, 8]},
+      {"id": "89", "arrivee": [12, 8, 10, 11, 2]}, {"id": "90", "arrivee": [13, 9, 5, 15, 3]},
+      {"id": "91", "arrivee": [15, 10, 12, 13, 7]}, {"id": "92", "arrivee": [3, 5, 9, 2, 16]},
+      {"id": "93", "arrivee": [9, 13, 7, 8, 12]}, {"id": "94", "arrivee": [14, 2, 11, 4, 15]},
+      {"id": "95", "arrivee": [7, 16, 4, 10, 6]}, {"id": "96", "arrivee": [2, 6, 15, 14, 11]},
+      {"id": "97", "arrivee": [10, 11, 8, 1, 5]}, {"id": "98", "arrivee": [1, 4, 13, 9, 12]},
+      {"id": "99", "arrivee": [8, 12, 2, 6, 10]}, {"id": "100", "arrivee": [13, 9, 5, 15, 3]},
+      {"id": "101", "arrivee": [5, 7, 14, 11, 8]}, {"id": "102", "arrivee": [12, 3, 10, 4, 16]},
+      {"id": "103", "arrivee": [6, 15, 1, 8, 13]}, {"id": "104", "arrivee": [11, 2, 9, 12, 7]},
+      {"id": "105", "arrivee": [4, 8, 6, 13, 10]}, {"id": "106", "arrivee": [16, 14, 11, 3, 2]},
+      {"id": "107", "arrivee": [9, 5, 12, 7, 15]}, {"id": "108", "arrivee": [3, 10, 4, 14, 6]},
+      {"id": "109", "arrivee": [7, 13, 8, 2, 11]}, {"id": "110", "arrivee": [14, 1, 15, 9, 5]},
+      {"id": "111", "arrivee": [6, 13, 8, 11, 4]}, {"id": "112", "arrivee": [12, 5, 14, 7, 2]},
+      {"id": "113", "arrivee": [9, 15, 3, 12, 6]}, {"id": "114", "arrivee": [4, 10, 16, 8, 13]},
+      {"id": "115", "arrivee": [15, 7, 11, 2, 9]}, {"id": "116", "arrivee": [3, 14, 6, 10, 15]},
+      {"id": "117", "arrivee": [11, 8, 13, 4, 1]}, {"id": "118", "arrivee": [7, 12, 5, 14, 10]},
+      {"id": "119", "arrivee": [13, 2, 9, 15, 6]}, {"id": "121", "arrivee": [5, 13, 8, 2, 11]},
+      {"id": "122", "arrivee": [12, 4, 15, 7, 3]}, {"id": "123", "arrivee": [9, 16, 5, 14, 6]},
+      {"id": "124", "arrivee": [3, 11, 14, 8, 12]}, {"id": "125", "arrivee": [15, 6, 10, 13, 4]},
+      {"id": "126", "arrivee": [8, 2, 7, 16, 11]}, {"id": "127", "arrivee": [14, 9, 3, 12, 5]},
+      {"id": "128", "arrivee": [1, 13, 6, 10, 15]}, {"id": "130", "arrivee": [6, 4, 3, 13, 9]},
+      {"id": "131", "arrivee": [13, 5, 11, 12, 8]}, {"id": "132", "arrivee": [14, 6, 12, 4, 8]},
+      {"id": "134", "arrivee": [13, 6, 2, 10, 7]}, {"id": "135", "arrivee": [8, 14, 11, 3, 15]},
+      {"id": "136", "arrivee": [12, 4, 7, 9, 16]}, {"id": "137", "arrivee": [5, 13, 8, 2, 11]},
+      {"id": "138", "arrivee": [10, 6, 14, 4, 9]}, {"id": "139", "arrivee": [3, 15, 12, 7, 1]},
+      {"id": "140", "arrivee": [14, 8, 6, 11, 2]}, {"id": "141", "arrivee": [7, 12, 15, 5, 10]},
+      {"id": "142", "arrivee": [11, 3, 9, 14, 6]}, {"id": "144", "arrivee": [14, 9, 7, 3, 12]},
+      {"id": "145", "arrivee": [6, 11, 2, 15, 8]}, {"id": "146", "arrivee": [12, 5, 14, 9, 4]},
+      {"id": "147", "arrivee": [3, 16, 8, 13, 6]}, {"id": "148", "arrivee": [8, 2, 11, 15, 7]},
+      {"id": "149", "arrivee": [5, 13, 10, 4, 14]}, {"id": "150", "arrivee": [9, 15, 6, 12, 3]},
+      {"id": "151", "arrivee": [11, 7, 4, 16, 2]}, {"id": "152", "arrivee": [2, 14, 9, 5, 13]},
+      {"id": "154", "arrivee": [5, 11, 14, 8, 3]}, {"id": "155", "arrivee": [12, 7, 16, 4, 9]},
+      {"id": "156", "arrivee": [10, 3, 13, 6, 15]}, {"id": "157", "arrivee": [4, 14, 8, 11, 2]},
+      {"id": "158", "arrivee": [7, 12, 5, 15, 10]}, {"id": "159", "arrivee": [13, 6, 9, 3, 14]},
+      {"id": "160", "arrivee": [2, 15, 11, 7, 8]}, {"id": "161", "arrivee": [14, 5, 12, 1, 9]},
+      {"id": "162", "arrivee": [8, 13, 4, 10, 15]}, {"id": "163", "arrivee": [11, 9, 2, 14, 6]},
+      {"id": "176", "arrivee": [13, 7, 4, 12, 9]}, {"id": "177", "arrivee": [6, 15, 10, 2, 14]},
+      {"id": "178", "arrivee": [9, 11, 3, 16, 5]}, {"id": "179", "arrivee": [4, 13, 8, 7, 15]},
+      {"id": "180", "arrivee": [11, 5, 14, 6, 2]}, {"id": "181", "arrivee": [3, 12, 9, 10, 16]},
+      {"id": "182", "arrivee": [14, 8, 6, 11, 7]}, {"id": "183", "arrivee": [10, 16, 12, 4, 13]},
+      {"id": "184", "arrivee": []}
+    ]
+    
     tous_les_gagnants = []
     for course in HISTORIQUE_SGE_DATA:
         tous_les_gagnants.extend(course["arrivee"])
-    
     compteur = Counter(tous_les_gagnants)
     resultats_chevaux = [f"<li>Cheval <strong>#{num}</strong> : apparu {compteur.get(num, 0)} fois dans l'historique</li>" for num in numeros_saisis]
 
-    # ==============================================================================
-    # RÉCUPÉRATION DES INFOS EN TEMPS RÉEL JUSTE AVANT D'AFFICHER LE RETOUR
-    # ==============================================================================
     infos_pmu = recuperer_infos_pmu()
     date_du_jour = _datetime.now().strftime("%d/%m/%Y")
 
-    # ==============================================================================
-    # GÉNÉRATION DU HTML DE RETOUR (Remplace les lignes 249 à 272)
-    # ==============================================================================
-    html_retour = f"""
+    return HTMLResponse(content=f"""
     <!DOCTYPE html>
     <html lang="fr">
     <head>
@@ -272,13 +326,10 @@ async def analyser(chevaux: str = Form(...)):
                 <div class="info-line"><strong>Nombre de partants :</strong> {infos_pmu['partants']}</div>
                 <div class="info-line"><strong>Heure de départ :</strong> {infos_pmu['heure']}</div>
             </div>
-
             <h2>Statistiques de performance sur la sélection :</h2>
             <ul>{"".join(resultats_chevaux)}</ul>
             <a href="/" class="btn-retour">« Nouvelle analyse</a>
         </div>
     </body>
     </html>
-    """
-    
-    return HTMLResponse(content=html_retour)
+    """)
