@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PEGASUS - Mon Quinté+ avec l'IA</title>
+    <title>PEGASUS - Analyse Quinté+</title>
     <style>
         * {
             margin: 0;
@@ -12,71 +12,182 @@
         }
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            background: linear-gradient(135deg, #121212 0%, #1e1e1e 100%);
             min-height: 100vh;
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
-            color: white;
+            color: #e0e0e0;
+            padding: 20px;
         }
         .container {
-            text-align: center;
-            padding: 40px 20px;
-            max-width: 800px;
+            width: 100%;
+            max-width: 600px;
+            background: #1e1e1e;
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.6);
+            border: 1px solid #333;
         }
         h1 {
-            font-size: 3em;
-            margin-bottom: 20px;
+            text-align: center;
             color: #ff9800;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            font-size: 2.2em;
+            margin-bottom: 10px;
         }
         .subtitle {
-            font-size: 1.3em;
-            margin-bottom: 40px;
-            color: #e0e0e0;
+            text-align: center;
+            color: #aaa;
+            margin-bottom: 25px;
+            font-size: 1.1em;
         }
-        .btn-launch {
+        .info-box {
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 25px;
+            border-left: 5px solid #ff9800;
+        }
+        .info-box h3 {
+            color: #ff9800;
+            margin-bottom: 15px;
+            font-size: 1.2em;
+        }
+        .info-line {
+            margin: 10px 0;
+            font-size: 1.05em;
+            display: flex;
+            justify-content: space-between;
+        }
+        .info-line strong {
+            color: #bbb;
+        }
+        .value {
+            color: #ffffff;
+            font-weight: bold;
+            text-align: right;
+        }
+        .actions {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 25px;
+            flex-wrap: wrap;
+        }
+        .btn-action {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+            text-decoration: none;
             display: inline-block;
+        }
+        .btn-refresh {
             background: linear-gradient(135deg, #26a69a 0%, #00897b 100%);
             color: white;
-            padding: 20px 50px;
-            font-size: 1.3em;
-            font-weight: bold;
-            text-decoration: none;
-            border-radius: 12px;
-            box-shadow: 0 8px 20px rgba(38, 166, 154, 0.4);
-            transition: all 0.3s ease;
-            margin-top: 20px;
         }
-        .btn-launch:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 12px 30px rgba(38, 166, 154, 0.6);
-            background: linear-gradient(135deg, #00897b 0%, #26a69a 100%);
+        .btn-robot {
+            background: linear-gradient(135deg, #7e57c2 0%, #5e35b1 100%);
+            color: white;
+        }
+        .btn-action:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+        }
+        form {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        label {
+            font-weight: bold;
+            color: #ff9800;
+            font-size: 1.1em;
+        }
+        input[type="text"] {
+            padding: 15px;
+            border-radius: 8px;
+            border: 2px solid #444;
+            background: #2a2a2a;
+            color: white;
+            font-size: 1.2em;
+            text-align: center;
+            transition: border-color 0.3s;
+        }
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #26a69a;
+        }
+        .btn-submit {
+            background: linear-gradient(135deg, #26a69a 0%, #00897b 100%);
+            color: white;
+            padding: 16px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.2em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 10px;
+        }
+        .btn-submit:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(38, 166, 154, 0.4);
         }
         .footer {
-            margin-top: 60px;
-            color: #888;
-            font-size: 0.9em;
-        }
-        .horse-icon {
-            font-size: 4em;
-            margin-bottom: 20px;
+            margin-top: 30px;
+            text-align: center;
+            color: #666;
+            font-size: 0.85em;
         }
     </style>
+    <script>
+        // Script pour convertir automatiquement les virgules en espaces/tirets
+        document.addEventListener('DOMContentLoaded', function() {
+            const input = document.querySelector('input[name="chevaux"]');
+            if (input) {
+                input.addEventListener('input', function(e) {
+                    this.value = this.value.replace(/,/g, ' - ');
+                });
+            }
+        });
+    </script>
 </head>
 <body>
     <div class="container">
-        <div class="horse-icon">🏇</div>
-        <h1>PEGASUS</h1>
-        <p class="subtitle">Mon pronostic Quinté+ avec l'appui de l'IA !</p>
+        <h1>🏇 PEGASUS IA</h1>
+        <p class="subtitle">Votre assistant pronostic Quinté+</p>
         
-        <a href="https://pegasus-backend-zku1-ezi30wsku-jaffry-pegasus1.vercel.app" class="btn-launch">
-            🚀 Lancer l'application Pegasus IA
-        </a>
-        
+        <div class="info-box">
+            <h3>📅 Informations de la course du jour</h3>
+            <div class="info-line">
+                <strong>Hippodrome :</strong> 
+                <span class="value" id="race-hippo">EN ATTENTE</span>
+            </div>
+            <div class="info-line">
+                <strong>Discipline :</strong> 
+                <span class="value" id="race-details">-- (-- m)</span>
+            </div>
+        </div>
+
+        <div class="actions">
+            <a href="/" class="btn-action btn-refresh">🔄 Actualiser les données</a>
+            <a href="/" class="btn-action btn-robot">🤖 Relancer le robot</a>
+        </div>
+
+        <form action="/analyser" method="POST">
+            <label for="chevaux">Saisissez vos favoris (ou laissez les défauts) :</label>
+            <input type="text" id="chevaux" name="chevaux" value="13 - 8 - 10 - 4" required autocomplete="off">
+            <button type="submit" class="btn-submit">🚀 Lancer l'analyse Pegasus</button>
+        </form>
+
         <div class="footer">
-            <p>© 2026 Pegasus IA - Pronostics hippiques optimisés par l'intelligence artificielle</p>
+            <p>© 2026 Pegasus IA - Données en temps réel via API PMU</p>
+            <p style="margin-top: 5px; color: #888;">📊 Arrivée de la veille intégrée</p>
         </div>
     </div>
 </body>
