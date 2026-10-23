@@ -246,6 +246,15 @@ async def analyser(chevaux: str = Form(...)):
     compteur = Counter(tous_les_gagnants)
     resultats_chevaux = [f"<li>Cheval <strong>#{num}</strong> : apparu {compteur.get(num, 0)} fois dans l'historique</li>" for num in numeros_saisis]
 
+      # ==============================================================================
+    # RÉCUPÉRATION DES INFOS EN TEMPS RÉEL JUSTE AVANT D'AFFICHER LE RETOUR
+    # ==============================================================================
+    infos_pmu = recuperer_infos_pmu()
+    date_du_jour = _datetime.now().strftime("%d/%m/%Y")
+
+    # ==============================================================================
+    # GÉNÉRATION DU HTML DE RETOUR (Remplace les lignes 249 à 272)
+    # ==============================================================================
     html_retour = f"""
     <!DOCTYPE html>
     <html lang="fr">
@@ -254,19 +263,34 @@ async def analyser(chevaux: str = Form(...)):
         <title>Résultats Analyse</title>
         <style>
             body {{ font-family: Arial, sans-serif; margin: 40px; background-color: #121212; color: #e0e0e0; }}
-            .container {{ max-width: 600px; background: #1e1e1e; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); margin: 0 auto; border: 1px solid #333; }}
-            h2 {{ color: #ff9800; }}
+            .container {{ max-width: 600px; margin: 20px auto; background: #1e1e1e; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }}
+            h2 {{ color: #ff9800; margin-top: 0; }}
             ul {{ padding-left: 20px; line-height: 1.8; }}
-            .btn-retour {{ display: inline-block; margin-top: 20px; background: #26a69a; color: white; text-decoration: none; padding: 10px 15px; border-radius: 6px; font-weight: bold; }}
+            .info-box {{ background: #2a2a2a; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #ff9800; }}
+            .info-line {{ margin: 5px 0; font-size: 0.95em; }}
+            .info-line strong {{ color: #ff9800; }}
+            .btn-retour {{ display: inline-block; margin-top: 20px; background: #26a69a; color: white; text-decoration: none; padding: 10px 20px; border-radius: 6px; }}
         </style>
     </head>
     <body>
         <div class="container">
+            <div class="info-box">
+                <h2>1. INFORMATIONS SUR LE QUINTÉ</h2>
+                <div class="info-line"><strong>Date :</strong> {date_du_jour}</div>
+                <div class="info-line"><strong>Hippodrome :</strong> {infos_pmu['hippodrome']}</div>
+                <div class="info-line"><strong>Discipline :</strong> {infos_pmu['discipline']}</div>
+                <div class="info-line"><strong>Nom de la course :</strong> {infos_pmu['nom_course']}</div>
+                <div class="info-line"><strong>Distance :</strong> {infos_pmu['distance']} mètres</div>
+                <div class="info-line"><strong>Nombre de partants :</strong> {infos_pmu['partants']}</div>
+                <div class="info-line"><strong>Heure de départ :</strong> {infos_pmu['heure']}</div>
+            </div>
+
             <h2>Statistiques de performance sur la sélection :</h2>
             <ul>{"".join(resultats_chevaux)}</ul>
-            <a href="/" class="btn-retour">← Nouvelle analyse</a>
+            <a href="/" class="btn-retour">« Nouvelle analyse</a>
         </div>
     </body>
     </html>
     """
+    
     return HTMLResponse(content=html_retour)
