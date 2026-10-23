@@ -1,12 +1,12 @@
 {
   "course_du_jour": {
-    "date": "2026-10-22",
-    "hippodrome": "AUT",
+    "date": "2026-10-23",
+    "hippodrome": "VIN",
     "discipline": "Inconnue",
-    "course_nom": "PRIX ANDRE ADELE",
-    "distance": 3600,
-    "partants": "16",
-    "heure": "13:55",
+    "course_nom": "PRIX ORIONIS",
+    "distance": 2850,
+    "partants": "18",
+    "heure": "20:15",
     "non_partants": [],
     "participants": [],
     "arrivee": [
@@ -19,8 +19,8 @@
     "favoris": []
   },
   "nouvelles_arrivees": [],
-  "derniere_maj": "2026-10-22T20:38:31.019090",
+  "derniere_maj": "2026-10-23T10:23:18.012170",
   "non_partants": [],
-  "nb_partants_declares": 16,
+  "nb_partants_declares": 18,
   "nb_non_partants": 0
 }
