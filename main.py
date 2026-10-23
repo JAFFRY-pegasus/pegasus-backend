@@ -1,3 +1,63 @@
+def recuperer_infos_pmu():
+    """Récupère la discipline, l'hippodrome et les détails du Quinté du jour via l'API PMU."""
+    # Valeurs par défaut conformes à votre structure
+    infos = {
+        "discipline": "Inconnue", 
+        "hippodrome": "Inconnu",
+        "nom_course": "Sans nom",
+        "distance": 0,
+        "partants": 0,
+        "heure": "--:--"
+    }
+    
+    if requests is None:
+        return infos
+    
+    try:
+        # 1. Utilisation de la date du jour dynamique
+        date_aujourdhui = _datetime.now().strftime("%Y-%m-%d")
+        
+        # L'URL CORRECTE DE L'API PMU :
+        url_programme = f"https://pmu.fr{date_aujourdhui}"
+        
+        response = requests.get(url_programme, timeout=5, headers={"User-Agent": "Pegasus/1.0"})
+        
+        if response.status_code == 200:
+            data = response.json()
+            
+            # 2. Vérification de la structure du JSON PMU
+            if "programme" in data and "reunions" in data["programme"]:
+                
+                # PARCOURS DE TOUTES LES RÉUNIONS ET COURSES POUR TROUVER LE QUINTÉ
+                for reunion in data["programme"]["reunions"]:
+                    for course in reunion.get("courses", []):
+                        
+                        # Détection précise de la course support du Quinté+
+                        if course.get("isSocieteGeneraleQuinte") or course.get("ordreEquipement") == "QUIN":
+                            
+                            # Extraction sécurisée de l'hippodrome
+                            hippo_data = reunion.get("hippodrome", {})
+                            infos["hippodrome"] = hippo_data.get("libelleLong", hippo_data.get("code", "Inconnu")).title()
+                            
+                            # Extraction de la discipline
+                            infos["discipline"] = course.get("discipline", "Inconnue").replace("_", " ").title()
+                            
+                            # Nouveaux champs pour alimenter votre Section 1
+                            infos["nom_course"] = course.get("libelle", "Sans nom").title()
+                            infos["distance"] = course.get("distance", 0)
+                            infos["partants"] = course.get("nombrePartantsDeclared", 0)
+                            
+                            # Conversion du timestamp de départ en heure lisible (HH:MM)
+                            ts = course.get("heureDepart")
+                            if ts:
+                                infos["heure"] = _datetime.fromtimestamp(ts / 1000).strftime("%H:%M")
+                            
+                            return infos # Quinté trouvé, on renvoie immédiatement le dictionnaire
+                            
+        return infos
+    except Exception:
+        return infos
+
 import html
 import json
 import os
