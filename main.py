@@ -1,3 +1,20 @@
+import html
+import json
+import os
+import time
+from collections import Counter
+from datetime import date as _date, datetime as _datetime
+from itertools import combinations
+from pathlib import Path
+
+from fastapi import FastAPI, Form
+from fastapi.responses import HTMLResponse
+
+try:
+    import requests
+except ImportError:
+    requests = None
+
 # ==============================================================================
 # UNIQUE FONCTION DE RÉCUPÉRATION DES INFOS PMU (CORRIGÉE ET SÉCURISÉE)
 # ==============================================================================
@@ -19,10 +36,12 @@ def recuperer_infos_pmu():
         # 1. Gestion stricte du fuseau horaire français pour éviter le décalage de date sur Render
         import zoneinfo
         tz_paris = zoneinfo.ZoneInfo("Europe/Paris")
-        date_aujourdhui = _datetime.now(tz_paris).strftime("%Y-%m-%d")
         
-        # L'URL OFFICIELLE DU FLUX PMU CORRIGÉE ET SÉCURISÉE SUR RENDER :
-        url_programme = f"https://pmu.fr{date_aujourdhui}"
+        # CORRECTION 1 : Format de date JJMMAAAA requis par l'API PMU (ex: 24102026)
+        date_aujourdhui = _datetime.now(tz_paris).strftime("%d%m%Y")
+        
+        # CORRECTION 2 : Utilisation de la VRAIE URL de l'API PMU
+        url_programme = f"https://offline.turfinfo.api.pmu.fr/rest/client/7/programme/{date_aujourdhui}"
         response = requests.get(url_programme, timeout=7, headers={"User-Agent": "Pegasus/1.0"})
         
         if response.status_code == 200:
@@ -215,7 +234,7 @@ async def analyser(chevaux: str = Form(...)):
     compteur = Counter(tous_les_gagnants)
     resultats_chevaux = [f"<li>Cheval <strong>#{num}</strong> : apparu {compteur.get(num, 0)} fois dans l'historique</li>" for num in numeros_saisis]
 
-      # ==============================================================================
+    # ==============================================================================
     # RÉCUPÉRATION DES INFOS EN TEMPS RÉEL JUSTE AVANT D'AFFICHER LE RETOUR
     # ==============================================================================
     infos_pmu = recuperer_infos_pmu()
