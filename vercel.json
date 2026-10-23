@@ -1,9 +1,9 @@
 {
+  "version": 2,
   "builds": [
     {
       "src": "main.py",
-      "use": "@vercel/python",
-      "config": { "includeFiles": "data/**" }
+      "use": "@vercel/python"
     }
   ],
   "routes": [
