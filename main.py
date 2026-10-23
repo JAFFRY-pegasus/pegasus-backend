@@ -1,20 +1,3 @@
-import html
-import json
-import os
-import time
-from collections import Counter
-from datetime import date as _date, datetime as _datetime
-from itertools import combinations
-from pathlib import Path
-
-from fastapi import FastAPI, Form
-from fastapi.responses import HTMLResponse
-
-try:
-    import requests
-except ImportError:
-    requests = None
-
 # ==============================================================================
 # UNIQUE FONCTION DE RÉCUPÉRATION DES INFOS PMU (CORRIGÉE ET SÉCURISÉE)
 # ==============================================================================
@@ -38,7 +21,7 @@ def recuperer_infos_pmu():
         tz_paris = zoneinfo.ZoneInfo("Europe/Paris")
         date_aujourdhui = _datetime.now(tz_paris).strftime("%Y-%m-%d")
         
-        # 2. Utilisation de l'endpoint offline (stable sur Render)
+        # L'URL OFFICIELLE DU FLUX PMU CORRIGÉE ET SÉCURISÉE SUR RENDER :
         url_programme = f"https://pmu.fr{date_aujourdhui}"
         response = requests.get(url_programme, timeout=7, headers={"User-Agent": "Pegasus/1.0"})
         
