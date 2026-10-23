@@ -1,3 +1,101 @@
+import html
+import json
+import os
+import time
+from collections import Counter
+from datetime import date as _date, datetime as _datetime
+from itertools import combinations
+from pathlib import Path
+
+from fastapi import FastAPI, Form
+from fastapi.responses import HTMLResponse
+
+try:
+    import requests
+except ImportError:
+    requests = None
+
+# ==============================================================================
+# UNIQUE FONCTION DE RÉCUPÉRATION DES INFOS PMU (CORRIGÉE ET SÉCURISÉE)
+# ==============================================================================
+def recuperer_infos_pmu():
+    """Récupère la discipline, l'hippodrome et les détails du Quinté du jour via l'API PMU."""
+    infos = {
+        "discipline": "Inconnue", 
+        "hippodrome": "Inconnu",
+        "nom_course": "Sans nom",
+        "distance": 0,
+        "partants": 0,
+        "heure": "--:--"
+    }
+    
+    if requests is None:
+        return infos
+    
+    try:
+        # 1. Gestion stricte du fuseau horaire français pour éviter le décalage de date sur Render
+        import zoneinfo
+        tz_paris = zoneinfo.ZoneInfo("Europe/Paris")
+        date_aujourdhui = _datetime.now(tz_paris).strftime("%Y-%m-%d")
+        
+        # 2. Utilisation de l'endpoint offline (stable sur Render)
+        url_programme = f"https://pmu.fr{date_aujourdhui}"
+        response = requests.get(url_programme, timeout=7, headers={"User-Agent": "Pegasus/1.0"})
+        
+        if response.status_code == 200:
+            data = response.json()
+            if "programme" in data and "reunions" in data["programme"]:
+                reunions_liste = data["programme"]["reunions"]
+                
+                # PARCOURS DE TOUTES LES RÉUNIONS POUR TROUVER LE QUINTÉ
+                for reunion in reunions_liste:
+                    for course in reunion.get("courses", []):
+                        
+                        # Détection multi-critères ultra-robuste du Quinté+
+                        est_quinte = (
+                            course.get("isSocieteGeneraleQuinte") == True or 
+                            course.get("ordreEquipement") == "QUIN" or
+                            "QUINTE" in str(course.get("libelle", "")).upper()
+                        )
+                        
+                        if est_quinte:
+                            hippo_data = reunion.get("hippodrome", {})
+                            infos["hippodrome"] = hippo_data.get("libelleLong", hippo_data.get("code", "Inconnu")).title()
+                            infos["discipline"] = course.get("discipline", "Inconnue").replace("_", " ").title()
+                            infos["nom_course"] = course.get("libelle", "Sans nom").title()
+                            infos["distance"] = course.get("distance", 0)
+                            infos["partants"] = course.get("nombrePartantsDeclared", 0)
+                            
+                            ts = course.get("heureDepart")
+                            if ts:
+                                infos["heure"] = _datetime.fromtimestamp(ts / 1000, tz_paris).strftime("%H:%M")
+                            return infos  # Quinté trouvé, on renvoie immédiatement le dictionnaire
+                            
+                # 3. Système de secours automatique si la clé Quinté n'est pas explicitement marquée
+                if reunions_liste and len(reunions_liste) > 0:
+                    premiere_reunion = reunions_liste[0]
+                    courses_secours = premiere_reunion.get("courses", [])
+                    if courses_secours and len(courses_secours) > 0:
+                        course_secours = courses_secours[0]
+                        hippo_data = premiere_reunion.get("hippodrome", {})
+                        infos["hippodrome"] = hippo_data.get("libelleLong", hippo_data.get("code", "Inconnu")).title()
+                        infos["discipline"] = course_secours.get("discipline", "Inconnue").replace("_", " ").title()
+                        infos["nom_course"] = course_secours.get("libelle", "Sans nom").title()
+                        infos["distance"] = course_secours.get("distance", 0)
+                        infos["partants"] = course_secours.get("nombrePartantsDeclared", 0)
+                        ts = course_secours.get("heureDepart")
+                        if ts:
+                            infos["heure"] = _datetime.fromtimestamp(ts / 1000, tz_paris).strftime("%H:%M")
+                            
+        return infos
+    except Exception:
+        return infos
+
+# ==============================================================================
+# INITIALISATION DE L'APPLICATION
+# ==============================================================================
+app = FastAPI()
+
 # ==============================================================================
 # BASE HISTORIQUE COMPLÈTE (ASSEMBLÉE ET CORRIGÉE)
 # ==============================================================================
