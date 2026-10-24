@@ -11,7 +11,8 @@ def recuperer_infos_pmu():
     infos = {
         "discipline": "Inconnue", "hippodrome": "Inconnu",
         "nom_course": "Sans nom", "distance": 0, "partants": 16,
-        "heure": "--:--", "derniere_maj": "Inconnue", "date_course": "Inconnue"
+        "heure": "--:--", "derniere_maj": "Inconnue", "date_course": "Inconnue",
+        "arrivee": []
     }
     try:
         with open("data/quinte.json", "r", encoding="utf-8") as f:
@@ -24,6 +25,8 @@ def recuperer_infos_pmu():
                 infos["distance"] = course.get("distance", 0)
                 infos["partants"] = int(course.get("partants", 16))
                 infos["heure"] = str(course.get("heure", "--:--"))
+                # Récupérer l'arrivée officielle
+                infos["arrivee"] = course.get("arrivee", []) or []
                 date_str = course.get("date", "")
                 if date_str:
                     try:
@@ -139,6 +142,27 @@ async def index():
     distance = html.escape(str(infos["distance"]))
     derniere_maj = html.escape(infos["derniere_maj"])
     date_course = html.escape(infos["date_course"])
+    arrivee = infos.get("arrivee", []) or []
+    
+    # Construire les boules d'arrivée si disponibles
+    if arrivee and len(arrivee) >= 5:
+        arrivee_boules = "".join([f'<div class="circle white">{n}</div>' for n in arrivee[:5]])
+        arrivee_label = f"Arrivée officielle (1er → 5e) — Quinté du {date_course} :"
+        arrivee_html = f"""
+            <div style="margin-bottom:20px;">
+                <label style="color:#94a3b8; font-size:0.9em;">{arrivee_label}</label>
+                <div class="circle-group">{arrivee_boules}</div>
+            </div>
+        """
+    else:
+        arrivee_html = f"""
+            <div style="margin-bottom:20px;">
+                <label style="color:#94a3b8; font-size:0.9em;">Arrivée officielle (1er → 5e) — Quinté du {date_course} :</label>
+                <div style="margin-top:10px; padding:15px; background:rgba(245, 158, 11, 0.15); border:1px solid #f59e0b; border-radius:8px; color:#f59e0b; font-weight:bold; text-align:center;">
+                    ⏳ Arrivée en attente
+                </div>
+            </div>
+        """
     
     tous_les_gagnants = []
     for course in HISTORIQUE_SGE_DATA:
@@ -267,16 +291,54 @@ async def index():
         </div>
         <button class="btn-submit" onclick="mettreAJour()">METTRE À JOUR & RECALCULER</button>
     </div>
+    
+    <!-- SECTION 2 MODIFIÉE -->
     <div class="section">
-        <h2>2. SYNTHÈSE PMU ET PRONOSTIC PEGASUS OPTIMISÉ POUR {partants} PARTANT(S) RÉEL(S) AU QUINTÉ</h2>
+        <h2>PRONOSTIC PEGASUS GENERE AUTOMATIQUEMENT</h2>
         <p style="color:#94a3b8; font-size:0.9em; margin-bottom:20px;">Le moteur Pegasus analyse les {total_courses} dernières arrivées pour identifier les axes géométriques récurrents et optimiser votre combinaison de 5 ou 8 chevaux.</p>
-        <div style="margin-bottom:20px;"><label style="color:#94a3b8; font-size:0.9em;">Synthèse Presse / Favoris :</label><div class="circle-group"><div class="circle turquoise">13</div><div class="circle turquoise">8</div><div class="circle turquoise">10</div><div class="circle turquoise">4</div><div class="circle turquoise">16</div><div class="circle turquoise">6</div><div class="circle turquoise">5</div><div class="circle turquoise">12</div></div></div>
-        <div style="margin-bottom:20px;"><label style="color:#94a3b8; font-size:0.9em;">Pronostic Pegasus calculé automatiquement :</label><div class="circle-group"><div class="circle orange">13</div><div class="circle orange">6</div><div class="circle orange">12</div><div class="circle orange">14</div><div class="circle orange highlight">4</div></div></div>
-        <div style="margin-bottom:20px;"><label style="color:#94a3b8; font-size:0.9em;">Arrivée officielle (1er → 5e) — Quinté du {date_course} :</label><div class="circle-group"><div class="circle white">4</div><div class="circle white">5</div><div class="circle white">9</div><div class="circle white">10</div><div class="circle white">11</div></div></div>
-        <div class="stats-box"><div class="label">Réussite du pronostic Pegasus</div><div class="value">20 %</div><div class="subtext">1 numéro sur 5 dans les 5 premiers (entourés ci-dessus)</div></div>
-        <div style="margin:20px 0;"><label style="color:#94a3b8; font-size:0.9em;">Combinaison active / saisie :</label><div class="circle-group"><div class="circle blue">13</div><div class="circle blue">6</div><div class="circle blue">5</div><div class="circle blue">12</div><div class="circle blue">11</div></div></div>
-        <div class="grid-2"><div class="grid-item"><div class="label">Pondération Pronostic Pegasus</div><div class="value orange">88 pts</div></div><div class="grid-item"><div class="label">Pondération Combinaison</div><div class="value turquoise">22 pts</div></div></div>
+        
+        <div style="margin-bottom:20px;">
+            <label style="color:#94a3b8; font-size:0.9em;">Pronostic Pegasus calculé automatiquement :</label>
+            <div class="circle-group">
+                <div class="circle orange">13</div>
+                <div class="circle orange">6</div>
+                <div class="circle orange">12</div>
+                <div class="circle orange">14</div>
+                <div class="circle orange highlight">4</div>
+            </div>
+        </div>
+        
+        {arrivee_html}
+        
+        <div class="stats-box">
+            <div class="label">Réussite du pronostic Pegasus</div>
+            <div class="value">20 %</div>
+            <div class="subtext">1 numéro sur 5 dans les 5 premiers (entourés ci-dessus)</div>
+        </div>
+        
+        <div style="margin:20px 0;">
+            <label style="color:#94a3b8; font-size:0.9em;">Combinaison active / saisie :</label>
+            <div class="circle-group">
+                <div class="circle blue">13</div>
+                <div class="circle blue">6</div>
+                <div class="circle blue">5</div>
+                <div class="circle blue">12</div>
+                <div class="circle blue">11</div>
+            </div>
+        </div>
+        
+        <div class="grid-2">
+            <div class="grid-item">
+                <div class="label">Pondération Pronostic Pegasus</div>
+                <div class="value orange">88 pts</div>
+            </div>
+            <div class="grid-item">
+                <div class="label">Pondération Combinaison</div>
+                <div class="value turquoise">22 pts</div>
+            </div>
+        </div>
     </div>
+    
     <div class="section">
         <h2>3. TEST DE VISION GÉOMÉTRIQUE (GRILLE 1-{partants})</h2>
         <p style="color:#94a3b8; font-size:0.9em; text-align:center; margin-bottom:20px;">Cliquez sur les numéros de la grille pour composer instantanément votre combinaison (8 chevaux max) — outil de test indépendant</p>
@@ -292,22 +354,14 @@ async def index():
     </div>
     <script>
         let selectionGrille = [];
-        let curseurPosition = 0;
         
-        // Formatage automatique avec tirets pour les DEUX champs
         function formaterAvecTirets(input) {{
-            // Sauvegarder la position du curseur
             const pos = input.selectionStart;
             const oldLength = input.value.length;
-            
-            // Récupérer uniquement les chiffres
             const chiffres = input.value.replace(/[^0-9]/g, '');
-            
-            // Limiter à 8 numéros max
             const nums = [];
             let i = 0;
             while (i < chiffres.length && nums.length < 8) {{
-                // Gérer les numéros à 2 chiffres (10-16)
                 if (i + 1 < chiffres.length && chiffres[i] === '1' && '0123456'.includes(chiffres[i+1])) {{
                     nums.push(chiffres[i] + chiffres[i+1]);
                     i += 2;
@@ -316,18 +370,13 @@ async def index():
                     i++;
                 }}
             }}
-            
-            // Formater avec " - "
             const newValue = nums.join(' - ');
             input.value = newValue;
-            
-            // Ajuster la position du curseur
             const newLength = input.value.length;
             const diff = newLength - oldLength;
             input.setSelectionRange(pos + diff, pos + diff);
         }}
         
-        // Appliquer aux deux champs
         document.getElementById('favoris-manuels').addEventListener('input', function(e) {{
             formaterAvecTirets(e.target);
         }});
@@ -359,16 +408,12 @@ async def index():
         function mettreAJour() {{
             const favoris = document.getElementById('favoris-manuels').value;
             const combinaison = document.getElementById('saisie-combinaison').value;
-            
-            // Extraire les numéros de la combinaison
             const nums = combinaison.split('-').map(n => n.trim()).filter(n => n !== '');
-            
             if (nums.length < 5 || nums.length > 8) {{
                 alert('⚠️ Veuillez saisir entre 5 et 8 chevaux (actuellement : ' + nums.length + ')');
                 return;
             }}
-            
-            alert('✅ Mise à jour effectuée !\\n\\nFavoris : ' + favoris + '\\nCombinaison : ' + combinaison + '\\n\\nRecalcul en cours...');
+            alert('✅ Mise à jour effectuée !\\n\\nFavoris : ' + favoris + '\\nCombinaison : ' + combinaison);
         }}
     </script>
 </body>
