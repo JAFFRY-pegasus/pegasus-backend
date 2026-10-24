@@ -18,20 +18,13 @@ except ImportError:
 app = FastAPI()
 
 # ==============================================================================
-# FONCTION DE RÉCUPÉRATION DES INFOS PMU (CORRIGÉE : Lit le JSON local en priorité)
+# FONCTION DE RÉCUPÉRATION DES INFOS PMU (CORRIGÉE : Lit le JSON local)
 # ==============================================================================
 def recuperer_infos_pmu():
-    """Récupère les infos du Quinté en lisant d'abord le JSON local, puis via API en secours."""
-    infos = {
-        "discipline": "Inconnue", 
-        "hippodrome": "Inconnu",
-        "nom_course": "Sans nom",
-        "distance": 0,
-        "partants": 0,
-        "heure": "--:--"
-    }
+    """Récupère la discipline et le nom de l'hippodrome du jour via le JSON local."""
+    infos = {"discipline": "Inconnue", "hippodrome": "Inconnu"}
     
-    # 1. PRIORITÉ ABSOLUE : Lire le fichier quinte.json local (généré par le robot)
+    # 1. PRIORITÉ : Lire le fichier quinte.json local (généré par le robot)
     try:
         with open("data/quinte.json", "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -39,23 +32,17 @@ def recuperer_infos_pmu():
             if course:
                 infos["hippodrome"] = str(course.get("hippodrome", "Inconnu")).title()
                 infos["discipline"] = str(course.get("discipline", "Inconnue")).title()
-                infos["nom_course"] = str(course.get("course_nom", "Sans nom")).title()
-                infos["distance"] = course.get("distance", 0)
-                infos["partants"] = str(course.get("partants", 0))
-                infos["heure"] = str(course.get("heure", "--:--"))
-                return infos  # Succès ! On a les données fraîches du JSON
+                return infos  # Succès ! On a les données
     except Exception:
-        pass  # Si le fichier n'existe pas, on passe à la méthode de secours
+        pass  # Si échec, on passe à la méthode de secours ci-dessous
 
-    # 2. SECOURS : Appel API live (votre code initial du 23 octobre)
+    # 2. SECOURS : Appel API live (votre code initial)
     if requests is None:
         return infos
     try:
-        import zoneinfo
-        tz_paris = zoneinfo.ZoneInfo("Europe/Paris")
-        date_aujourdhui = _datetime.now(tz_paris).strftime("%d%m%Y")
-        url_programme = f"https://offline.turfinfo.api.pmu.fr/rest/client/7/programme/{date_aujourdhui}"
-        response = requests.get(url_programme, timeout=7, headers={"User-Agent": "Pegasus/1.0"})
+        date_aujourdhui = _datetime.now().strftime("%Y-%m-%d")
+        url_programme = f"https://online.turfinfo.api.pmu.fr/rest/client/1/programme/{date_aujourdhui}"
+        response = requests.get(url_programme, timeout=5, headers={"User-Agent": "Pegasus/1.0"})
         
         if response.status_code == 200:
             data = response.json()
@@ -65,22 +52,12 @@ def recuperer_infos_pmu():
                     premiere_reunion = reunions[0]
                     if "hippodrome" in premiere_reunion:
                         hippo_data = premiere_reunion["hippodrome"]
-                        infos["hippodrome"] = hippo_data.get("libelleLong", hippo_data.get("code", "Inconnu")).title()
+                        infos["hippodrome"] = hippo_data.get("libelle", hippo_data.get("code", "Inconnu")).title()
                     
                     if "courses" in premiere_reunion and len(premiere_reunion["courses"]) > 0:
                         premiere_course = premiere_reunion["courses"][0]
-                        discipline = premiere_course.get("discipline", "Inconnue")
-                        if isinstance(discipline, dict):
-                            discipline = discipline.get("libelle", "NON SPÉCIFIÉE")
-                        infos["discipline"] = str(discipline).replace("_", " ").title()
-                        
-                        infos["nom_course"] = premiere_course.get("libelle", "Sans nom").title()
-                        infos["distance"] = premiere_course.get("distance", 0)
-                        infos["partants"] = str(premiere_course.get("nombreDeclaresPartants", 0))
-                        ts = premiere_course.get("heureDepart")
-                        if ts:
-                            infos["heure"] = _datetime.fromtimestamp(ts / 1000, tz_paris).strftime("%H:%M")
-                            
+                        discipline = premiere_course.get("discipline", {}).get("libelle", "NON SPÉCIFIÉE")
+                        infos["discipline"] = discipline.replace("_", " ").title()
         return infos
     except Exception:
         return infos
