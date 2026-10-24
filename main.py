@@ -356,70 +356,68 @@ async def index():
     <script>
         let selectionGrille = [];
         
-        // Formatage FIABLE : se déclenche UNIQUEMENT quand l'utilisateur quitte le champ (blur)
-        function formaterAvecTirets(input) {
+        function formaterAvecTirets(input) {{
             const chiffres = input.value.replace(/[^0-9]/g, '');
-            if (chiffres.length === 0) {
+            if (chiffres.length === 0) {{
                 input.value = '';
                 return;
-            }
+            }}
             
             const nums = [];
             let i = 0;
-            while (i < chiffres.length && nums.length < 8) {
-                if (chiffres[i] === '1' && i + 1 < chiffres.length && '0123456'.includes(chiffres[i+1])) {
+            while (i < chiffres.length && nums.length < 8) {{
+                if (chiffres[i] === '1' && i + 1 < chiffres.length && '0123456'.includes(chiffres[i+1])) {{
                     nums.push(chiffres[i] + chiffres[i+1]);
                     i += 2;
-                } else if (chiffres[i] !== '0') {
+                }} else if (chiffres[i] !== '0') {{
                     nums.push(chiffres[i]);
                     i++;
-                } else {
+                }} else {{
                     i++;
-                }
-            }
+                }}
+            }}
             
             input.value = nums.join(' - ');
-        }
+        }}
         
-        // Appliquer aux DEUX champs UNIQUEMENT au blur (quand l'utilisateur quitte le champ)
-        document.getElementById('favoris-manuels').addEventListener('blur', function(e) {
+        document.getElementById('favoris-manuels').addEventListener('blur', function(e) {{
             formaterAvecTirets(e.target);
-        });
+        }});
         
-        document.getElementById('saisie-combinaison').addEventListener('blur', function(e) {
+        document.getElementById('saisie-combinaison').addEventListener('blur', function(e) {{
             formaterAvecTirets(e.target);
-        });
+        }});
         
-        function toggleGrille(num) {
-            const btn = document.querySelector(`.grille-btn[data-num="${num}"]`);
-            if (selectionGrille.includes(num)) {
+        function toggleGrille(num) {{
+            const btn = document.querySelector(`.grille-btn[data-num="${{num}}"]`);
+            if (selectionGrille.includes(num)) {{
                 selectionGrille = selectionGrille.filter(n => n !== num);
                 btn.classList.remove('selected');
-            } else {
-                if (selectionGrille.length >= 8) {
+            }} else {{
+                if (selectionGrille.length >= 8) {{
                     alert('Maximum 8 chevaux !');
                     return;
-                }
+                }}
                 selectionGrille.push(num);
                 btn.classList.add('selected');
-            }
-        }
+            }}
+        }}
         
-        function resetGrille() {
+        function resetGrille() {{
             selectionGrille = [];
             document.querySelectorAll('.grille-btn').forEach(btn => btn.classList.remove('selected'));
-        }
+        }}
         
-        function mettreAJour() {
+        function mettreAJour() {{
             const favoris = document.getElementById('favoris-manuels').value;
             const combinaison = document.getElementById('saisie-combinaison').value;
             const nums = combinaison.split('-').map(n => n.trim()).filter(n => n !== '');
-            if (nums.length < 5 || nums.length > 8) {
+            if (nums.length < 5 || nums.length > 8) {{
                 alert('⚠️ Veuillez saisir entre 5 et 8 chevaux (actuellement : ' + nums.length + ')');
                 return;
-            }
-            alert('✅ Mise à jour effectuée !\n\nFavoris : ' + favoris + '\nCombinaison : ' + combinaison);
-        }
+            }}
+            alert('✅ Mise à jour effectuée !\\n\\nFavoris : ' + favoris + '\\nCombinaison : ' + combinaison);
+        }}
     </script>
 </body>
 </html>""")
