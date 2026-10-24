@@ -157,7 +157,6 @@ async def index():
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
         body {{
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            /* IMAGE DE FOND BIEN VISIBLE */
             background-image: url('Horse-racing-1.jpg');
             background-size: cover;
             background-position: center;
@@ -168,7 +167,6 @@ async def index():
             padding: 20px;
             position: relative;
         }}
-        /* Voile sombre léger pour lisibilité */
         body::before {{
             content: '';
             position: fixed;
@@ -259,9 +257,9 @@ async def index():
             <div class="info-field"><label>Nombre de partants déclarés :</label><input type="text" value="{partants}" readonly></div>
             <div class="info-field"><label>Heure de départ :</label><input type="text" value="{heure}" readonly></div>
         </div>
-        <div class="input-group"><label>Synthèse Presse / Favoris (séparés par tirets) :</label><input type="text" value="13 - 8 - 10 - 4 - 16 - 6 - 5 - 12" readonly></div>
-        <div class="input-group"><label>Inscrivez ici la combinaison de votre choix de 5 à 8 chevaux, elle générera automatiquement la combinaison optimisée de PEGASUS !</label><input type="text" value="13 - 6 - 5 - 12 - 11"></div>
-        <button class="btn-submit">METTRE À JOUR & RECALCULER</button>
+        <div class="input-group"><label>Ajout manuel de vos favoris - de 5 à 8 chevaux - issus de la presse ou autre choix personnel :</label><input type="text" id="favoris-manuels" value="13 - 8 - 10 - 4 - 16 - 6 - 5 - 12" readonly></div>
+        <div class="input-group"><label>Inscrivez ici la combinaison de votre choix de 5 à 8 chevaux, elle générera automatiquement la combinaison optimisée de PEGASUS !</label><input type="text" id="saisie-combinaison" value="13 - 6 - 5 - 12 - 11"></div>
+        <button class="btn-submit" onclick="mettreAJour()">METTRE À JOUR & RECALCULER</button>
     </div>
     <div class="section">
         <h2>2. SYNTHÈSE PMU ET PRONOSTIC PEGASUS OPTIMISÉ POUR {partants} PARTANT(S) RÉEL(S) AU QUINTÉ</h2>
@@ -288,12 +286,44 @@ async def index():
     </div>
     <script>
         let selectionGrille = [];
+        
+        // Formatage automatique avec tirets
+        document.getElementById('saisie-combinaison').addEventListener('input', function(e) {{
+            let value = e.target.value;
+            // Supprime tout ce qui n'est pas un chiffre ou un tiret
+            value = value.replace(/[^0-9-]/g, '');
+            // Sépare par les tirets et filtre les vides
+            let numbers = value.split('-').filter(n => n.trim() !== '');
+            // Formate avec des tirets entre les nombres
+            e.target.value = numbers.join(' - ');
+        }});
+        
         function toggleGrille(num) {{
             const btn = document.querySelector(`.grille-btn[data-num="${{num}}"]`);
-            if (selectionGrille.includes(num)) {{ selectionGrille = selectionGrille.filter(n => n !== num); btn.classList.remove('selected'); }}
-            else {{ if (selectionGrille.length >= 8) {{ alert('Maximum 8 chevaux !'); return; }} selectionGrille.push(num); btn.classList.add('selected'); }}
+            if (selectionGrille.includes(num)) {{
+                selectionGrille = selectionGrille.filter(n => n !== num);
+                btn.classList.remove('selected');
+            }} else {{
+                if (selectionGrille.length >= 8) {{
+                    alert('Maximum 8 chevaux !');
+                    return;
+                }}
+                selectionGrille.push(num);
+                btn.classList.add('selected');
+            }}
         }}
-        function resetGrille() {{ selectionGrille = []; document.querySelectorAll('.grille-btn').forEach(btn => btn.classList.remove('selected')); }}
+        
+        function resetGrille() {{
+            selectionGrille = [];
+            document.querySelectorAll('.grille-btn').forEach(btn => btn.classList.remove('selected'));
+        }}
+        
+        function mettreAJour() {{
+            const saisie = document.getElementById('saisie-combinaison').value;
+            const favoris = document.getElementById('favoris-manuels').value;
+            alert('Mise à jour effectuée !\\n\\nFavoris : ' + favoris + '\\nCombinaison saisie : ' + saisie + '\\n\\nRecalcul en cours...');
+            // Ici vous pouvez ajouter la logique de recalcul
+        }}
     </script>
 </body>
 </html>""")
