@@ -1,12 +1,12 @@
 {
   "course_du_jour": {
-    "date": "2026-10-23",
-    "hippodrome": "VIN",
+    "date": "2026-10-24",
+    "hippodrome": "COM",
     "discipline": "Inconnue",
-    "course_nom": "PRIX ORIONIS",
-    "distance": 2850,
-    "partants": "18",
-    "heure": "20:15",
+    "course_nom": "PRIX DE BEAUNE",
+    "distance": 3600,
+    "partants": "15",
+    "heure": "15:15",
     "non_partants": [],
     "participants": [],
     "arrivee": [
@@ -19,8 +19,8 @@
     "favoris": []
   },
   "nouvelles_arrivees": [],
-  "derniere_maj": "2026-10-23T20:32:03.693419",
+  "derniere_maj": "2026-10-24T07:59:11.415892",
   "non_partants": [],
-  "nb_partants_declares": 18,
+  "nb_partants_declares": 15,
   "nb_non_partants": 0
 }
