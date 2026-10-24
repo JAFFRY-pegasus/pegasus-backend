@@ -12,7 +12,7 @@ def recuperer_infos_pmu():
         "discipline": "Inconnue", "hippodrome": "Inconnu",
         "nom_course": "Sans nom", "distance": 0, "partants": 16,
         "heure": "--:--", "derniere_maj": "Inconnue", "date_course": "Inconnue",
-        "arrivee": []
+        "arrivee": [], "date_arrivee": ""
     }
     try:
         with open("data/quinte.json", "r", encoding="utf-8") as f:
@@ -25,8 +25,8 @@ def recuperer_infos_pmu():
                 infos["distance"] = course.get("distance", 0)
                 infos["partants"] = int(course.get("partants", 16))
                 infos["heure"] = str(course.get("heure", "--:--"))
-                # Récupérer l'arrivée officielle
                 infos["arrivee"] = course.get("arrivee", []) or []
+                infos["date_arrivee"] = course.get("date", "")
                 date_str = course.get("date", "")
                 if date_str:
                     try:
@@ -143,14 +143,17 @@ async def index():
     derniere_maj = html.escape(infos["derniere_maj"])
     date_course = html.escape(infos["date_course"])
     arrivee = infos.get("arrivee", []) or []
+    date_arrivee = infos.get("date_arrivee", "")
     
-    # Construire les boules d'arrivée si disponibles
-    if arrivee and len(arrivee) >= 5:
+    # Vérifier si l'arrivée est bien du jour (pas celle d'hier conservée)
+    today_str = _datetime.now().strftime("%Y-%m-%d")
+    arrivee_valide = arrivee and len(arrivee) >= 5 and date_arrivee == today_str
+    
+    if arrivee_valide:
         arrivee_boules = "".join([f'<div class="circle white">{n}</div>' for n in arrivee[:5]])
-        arrivee_label = f"Arrivée officielle (1er → 5e) — Quinté du {date_course} :"
         arrivee_html = f"""
             <div style="margin-bottom:20px;">
-                <label style="color:#94a3b8; font-size:0.9em;">{arrivee_label}</label>
+                <label style="color:#94a3b8; font-size:0.9em;">Arrivée officielle (1er → 5e) — Quinté du {date_course} :</label>
                 <div class="circle-group">{arrivee_boules}</div>
             </div>
         """
@@ -283,7 +286,7 @@ async def index():
         </div>
         <div class="input-group">
             <label>Ajout manuel de vos favoris - de 5 à 8 chevaux - issus de la presse ou autre choix personnel :</label>
-            <input type="text" id="favoris-manuels" value="13 - 8 - 10 - 4 - 16 - 6 - 5 - 12" placeholder="Ex: 13 - 8 - 10 - 4">
+            <input type="text" id="favoris-manuels" value="13 - 8 - 10 - 4 - 16" placeholder="Ex: 13 - 8 - 10 - 4 - 16">
         </div>
         <div class="input-group">
             <label>Inscrivez ici la combinaison de votre choix de 5 à 8 chevaux, elle générera automatiquement la combinaison optimisée de PEGASUS !</label>
@@ -292,7 +295,6 @@ async def index():
         <button class="btn-submit" onclick="mettreAJour()">METTRE À JOUR & RECALCULER</button>
     </div>
     
-    <!-- SECTION 2 MODIFIÉE -->
     <div class="section">
         <h2>PRONOSTIC PEGASUS GENERE AUTOMATIQUEMENT</h2>
         <p style="color:#94a3b8; font-size:0.9em; margin-bottom:20px;">Le moteur Pegasus analyse les {total_courses} dernières arrivées pour identifier les axes géométriques récurrents et optimiser votre combinaison de 5 ou 8 chevaux.</p>
@@ -355,34 +357,44 @@ async def index():
     <script>
         let selectionGrille = [];
         
+        // Formatage SIMPLE et FIABLE : ajoute " - " après chaque numéro tapé
         function formaterAvecTirets(input) {{
-            const pos = input.selectionStart;
-            const oldLength = input.value.length;
             const chiffres = input.value.replace(/[^0-9]/g, '');
+            if (chiffres.length === 0) {{
+                input.value = '';
+                return;
+            }}
+            
             const nums = [];
             let i = 0;
             while (i < chiffres.length && nums.length < 8) {{
-                if (i + 1 < chiffres.length && chiffres[i] === '1' && '0123456'.includes(chiffres[i+1])) {{
+                if (chiffres[i] === '1' && i + 1 < chiffres.length && '0123456'.includes(chiffres[i+1])) {{
                     nums.push(chiffres[i] + chiffres[i+1]);
                     i += 2;
-                }} else {{
+                }} else if (chiffres[i] !== '0') {{
                     nums.push(chiffres[i]);
+                    i++;
+                }} else {{
                     i++;
                 }}
             }}
+            
             const newValue = nums.join(' - ');
-            input.value = newValue;
-            const newLength = input.value.length;
-            const diff = newLength - oldLength;
-            input.setSelectionRange(pos + diff, pos + diff);
+            if (input.value !== newValue) {{
+                input.value = newValue;
+            }}
         }}
         
+        let timeoutFavoris = null;
         document.getElementById('favoris-manuels').addEventListener('input', function(e) {{
-            formaterAvecTirets(e.target);
+            clearTimeout(timeoutFavoris);
+            timeoutFavoris = setTimeout(() => formaterAvecTirets(e.target), 150);
         }});
         
+        let timeoutSaisie = null;
         document.getElementById('saisie-combinaison').addEventListener('input', function(e) {{
-            formaterAvecTirets(e.target);
+            clearTimeout(timeoutSaisie);
+            timeoutSaisie = setTimeout(() => formaterAvecTirets(e.target), 150);
         }});
         
         function toggleGrille(num) {{
