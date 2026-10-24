@@ -145,7 +145,6 @@ async def index():
     arrivee = infos.get("arrivee", []) or []
     date_arrivee = infos.get("date_arrivee", "")
     
-    # Vérifier si l'arrivée est bien du jour (pas celle d'hier conservée)
     today_str = _datetime.now().strftime("%Y-%m-%d")
     arrivee_valide = arrivee and len(arrivee) >= 5 and date_arrivee == today_str
     
@@ -286,11 +285,11 @@ async def index():
         </div>
         <div class="input-group">
             <label>Ajout manuel de vos favoris - de 5 à 8 chevaux - issus de la presse ou autre choix personnel :</label>
-            <input type="text" id="favoris-manuels" value="13 - 8 - 10 - 4 - 16" placeholder="Ex: 13 - 8 - 10 - 4 - 16">
+            <input type="text" id="favoris-manuels" value="13 - 8 - 10 - 4 - 16" placeholder="Ex: 13 8 10 4 16">
         </div>
         <div class="input-group">
             <label>Inscrivez ici la combinaison de votre choix de 5 à 8 chevaux, elle générera automatiquement la combinaison optimisée de PEGASUS !</label>
-            <input type="text" id="saisie-combinaison" value="" placeholder="Tapez vos numéros (les tirets s'ajoutent automatiquement)">
+            <input type="text" id="saisie-combinaison" value="" placeholder="Tapez vos numéros (espaces, virgules ou tirets acceptés)">
         </div>
         <button class="btn-submit" onclick="mettreAJour()">METTRE À JOUR & RECALCULER</button>
     </div>
@@ -357,76 +356,70 @@ async def index():
     <script>
         let selectionGrille = [];
         
-        // Formatage SIMPLE et FIABLE : ajoute " - " après chaque numéro tapé
-        function formaterAvecTirets(input) {{
+        // Formatage FIABLE : se déclenche UNIQUEMENT quand l'utilisateur quitte le champ (blur)
+        function formaterAvecTirets(input) {
             const chiffres = input.value.replace(/[^0-9]/g, '');
-            if (chiffres.length === 0) {{
+            if (chiffres.length === 0) {
                 input.value = '';
                 return;
-            }}
+            }
             
             const nums = [];
             let i = 0;
-            while (i < chiffres.length && nums.length < 8) {{
-                if (chiffres[i] === '1' && i + 1 < chiffres.length && '0123456'.includes(chiffres[i+1])) {{
+            while (i < chiffres.length && nums.length < 8) {
+                if (chiffres[i] === '1' && i + 1 < chiffres.length && '0123456'.includes(chiffres[i+1])) {
                     nums.push(chiffres[i] + chiffres[i+1]);
                     i += 2;
-                }} else if (chiffres[i] !== '0') {{
+                } else if (chiffres[i] !== '0') {
                     nums.push(chiffres[i]);
                     i++;
-                }} else {{
+                } else {
                     i++;
-                }}
-            }}
+                }
+            }
             
-            const newValue = nums.join(' - ');
-            if (input.value !== newValue) {{
-                input.value = newValue;
-            }}
-        }}
+            input.value = nums.join(' - ');
+        }
         
-        let timeoutFavoris = null;
-        document.getElementById('favoris-manuels').addEventListener('input', function(e) {{
-            clearTimeout(timeoutFavoris);
-            timeoutFavoris = setTimeout(() => formaterAvecTirets(e.target), 150);
-        }});
+        // Appliquer aux DEUX champs UNIQUEMENT au blur (quand l'utilisateur quitte le champ)
+        document.getElementById('favoris-manuels').addEventListener('blur', function(e) {
+            formaterAvecTirets(e.target);
+        });
         
-        let timeoutSaisie = null;
-        document.getElementById('saisie-combinaison').addEventListener('input', function(e) {{
-            clearTimeout(timeoutSaisie);
-            timeoutSaisie = setTimeout(() => formaterAvecTirets(e.target), 150);
-        }});
+        document.getElementById('saisie-combinaison').addEventListener('blur', function(e) {
+            formaterAvecTirets(e.target);
+        });
         
-        function toggleGrille(num) {{
-            const btn = document.querySelector(`.grille-btn[data-num="${{num}}"]`);
-            if (selectionGrille.includes(num)) {{
+        function toggleGrille(num) {
+            const btn = document.querySelector(`.grille-btn[data-num="${num}"]`);
+            if (selectionGrille.includes(num)) {
                 selectionGrille = selectionGrille.filter(n => n !== num);
                 btn.classList.remove('selected');
-            }} else {{
-                if (selectionGrille.length >= 8) {{
+            } else {
+                if (selectionGrille.length >= 8) {
                     alert('Maximum 8 chevaux !');
                     return;
-                }}
+                }
                 selectionGrille.push(num);
                 btn.classList.add('selected');
-            }}
-        }}
+            }
+        }
         
-        function resetGrille() {{
+        function resetGrille() {
             selectionGrille = [];
             document.querySelectorAll('.grille-btn').forEach(btn => btn.classList.remove('selected'));
-        }}
+        }
         
-        function mettreAJour() {{
+        function mettreAJour() {
             const favoris = document.getElementById('favoris-manuels').value;
             const combinaison = document.getElementById('saisie-combinaison').value;
             const nums = combinaison.split('-').map(n => n.trim()).filter(n => n !== '');
-            if (nums.length < 5 || nums.length > 8) {{
+            if (nums.length < 5 || nums.length > 8) {
                 alert('⚠️ Veuillez saisir entre 5 et 8 chevaux (actuellement : ' + nums.length + ')');
                 return;
-            }}
-            alert('✅ Mise à jour effectuée !\\n\\nFavoris : ' + favoris + '\\nCombinaison : ' + combinaison);
-        }}
+            }
+            alert('✅ Mise à jour effectuée !\n\nFavoris : ' + favoris + '\nCombinaison : ' + combinaison);
+        }
     </script>
 </body>
 </html>""")
