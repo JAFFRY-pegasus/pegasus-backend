@@ -15,7 +15,7 @@ except ImportError:
 app = FastAPI()
 
 # ==============================================================================
-# RÉCUPÉRATION DES INFOS PMU (CORRIGÉE : Lit le JSON local en priorité)
+# RÉCUPÉRATION DES INFOS PMU (Lit le JSON local + extrait la date de mise à jour)
 # ==============================================================================
 def recuperer_infos_pmu():
     infos = {
@@ -24,7 +24,8 @@ def recuperer_infos_pmu():
         "nom_course": "Sans nom",
         "distance": 0,
         "partants": 0,
-        "heure": "--:--"
+        "heure": "--:--",
+        "derniere_maj": "Inconnue"
     }
     
     # 1. PRIORITÉ : Lire le fichier quinte.json local
@@ -39,11 +40,17 @@ def recuperer_infos_pmu():
                 infos["distance"] = course.get("distance", 0)
                 infos["partants"] = str(course.get("partants", 0))
                 infos["heure"] = str(course.get("heure", "--:--"))
-                return infos
+            
+            # Extraire la date de dernière mise à jour du JSON (ex: 2026-10-24 07:59)
+            maj = data.get("derniere_maj", "")
+            if maj:
+                infos["derniere_maj"] = maj[:16].replace("T", " ")
+                
+            return infos
     except Exception:
         pass
 
-    # 2. SECOURS : Appel API live
+    # 2. SECOURS : Appel API live (si le fichier JSON est absent)
     if requests is None:
         return infos
     try:
@@ -78,7 +85,7 @@ def recuperer_infos_pmu():
     return infos
 
 # ==============================================================================
-# PAGE D'ACCUEIL
+# PAGE D'ACCUEIL (DESIGN COMPLET RESTAURÉ : Sections 1, 2, 3 + Grille)
 # ==============================================================================
 @app.get("/", response_class=HTMLResponse)
 async def index():
@@ -89,7 +96,11 @@ async def index():
     heure = html.escape(infos["heure"])
     partants = html.escape(str(infos["partants"]))
     distance = html.escape(str(infos["distance"]))
+    derniere_maj = html.escape(infos["derniere_maj"])
     
+    # Nombre de quintés dans l'historique
+    nb_quintes = 184  # Correspond à la longueur de votre base HISTORIQUE_SGE_DATA
+
     return HTMLResponse(content=f"""
 <!DOCTYPE html>
 <html lang="fr">
@@ -101,133 +112,181 @@ async def index():
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
         body {{
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #121212 0%, #1e1e1e 100%);
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
             min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            color: #e0e0e0;
+            color: #e2e8f0;
             padding: 20px;
         }}
         .container {{
-            width: 100%;
-            max-width: 600px;
-            background: #1e1e1e;
+            max-width: 800px;
+            margin: 0 auto;
+            background: rgba(30, 41, 59, 0.8);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
             padding: 30px;
-            border-radius: 16px;
-            box-shadow: 0 8px 30px rgba(0,0,0,0.6);
-            border: 1px solid #333;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+            border: 1px solid rgba(255,255,255,0.1);
         }}
-        h1 {{ text-align: center; color: #ff9800; font-size: 2.2em; margin-bottom: 10px; }}
-        .subtitle {{ text-align: center; color: #aaa; margin-bottom: 25px; font-size: 1.1em; }}
-        .info-box {{
-            background: #2a2a2a;
+        h1 {{ text-align: center; color: #f59e0b; font-size: 2.5em; margin-bottom: 10px; text-shadow: 0 2px 10px rgba(245, 158, 11, 0.3); }}
+        .subtitle {{ text-align: center; color: #94a3b8; margin-bottom: 30px; font-size: 1.1em; }}
+        
+        .section {{
+            background: rgba(15, 23, 42, 0.6);
+            border-radius: 12px;
             padding: 20px;
-            border-radius: 10px;
             margin-bottom: 25px;
-            border-left: 5px solid #ff9800;
+            border-left: 4px solid #f59e0b;
         }}
-        .info-box h3 {{ color: #ff9800; margin-bottom: 15px; font-size: 1.2em; }}
-        .info-line {{ margin: 10px 0; font-size: 1.05em; display: flex; justify-content: space-between; }}
-        .info-line strong {{ color: #bbb; }}
-        .value {{ color: #ffffff; font-weight: bold; text-align: right; }}
-        .actions {{ display: flex; gap: 10px; margin-bottom: 25px; flex-wrap: wrap; }}
-        .btn-action {{
-            flex: 1;
-            padding: 12px;
-            border: none;
-            border-radius: 8px;
-            font-size: 1em;
-            font-weight: bold;
-            cursor: pointer;
-            text-align: center;
-            text-decoration: none;
-            display: inline-block;
-            color: white;
+        .section h2 {{ color: #f59e0b; font-size: 1.3em; margin-bottom: 15px; display: flex; align-items: center; gap: 10px; }}
+        
+        .info-grid {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
         }}
-        .btn-refresh {{ background: linear-gradient(135deg, #26a69a 0%, #00897b 100%); }}
-        .btn-robot {{ background: linear-gradient(135deg, #7e57c2 0%, #5e35b1 100%); }}
-        form {{ display: flex; flex-direction: column; gap: 15px; }}
-        label {{ font-weight: bold; color: #ff9800; font-size: 1.1em; }}
-        input[type="text"] {{
+        .info-item {{ background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px; text-align: center; }}
+        .info-item strong {{ display: block; color: #94a3b8; font-size: 0.85em; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 1px; }}
+        .info-item .value {{ color: #ffffff; font-size: 1.2em; font-weight: bold; }}
+        
+        .form-group {{ margin-top: 20px; }}
+        .form-group label {{ display: block; color: #f59e0b; font-weight: bold; margin-bottom: 10px; font-size: 1.1em; }}
+        .form-group input {{
+            width: 100%;
             padding: 15px;
-            border-radius: 8px;
-            border: 2px solid #444;
-            background: #2a2a2a;
+            border-radius: 10px;
+            border: 2px solid #334155;
+            background: #0f172a;
             color: white;
-            font-size: 1.2em;
+            font-size: 1.3em;
             text-align: center;
+            letter-spacing: 2px;
+            transition: all 0.3s;
         }}
-        input[type="text"]:focus {{ outline: none; border-color: #26a69a; }}
+        .form-group input:focus {{ outline: none; border-color: #f59e0b; box-shadow: 0 0 15px rgba(245, 158, 11, 0.2); }}
+        
         .btn-submit {{
-            background: linear-gradient(135deg, #26a69a 0%, #00897b 100%);
+            width: 100%;
+            padding: 18px;
+            margin-top: 20px;
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
             color: white;
-            padding: 16px;
             border: none;
-            border-radius: 8px;
+            border-radius: 10px;
             font-size: 1.2em;
             font-weight: bold;
             cursor: pointer;
-            margin-top: 10px;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
         }}
-        .footer {{ margin-top: 30px; text-align: center; color: #666; font-size: 0.85em; }}
+        .btn-submit:hover {{ transform: translateY(-2px); box-shadow: 0 10px 25px rgba(245, 158, 11, 0.4); }}
+        
+        .db-status {{
+            text-align: center;
+            color: #64748b;
+            font-size: 0.9em;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }}
+        .db-status span {{ color: #f59e0b; font-weight: bold; }}
+        
+        .actions {{ display: flex; gap: 10px; margin-bottom: 20px; }}
+        .btn-action {{
+            flex: 1; padding: 12px; border: none; border-radius: 8px;
+            font-weight: bold; cursor: pointer; text-align: center;
+            text-decoration: none; color: white; font-size: 0.95em;
+        }}
+        .btn-refresh {{ background: linear-gradient(135deg, #10b981 0%, #059669 100%); }}
+        .btn-robot {{ background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); }}
     </style>
 </head>
 <body>
     <div class="container">
         <h1>🏇 PEGASUS IA</h1>
-        <p class="subtitle">Votre assistant pronostic Quinté+</p>
+        <p class="subtitle">Votre assistant pronostic Quinté+ de nouvelle génération</p>
         
-        <div class="info-box">
-            <h3> Informations de la course du jour</h3>
-            <div class="info-line">
-                <strong>Hippodrome :</strong> 
-                <span class="value">{hippo}</span>
-            </div>
-            <div class="info-line">
-                <strong>Discipline :</strong> 
-                <span class="value">{discipline}</span>
-            </div>
-            <div class="info-line">
-                <strong>Course :</strong> 
-                <span class="value">{nom_course}</span>
-            </div>
-            <div class="info-line">
-                <strong>Heure :</strong> 
-                <span class="value">{heure}</span>
-            </div>
-            <div class="info-line">
-                <strong>Partants :</strong> 
-                <span class="value">{partants}</span>
-            </div>
-            <div class="info-line">
-                <strong>Distance :</strong> 
-                <span class="value">{distance} m</span>
-            </div>
-        </div>
-
         <div class="actions">
             <a href="/" class="btn-action btn-refresh">🔄 Actualiser les données</a>
             <a href="/" class="btn-action btn-robot">🤖 Relancer le robot</a>
         </div>
 
-        <form action="/analyser" method="POST">
-            <label for="chevaux">Saisissez vos favoris :</label>
-            <input type="text" id="chevaux" name="chevaux" value="13 - 8 - 10 - 4" required autocomplete="off">
-            <button type="submit" class="btn-submit">🚀 Lancer l'analyse Pegasus</button>
-        </form>
+        <!-- SECTION 1 : INFORMATIONS DU JOUR -->
+        <div class="section">
+            <h2>📅 1. Informations de la course du jour</h2>
+            <div class="info-grid">
+                <div class="info-item">
+                    <strong>Hippodrome</strong>
+                    <div class="value">{hippo}</div>
+                </div>
+                <div class="info-item">
+                    <strong>Discipline</strong>
+                    <div class="value">{discipline}</div>
+                </div>
+                <div class="info-item">
+                    <strong>Course</strong>
+                    <div class="value">{nom_course}</div>
+                </div>
+                <div class="info-item">
+                    <strong>Heure</strong>
+                    <div class="value">{heure}</div>
+                </div>
+                <div class="info-item">
+                    <strong>Partants</strong>
+                    <div class="value">{partants}</div>
+                </div>
+                <div class="info-item">
+                    <strong>Distance</strong>
+                    <div class="value">{distance} m</div>
+                </div>
+            </div>
+        </div>
 
-        <div class="footer">
+        <!-- SECTION 2 : LA GRILLE DE SAISIE -->
+        <div class="section">
+            <h2>🎯 2. Votre sélection de favoris</h2>
+            <form action="/analyser" method="POST">
+                <div class="form-group">
+                    <label for="chevaux">Entrez vos numéros (séparés par des espaces ou tirets) :</label>
+                    <input type="text" id="chevaux" name="chevaux" value="13 - 8 - 10 - 4" required autocomplete="off" placeholder="Ex: 13 - 8 - 10 - 4">
+                </div>
+                <button type="submit" class="btn-submit">🚀 Lancer l'analyse Pegasus</button>
+            </form>
+        </div>
+
+        <!-- SECTION 3 : ÉTAT DE LA BASE DE DONNÉES -->
+        <div class="section">
+            <h2>📊 3. État de la base de données</h2>
+            <div class="info-grid">
+                <div class="info-item">
+                    <strong>Quintés en mémoire</strong>
+                    <div class="value">{nb_quintes} quintés</div>
+                </div>
+                <div class="info-item">
+                    <strong>Dernière mise à jour PMU</strong>
+                    <div class="value">{derniere_maj}</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="db-status">
             <p>© 2026 Pegasus IA - Données en temps réel via API PMU</p>
-            <p style="margin-top: 5px; color: #888;">📊 Arrivée de la veille intégrée</p>
+            <p>📊 Arrivée de la veille intégrée automatiquement</p>
         </div>
     </div>
+    
+    <script>
+        // Script pour convertir automatiquement les virgules en espaces/tirets
+        document.querySelector('input[name="chevaux"]').addEventListener('input', function(e) {{
+            this.value = this.value.replace(/,/g, ' - ');
+        }});
+    </script>
 </body>
 </html>
 """)
 
 # ==============================================================================
-# ROUTE D'ANALYSE
+# ROUTE D'ANALYSE (Conservée à l'identique)
 # ==============================================================================
 @app.post("/analyser", response_class=HTMLResponse)
 async def analyser(chevaux: str = Form(...)):
@@ -344,12 +403,12 @@ async def analyser(chevaux: str = Form(...)):
         <style>
             body {{ font-family: Arial, sans-serif; margin: 40px; background-color: #121212; color: #e0e0e0; }}
             .container {{ max-width: 600px; margin: 20px auto; background: #1e1e1e; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }}
-            h2 {{ color: #ff9800; margin-top: 0; }}
+            h2 {{ color: #f59e0b; margin-top: 0; }}
             ul {{ padding-left: 20px; line-height: 1.8; }}
-            .info-box {{ background: #2a2a2a; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #ff9800; }}
+            .info-box {{ background: #2a2a2a; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #f59e0b; }}
             .info-line {{ margin: 5px 0; font-size: 0.95em; }}
-            .info-line strong {{ color: #ff9800; }}
-            .btn-retour {{ display: inline-block; margin-top: 20px; background: #26a69a; color: white; text-decoration: none; padding: 10px 20px; border-radius: 6px; }}
+            .info-line strong {{ color: #f59e0b; }}
+            .btn-retour {{ display: inline-block; margin-top: 20px; background: #10b981; color: white; text-decoration: none; padding: 10px 20px; border-radius: 6px; }}
         </style>
     </head>
     <body>
