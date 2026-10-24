@@ -1,30 +1,25 @@
 import html
 import json
-import os
-import time
 from collections import Counter
-from datetime import date as _date, datetime as _datetime
-from itertools import combinations
-from pathlib import Path
-
+from datetime import datetime as _datetime
 from fastapi import FastAPI, Form
 from fastapi.responses import HTMLResponse
-
-try:
-    import requests
-except ImportError:
-    requests = None
 
 app = FastAPI()
 
 # ==============================================================================
-# FONCTION DE RÉCUPÉRATION DES INFOS PMU (CORRIGÉE : Lit le JSON local)
+# RÉCUPÉRATION DES INFOS PMU (Lit le JSON local)
 # ==============================================================================
 def recuperer_infos_pmu():
-    """Récupère la discipline et le nom de l'hippodrome du jour via le JSON local."""
-    infos = {"discipline": "Inconnue", "hippodrome": "Inconnu"}
-    
-    # 1. PRIORITÉ : Lire le fichier quinte.json local (généré par le robot)
+    infos = {
+        "discipline": "Inconnue", 
+        "hippodrome": "Inconnu",
+        "nom_course": "Sans nom",
+        "distance": 0,
+        "partants": 0,
+        "heure": "--:--",
+        "derniere_maj": "Inconnue"
+    }
     try:
         with open("data/quinte.json", "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -32,38 +27,20 @@ def recuperer_infos_pmu():
             if course:
                 infos["hippodrome"] = str(course.get("hippodrome", "Inconnu")).title()
                 infos["discipline"] = str(course.get("discipline", "Inconnue")).title()
-                return infos  # Succès ! On a les données
+                infos["nom_course"] = str(course.get("course_nom", "Sans nom")).title()
+                infos["distance"] = course.get("distance", 0)
+                infos["partants"] = str(course.get("partants", 0))
+                infos["heure"] = str(course.get("heure", "--:--"))
+            maj = data.get("derniere_maj", "")
+            if maj:
+                infos["derniere_maj"] = maj[:16].replace("T", " ")
+            return infos
     except Exception:
-        pass  # Si échec, on passe à la méthode de secours ci-dessous
-
-    # 2. SECOURS : Appel API live (votre code initial)
-    if requests is None:
-        return infos
-    try:
-        date_aujourdhui = _datetime.now().strftime("%Y-%m-%d")
-        url_programme = f"https://online.turfinfo.api.pmu.fr/rest/client/1/programme/{date_aujourdhui}"
-        response = requests.get(url_programme, timeout=5, headers={"User-Agent": "Pegasus/1.0"})
-        
-        if response.status_code == 200:
-            data = response.json()
-            if "programme" in data and "reunions" in data["programme"]:
-                reunions = data["programme"]["reunions"]
-                if len(reunions) > 0:
-                    premiere_reunion = reunions[0]
-                    if "hippodrome" in premiere_reunion:
-                        hippo_data = premiere_reunion["hippodrome"]
-                        infos["hippodrome"] = hippo_data.get("libelle", hippo_data.get("code", "Inconnu")).title()
-                    
-                    if "courses" in premiere_reunion and len(premiere_reunion["courses"]) > 0:
-                        premiere_course = premiere_reunion["courses"][0]
-                        discipline = premiere_course.get("discipline", {}).get("libelle", "NON SPÉCIFIÉE")
-                        infos["discipline"] = discipline.replace("_", " ").title()
-        return infos
-    except Exception:
-        return infos
+        pass
+    return infos
 
 # ==============================================================================
-# BASE HISTORIQUE COMPLÈTE (ASSEMBLÉE ET CORRIGÉE)
+# BASE HISTORIQUE
 # ==============================================================================
 HISTORIQUE_SGE_DATA = [
   {"id": "1", "arrivee": [11, 4, 15, 6, 12]}, {"id": "2", "arrivee": [8, 14, 5, 13, 2]},
@@ -153,33 +130,198 @@ HISTORIQUE_SGE_DATA = [
 ]
 
 # ==============================================================================
-# ROUTE PRINCIPALE : LIT LE VRAI FICHIER index.html (Thème sombre + Tirets auto)
+# PAGE D'ACCUEIL (HTML généré directement - Design identique à votre capture)
 # ==============================================================================
 @app.get("/", response_class=HTMLResponse)
 async def index():
     infos = recuperer_infos_pmu()
+    hippo = html.escape(infos["hippodrome"])
+    discipline = html.escape(infos["discipline"])
+    nom_course = html.escape(infos["nom_course"])
+    heure = html.escape(infos["heure"])
+    partants = html.escape(str(infos["partants"]))
+    distance = html.escape(str(infos["distance"]))
+    derniere_maj = html.escape(infos["derniere_maj"])
     
-    try:
-        # On lit le magnifique fichier index.html que nous avons déjà créé
-        with open("index.html", "r", encoding="utf-8") as f:
-            html_content = f.read()
+    return HTMLResponse(content=f"""<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PEGASUS IA - Analyse Quinté+</title>
+    <style>
+        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+        body {{
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0a0e1a;
+            background-image: url('Horse-racing-1.jpg');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            min-height: 100vh;
+            color: #e2e8f0;
+            padding: 20px;
+        }}
+        body::before {{
+            content: '';
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(10, 14, 26, 0.75);
+            z-index: 0;
+        }}
+        .container {{
+            position: relative;
+            z-index: 1;
+            max-width: 800px;
+            margin: 0 auto;
+            background: rgba(15, 23, 42, 0.92);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.6);
+            border: 1px solid rgba(245, 158, 11, 0.2);
+        }}
+        h1 {{ 
+            text-align: center; 
+            color: #f59e0b; 
+            font-size: 2.5em; 
+            margin-bottom: 10px;
+        }}
+        .subtitle {{ 
+            text-align: center; 
+            color: #94a3b8; 
+            margin-bottom: 30px; 
+            font-size: 1.1em; 
+        }}
+        .section {{
+            background: rgba(30, 41, 59, 0.7);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 25px;
+            border-left: 4px solid #f59e0b;
+        }}
+        .section h2 {{ 
+            color: #f59e0b; 
+            font-size: 1.3em; 
+            margin-top: 0; 
+            margin-bottom: 15px; 
+        }}
+        .info-grid {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+        }}
+        .info-item {{ 
+            background: rgba(15, 23, 42, 0.8);
+            padding: 15px; 
+            border-radius: 8px; 
+            text-align: center; 
+        }}
+        .info-item strong {{ 
+            display: block; 
+            color: #94a3b8; 
+            font-size: 0.8em; 
+            margin-bottom: 8px; 
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }}
+        .info-item .value {{ 
+            color: #ffffff; 
+            font-size: 1.3em; 
+            font-weight: bold; 
+        }}
+        .form-group {{ margin-top: 10px; }}
+        .form-group label {{ 
+            display: block; 
+            color: #f59e0b; 
+            font-weight: bold; 
+            margin-bottom: 10px; 
+            font-size: 1.1em; 
+        }}
+        .form-group input {{
+            width: 100%;
+            padding: 15px;
+            border-radius: 8px;
+            border: 2px solid #334155;
+            background: #0f172a;
+            color: white;
+            font-size: 1.4em;
+            text-align: center;
+            letter-spacing: 3px;
+            font-weight: bold;
+        }}
+        .form-group input:focus {{ outline: none; border-color: #f59e0b; }}
+        .btn-submit {{
+            width: 100%;
+            padding: 18px;
+            margin-top: 20px;
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.2em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }}
+        .btn-submit:hover {{ transform: translateY(-2px); }}
+        .footer {{ 
+            text-align: center; 
+            color: #64748b; 
+            font-size: 0.9em; 
+            margin-top: 30px; 
+            padding-top: 20px; 
+            border-top: 1px solid rgba(255,255,255,0.1); 
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏇 PEGASUS IA</h1>
+        <p class="subtitle">Votre assistant pronostic Quinté+ de nouvelle génération</p>
         
-        # On injecte les infos PMU dans le HTML pour qu'elles s'affichent dynamiquement
-        html_content = html_content.replace(
-            '<span class="value" id="race-hippo">EN ATTENTE</span>',
-            f'<span class="value" id="race-hippo">{html.escape(infos["hippodrome"])}</span>'
-        )
-        html_content = html_content.replace(
-            '<span class="value" id="race-details">-- (-- m)</span>',
-            f'<span class="value" id="race-details">{html.escape(infos["discipline"])} (-- m)</span>'
-        )
-        
-        return HTMLResponse(content=html_content)
-    except FileNotFoundError:
-        return HTMLResponse(content="<h1 style='color:red; text-align:center;'>Erreur : Le fichier index.html est introuvable à la racine du projet.</h1>")
+        <div class="section">
+            <h2>📅 1. Informations de la course du jour</h2>
+            <div class="info-grid">
+                <div class="info-item"><strong>Hippodrome</strong><div class="value">{hippo}</div></div>
+                <div class="info-item"><strong>Discipline</strong><div class="value">{discipline}</div></div>
+                <div class="info-item"><strong>Course</strong><div class="value">{nom_course}</div></div>
+                <div class="info-item"><strong>Heure</strong><div class="value">{heure}</div></div>
+                <div class="info-item"><strong>Partants</strong><div class="value">{partants}</div></div>
+                <div class="info-item"><strong>Distance</strong><div class="value">{distance} m</div></div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>📊 2. État du système Pegasus</h2>
+            <div class="info-grid">
+                <div class="info-item"><strong>Statut du robot</strong><div class="value" style="color:#10b981">✅ Actif</div></div>
+                <div class="info-item"><strong>Base de données</strong><div class="value">184 quintés</div></div>
+                <div class="info-item"><strong>Dernière analyse</strong><div class="value">{derniere_maj}</div></div>
+                <div class="info-item"><strong>Mise à jour PMU</strong><div class="value">{derniere_maj}</div></div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>🎯 3. Votre sélection de favoris</h2>
+            <form action="/analyser" method="POST">
+                <div class="form-group">
+                    <label for="chevaux">Entrez vos numéros (séparés par des espaces ou tirets) :</label>
+                    <input type="text" id="chevaux" name="chevaux" value="13 - 8 - 10 - 4" required autocomplete="off">
+                </div>
+                <button type="submit" class="btn-submit">🚀 Lancer l'analyse Pegasus</button>
+            </form>
+        </div>
+
+        <div class="footer">
+            <p>© 2026 Pegasus IA - Données en temps réel via API PMU</p>
+        </div>
+    </div>
+</body>
+</html>""")
 
 # ==============================================================================
-# ROUTE DE TRAITEMENT (Conservée pour compatibilité avec votre ancien système)
+# ROUTE D'ANALYSE
 # ==============================================================================
 @app.post("/analyser", response_class=HTMLResponse)
 async def analyser(chevaux: str = Form(...)):
@@ -194,31 +336,42 @@ async def analyser(chevaux: str = Form(...)):
     tous_les_gagnants = []
     for course in HISTORIQUE_SGE_DATA:
         tous_les_gagnants.extend(course["arrivee"])
-
     compteur = Counter(tous_les_gagnants)
     resultats_chevaux = [f"<li>Cheval <strong>#{num}</strong> : apparu {compteur.get(num, 0)} fois dans l'historique</li>" for num in numeros_saisis]
 
-    html_retour = f"""
-    <!DOCTYPE html>
-    <html lang="fr">
-    <head>
-        <meta charset="UTF-8">
-        <title>Résultats Analyse</title>
-        <style>
-            body {{ font-family: Arial, sans-serif; margin: 40px; background-color: #121212; color: #e0e0e0; }}
-            .container {{ max-width: 600px; background: #1e1e1e; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); margin: 0 auto; border: 1px solid #333; }}
-            h2 {{ color: #ff9800; }}
-            ul {{ padding-left: 20px; line-height: 1.8; }}
-            .btn-retour {{ display: inline-block; margin-top: 20px; background: #26a69a; color: white; text-decoration: none; padding: 10px 15px; border-radius: 6px; font-weight: bold; }}
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <h2>Statistiques de performance sur la sélection :</h2>
-            <ul>{"".join(resultats_chevaux)}</ul>
-            <a href="/" class="btn-retour">← Nouvelle analyse</a>
+    infos_pmu = recuperer_infos_pmu()
+    date_du_jour = _datetime.now().strftime("%d/%m/%Y")
+
+    return HTMLResponse(content=f"""<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Résultats Analyse</title>
+    <style>
+        body {{ font-family: Arial, sans-serif; margin: 40px; background-color: #121212; color: #e0e0e0; }}
+        .container {{ max-width: 600px; margin: 20px auto; background: #1e1e1e; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }}
+        h2 {{ color: #f59e0b; margin-top: 0; }}
+        ul {{ padding-left: 20px; line-height: 1.8; }}
+        .info-box {{ background: #2a2a2a; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #f59e0b; }}
+        .info-line {{ margin: 5px 0; font-size: 0.95em; }}
+        .info-line strong {{ color: #f59e0b; }}
+        .btn-retour {{ display: inline-block; margin-top: 20px; background: #10b981; color: white; text-decoration: none; padding: 10px 20px; border-radius: 6px; }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="info-box">
+            <h2>1. INFORMATIONS SUR LE QUINTÉ</h2>
+            <div class="info-line"><strong>Date :</strong> {date_du_jour}</div>
+            <div class="info-line"><strong>Hippodrome :</strong> {infos_pmu['hippodrome']}</div>
+            <div class="info-line"><strong>Discipline :</strong> {infos_pmu['discipline']}</div>
+            <div class="info-line"><strong>Course :</strong> {infos_pmu['nom_course']}</div>
+            <div class="info-line"><strong>Heure :</strong> {infos_pmu['heure']}</div>
+            <div class="info-line"><strong>Partants :</strong> {infos_pmu['partants']}</div>
         </div>
-    </body>
-    </html>
-    """
-    return HTMLResponse(content=html_retour)
+        <h2>Statistiques de performance sur la sélection :</h2>
+        <ul>{"".join(resultats_chevaux)}</ul>
+        <a href="/" class="btn-retour">« Nouvelle analyse</a>
+    </div>
+</body>
+</html>""")
