@@ -15,7 +15,7 @@ except ImportError:
 app = FastAPI()
 
 # ==============================================================================
-# RÉCUPÉRATION DES INFOS PMU
+# RÉCUPÉRATION DES INFOS PMU (CORRIGÉE : Lit le JSON local en priorité)
 # ==============================================================================
 def recuperer_infos_pmu():
     infos = {
@@ -26,6 +26,24 @@ def recuperer_infos_pmu():
         "partants": 0,
         "heure": "--:--"
     }
+    
+    # 1. PRIORITÉ : Lire le fichier quinte.json local
+    try:
+        with open("data/quinte.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+            course = data.get("course_du_jour", {})
+            if course:
+                infos["hippodrome"] = str(course.get("hippodrome", "Inconnu")).title()
+                infos["discipline"] = str(course.get("discipline", "Inconnue")).title()
+                infos["nom_course"] = str(course.get("course_nom", "Sans nom")).title()
+                infos["distance"] = course.get("distance", 0)
+                infos["partants"] = str(course.get("partants", 0))
+                infos["heure"] = str(course.get("heure", "--:--"))
+                return infos
+    except Exception:
+        pass
+
+    # 2. SECOURS : Appel API live
     if requests is None:
         return infos
     try:
@@ -60,13 +78,17 @@ def recuperer_infos_pmu():
     return infos
 
 # ==============================================================================
-# PAGE D'ACCUEIL (HTML GÉNÉRÉ DYNAMIQUEMENT PAR PYTHON)
+# PAGE D'ACCUEIL
 # ==============================================================================
 @app.get("/", response_class=HTMLResponse)
 async def index():
     infos = recuperer_infos_pmu()
     hippo = html.escape(infos["hippodrome"])
     discipline = html.escape(infos["discipline"])
+    nom_course = html.escape(infos["nom_course"])
+    heure = html.escape(infos["heure"])
+    partants = html.escape(str(infos["partants"]))
+    distance = html.escape(str(infos["distance"]))
     
     return HTMLResponse(content=f"""
 <!DOCTYPE html>
@@ -166,6 +188,22 @@ async def index():
                 <strong>Discipline :</strong> 
                 <span class="value">{discipline}</span>
             </div>
+            <div class="info-line">
+                <strong>Course :</strong> 
+                <span class="value">{nom_course}</span>
+            </div>
+            <div class="info-line">
+                <strong>Heure :</strong> 
+                <span class="value">{heure}</span>
+            </div>
+            <div class="info-line">
+                <strong>Partants :</strong> 
+                <span class="value">{partants}</span>
+            </div>
+            <div class="info-line">
+                <strong>Distance :</strong> 
+                <span class="value">{distance} m</span>
+            </div>
         </div>
 
         <div class="actions">
@@ -181,7 +219,7 @@ async def index():
 
         <div class="footer">
             <p>© 2026 Pegasus IA - Données en temps réel via API PMU</p>
-            <p style="margin-top: 5px; color: #888;"> Arrivée de la veille intégrée</p>
+            <p style="margin-top: 5px; color: #888;">📊 Arrivée de la veille intégrée</p>
         </div>
     </div>
 </body>
