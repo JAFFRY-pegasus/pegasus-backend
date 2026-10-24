@@ -257,8 +257,14 @@ async def index():
             <div class="info-field"><label>Nombre de partants déclarés :</label><input type="text" value="{partants}" readonly></div>
             <div class="info-field"><label>Heure de départ :</label><input type="text" value="{heure}" readonly></div>
         </div>
-        <div class="input-group"><label>Ajout manuel de vos favoris - de 5 à 8 chevaux - issus de la presse ou autre choix personnel :</label><input type="text" id="favoris-manuels" value="13 - 8 - 10 - 4 - 16 - 6 - 5 - 12" readonly></div>
-        <div class="input-group"><label>Inscrivez ici la combinaison de votre choix de 5 à 8 chevaux, elle générera automatiquement la combinaison optimisée de PEGASUS !</label><input type="text" id="saisie-combinaison" value="13 - 6 - 5 - 12 - 11"></div>
+        <div class="input-group">
+            <label>Ajout manuel de vos favoris - de 5 à 8 chevaux - issus de la presse ou autre choix personnel :</label>
+            <input type="text" id="favoris-manuels" value="13 - 8 - 10 - 4 - 16 - 6 - 5 - 12" placeholder="Ex: 13 - 8 - 10 - 4">
+        </div>
+        <div class="input-group">
+            <label>Inscrivez ici la combinaison de votre choix de 5 à 8 chevaux, elle générera automatiquement la combinaison optimisée de PEGASUS !</label>
+            <input type="text" id="saisie-combinaison" value="" placeholder="Tapez vos numéros (les tirets s'ajoutent automatiquement)">
+        </div>
         <button class="btn-submit" onclick="mettreAJour()">METTRE À JOUR & RECALCULER</button>
     </div>
     <div class="section">
@@ -286,16 +292,48 @@ async def index():
     </div>
     <script>
         let selectionGrille = [];
+        let curseurPosition = 0;
         
-        // Formatage automatique avec tirets
+        // Formatage automatique avec tirets pour les DEUX champs
+        function formaterAvecTirets(input) {{
+            // Sauvegarder la position du curseur
+            const pos = input.selectionStart;
+            const oldLength = input.value.length;
+            
+            // Récupérer uniquement les chiffres
+            const chiffres = input.value.replace(/[^0-9]/g, '');
+            
+            // Limiter à 8 numéros max
+            const nums = [];
+            let i = 0;
+            while (i < chiffres.length && nums.length < 8) {{
+                // Gérer les numéros à 2 chiffres (10-16)
+                if (i + 1 < chiffres.length && chiffres[i] === '1' && '0123456'.includes(chiffres[i+1])) {{
+                    nums.push(chiffres[i] + chiffres[i+1]);
+                    i += 2;
+                }} else {{
+                    nums.push(chiffres[i]);
+                    i++;
+                }}
+            }}
+            
+            // Formater avec " - "
+            const newValue = nums.join(' - ');
+            input.value = newValue;
+            
+            // Ajuster la position du curseur
+            const newLength = input.value.length;
+            const diff = newLength - oldLength;
+            input.setSelectionRange(pos + diff, pos + diff);
+        }}
+        
+        // Appliquer aux deux champs
+        document.getElementById('favoris-manuels').addEventListener('input', function(e) {{
+            formaterAvecTirets(e.target);
+        }});
+        
         document.getElementById('saisie-combinaison').addEventListener('input', function(e) {{
-            let value = e.target.value;
-            // Supprime tout ce qui n'est pas un chiffre ou un tiret
-            value = value.replace(/[^0-9-]/g, '');
-            // Sépare par les tirets et filtre les vides
-            let numbers = value.split('-').filter(n => n.trim() !== '');
-            // Formate avec des tirets entre les nombres
-            e.target.value = numbers.join(' - ');
+            formaterAvecTirets(e.target);
         }});
         
         function toggleGrille(num) {{
@@ -319,10 +357,18 @@ async def index():
         }}
         
         function mettreAJour() {{
-            const saisie = document.getElementById('saisie-combinaison').value;
             const favoris = document.getElementById('favoris-manuels').value;
-            alert('Mise à jour effectuée !\\n\\nFavoris : ' + favoris + '\\nCombinaison saisie : ' + saisie + '\\n\\nRecalcul en cours...');
-            // Ici vous pouvez ajouter la logique de recalcul
+            const combinaison = document.getElementById('saisie-combinaison').value;
+            
+            // Extraire les numéros de la combinaison
+            const nums = combinaison.split('-').map(n => n.trim()).filter(n => n !== '');
+            
+            if (nums.length < 5 || nums.length > 8) {{
+                alert('⚠️ Veuillez saisir entre 5 et 8 chevaux (actuellement : ' + nums.length + ')');
+                return;
+            }}
+            
+            alert('✅ Mise à jour effectuée !\\n\\nFavoris : ' + favoris + '\\nCombinaison : ' + combinaison + '\\n\\nRecalcul en cours...');
         }}
     </script>
 </body>
