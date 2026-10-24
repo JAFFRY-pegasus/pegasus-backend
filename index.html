@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PEGASUS - Analyse Quinté+</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            min-height: 100vh;
+            color: #e2e8f0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: rgba(30, 41, 59, 0.8);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        h1 { text-align: center; color: #f59e0b; font-size: 2.5em; margin-bottom: 10px; }
+        .subtitle { text-align: center; color: #94a3b8; margin-bottom: 30px; font-size: 1.1em; }
+        
+        .section {
+            background: rgba(15, 23, 42, 0.6);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 25px;
+            border-left: 4px solid #f59e0b;
+        }
+        .section h2 { color: #f59e0b; font-size: 1.3em; margin-bottom: 15px; }
+        
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+        }
+        .info-item { background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px; text-align: center; }
+        .info-item strong { display: block; color: #94a3b8; font-size: 0.85em; margin-bottom: 5px; }
+        .info-item .value { color: #ffffff; font-size: 1.2em; font-weight: bold; }
+        
+        .form-group { margin-top: 20px; }
+        .form-group label { display: block; color: #f59e0b; font-weight: bold; margin-bottom: 10px; font-size: 1.1em; }
+        .form-group input {
+            width: 100%;
+            padding: 15px;
+            border-radius: 10px;
+            border: 2px solid #334155;
+            background: #0f172a;
+            color: white;
+            font-size: 1.3em;
+            text-align: center;
+            letter-spacing: 2px;
+        }
+        .form-group input:focus { outline: none; border-color: #f59e0b; }
+        
+        .btn-submit {
+            width: 100%;
+            padding: 18px;
+            margin-top: 20px;
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.2em;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        
+        .actions { display: flex; gap: 10px; margin-bottom: 20px; }
+        .btn-action {
+            flex: 1; padding: 12px; border: none; border-radius: 8px;
+            font-weight: bold; cursor: pointer; text-align: center;
+            text-decoration: none; color: white;
+        }
+        .btn-refresh { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
+        .btn-robot { background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); }
+        
+        .db-status {
+            text-align: center;
+            color: #64748b;
+            font-size: 0.9em;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏇 PEGASUS IA</h1>
+        <p class="subtitle">Votre assistant pronostic Quinté+ de nouvelle génération</p>
+        
+        <div class="actions">
+            <a href="/" class="btn-action btn-refresh">🔄 Actualiser les données</a>
+            <a href="/" class="btn-action btn-robot">🤖 Relancer le robot</a>
+        </div>
+
+        <!-- SECTION 1 -->
+        <div class="section">
+            <h2>📅 1. Informations de la course du jour</h2>
+            <div class="info-grid">
+                <div class="info-item">
+                    <strong>Hippodrome</strong>
+                    <div class="value" id="race-hippo">EN ATTENTE</div>
+                </div>
+                <div class="info-item">
+                    <strong>Discipline</strong>
+                    <div class="value" id="race-details">-- (-- m)</div>
+                </div>
+                <div class="info-item">
+                    <strong>Partants</strong>
+                    <div class="value">15</div>
+                </div>
+                <div class="info-item">
+                    <strong>Heure</strong>
+                    <div class="value">15:15</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECTION 2 -->
+        <div class="section">
+            <h2>🎯 2. Votre sélection de favoris</h2>
+            <form action="/analyser" method="POST">
+                <div class="form-group">
+                    <label for="chevaux">Entrez vos numéros (séparés par des espaces ou tirets) :</label>
+                    <input type="text" id="chevaux" name="chevaux" value="13 - 8 - 10 - 4" required autocomplete="off">
+                </div>
+                <button type="submit" class="btn-submit"> Lancer l'analyse Pegasus</button>
+            </form>
+        </div>
+
+        <!-- SECTION 3 -->
+        <div class="section">
+            <h2>📊 3. État de la base de données</h2>
+            <div class="info-grid">
+                <div class="info-item">
+                    <strong>Quintés en mémoire</strong>
+                    <div class="value">184 quintés</div>
+                </div>
+                <div class="info-item">
+                    <strong>Dernière mise à jour PMU</strong>
+                    <div class="value">2026-10-24 07:59</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="db-status">
+            <p>© 2026 Pegasus IA - Données en temps réel via API PMU</p>
+        </div>
+    </div>
+    
+    <script>
+        document.querySelector('input[name="chevaux"]').addEventListener('input', function(e) {
+            this.value = this.value.replace(/,/g, ' - ');
+        });
+    </script>
+</body>
+</html>
