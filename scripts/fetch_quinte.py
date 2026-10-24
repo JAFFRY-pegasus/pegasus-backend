@@ -1,5 +1,6 @@
 """
-Script V6.3 : Détection Quinté+, Heure, Arrivée protégée + Favoris en saisie manuelle
+Script V6.4 : Détection Quinté+, Heure, Arrivée protégée + Favoris en saisie manuelle
+Correction : arrivée conservée UNIQUEMENT si même jour
 """
 import json
 import os
@@ -121,10 +122,11 @@ def charger_donnees_existantes():
 
 def main():
     date_jour = date.today()
-    print(f"[{datetime.now().isoformat()}] Démarrage PEGASUS V6.3...")
+    print(f"[{datetime.now().isoformat()}] Démarrage PEGASUS V6.4...")
     
     donnees_existantes = charger_donnees_existantes()
     arrivee_existante = donnees_existantes.get("course_du_jour", {}).get("arrivee") if donnees_existantes else None
+    date_existante = donnees_existantes.get("course_du_jour", {}).get("date", "") if donnees_existantes else ""
     
     date_trouvee, reunion_data, course_data = None, None, None
     
@@ -147,10 +149,14 @@ def main():
     participants = extraire_participants(course_data)
     arrivee = extraire_arrivee(course_data)
     
-    # 🛡️ Protection anti-perte
+    # 🛡️ Protection anti-perte : NE conserve l'arrivée que si c'est le MÊME JOUR
     if not arrivee and arrivee_existante:
-        arrivee = arrivee_existante
-        print(f"  [🛡️] Protection activée : conservation de l'arrivée existante")
+        if date_existante == format_date_iso(date_trouvee):
+            arrivee = arrivee_existante
+            print(f"  [🛡️] Protection activée : conservation de l'arrivée du jour même")
+        else:
+            print(f"  [🔄] Date changée ({date_existante} → {format_date_iso(date_trouvee)}), arrivée réinitialisée à []")
+            arrivee = []
     
     # ❌ PLUS DE RÉCUPÉRATION DES FAVORIS VIA API - Saisie manuelle côté site
     # favoris = recuperer_favoris(date_trouvee, num_reunion, num_course)
